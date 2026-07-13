@@ -1,50 +1,16 @@
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+# Virtual workspace root for the Dash0 OpenTelemetry Python distribution.
+#
+# The Dash0 distribution and the pure-Python (pyproto) OTLP exporter packages it
+# depends on live together as workspace members so the distribution resolves the
+# in-repo exporters instead of published ones. api/sdk/instrumentation still come
+# from PyPI.
 
-[project]
-name = "dash0-opentelemetry-distro"
-dynamic = ["version"]
-description = "Dash0 OpenTelemetry distribution for Python"
-readme = "README.rst"
-requires-python = ">=3.9"
-license = "Apache-2.0"
-authors = [{ name = "Dash0" }]
-classifiers = [
-  "Development Status :: 3 - Alpha",
-  "Intended Audience :: Developers",
-  "License :: OSI Approved :: Apache Software License",
-  "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.9",
-  "Programming Language :: Python :: 3.10",
-  "Programming Language :: Python :: 3.11",
-  "Programming Language :: Python :: 3.12",
-  "Programming Language :: Python :: 3.13",
-]
-dependencies = [
-  "opentelemetry-api ~= 1.12",
-  "opentelemetry-sdk ~= 1.12",
-  "opentelemetry-instrumentation",
-  # Pure-Python OTLP/HTTP exporter (no native dependencies). Currently lives in
-  # the pyproto branch of the OpenTelemetry Python fork and is not yet published,
-  # so this dependency is not resolvable from PyPI until it is released or
-  # vendored into the injected tree.
-  "opentelemetry-exporter-otlp-pyproto-http",
-]
+[tool.uv.workspace]
+members = ["packages/*"]
 
-[project.entry-points.opentelemetry_distro]
-dash0 = "dash0.opentelemetry.distro:Dash0Distro"
-
-[project.entry-points.opentelemetry_configurator]
-dash0 = "dash0.opentelemetry.configurator:Dash0Configurator"
-
-[dependency-groups]
-dev = [
-  "pytest >= 7.0",
-]
-
-[tool.hatch.version]
-path = "src/dash0/opentelemetry/version.py"
-
-[tool.hatch.build.targets.wheel]
-packages = ["src/dash0"]
+[tool.uv.sources]
+dash0-opentelemetry-distro = { workspace = true }
+opentelemetry-pyproto = { workspace = true }
+opentelemetry-exporter-otlp-pyproto-common = { workspace = true }
+opentelemetry-exporter-otlp-pyproto-http = { workspace = true }
+opentelemetry-exporter-otlp-pyproto-grpc = { workspace = true }

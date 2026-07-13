@@ -1,59 +1,54 @@
-========================
-Dash0 OpenTelemetry Distro
-========================
+============
+dash0_distro
+============
 
-Prototype of the Dash0 OpenTelemetry distribution for Python.
+Prototype monorepo for the Dash0 OpenTelemetry distribution for Python and the
+pure-Python OTLP exporter packages it builds on.
 
-A *distribution* ("distro") is a small package that OpenTelemetry
-auto-instrumentation discovers through entry points and uses to decide how a
-process is instrumented. This distribution is meant to be injected into customer
-processes (for example by the `OpenTelemetry injector
-<https://github.com/open-telemetry/opentelemetry-injector>`_), so it makes two
-choices that matter in that context.
+It is a `uv <https://docs.astral.sh/uv/>`_ workspace. Each directory under
+``packages/`` is an independent Python distribution; the workspace wires them
+together so the distribution resolves the in-repo exporters rather than published
+ones.
 
-What it provides
-================
+Packages
+========
 
-``Dash0Distro`` (``opentelemetry_distro`` entry point)
-    * Defaults all three signals to the pure-Python OTLP/HTTP exporter
-      (``otlp_proto_http``) with protocol ``http/protobuf``. Because the
-      pure-Python exporter has no native dependencies, it is safe to prepend to
-      an arbitrary process' ``PYTHONPATH`` without risking ABI or version
-      conflicts with the host application. Defaults are applied with
-      ``setdefault`` so configuration coming from the injector, the operator or
-      the user is never overridden.
-    * Overrides ``load_instrumentor`` to activate each instrumentor defensively:
-      a disabled instrumentor is skipped, and one that fails to load is logged
-      and skipped instead of aborting auto-instrumentation of the host process.
-      This override is also where fixed or forked instrumentors can be swapped in
-      ahead of an upstream release.
+``packages/dash0-opentelemetry-distro``
+    The Dash0 distribution: ``Dash0Distro`` (``opentelemetry_distro`` entry
+    point) and ``Dash0Configurator`` (``opentelemetry_configurator`` entry
+    point). Defaults every signal to the pure-Python OTLP/HTTP exporter and
+    activates instrumentors defensively. See the package README for details.
 
-``Dash0Configurator`` (``opentelemetry_configurator`` entry point)
-    Configures the OpenTelemetry SDK. It currently reuses the SDK configurator
-    unchanged and exists so the distribution owns a stable configurator symbol
-    (the upstream ``opentelemetry-distro`` package is intentionally not shipped)
-    and has a home for distribution-specific SDK defaults.
+``packages/opentelemetry-pyproto``
+    Pure-Python implementation of the OpenTelemetry protobuf messages, with no
+    native dependencies.
 
-Layout
+``packages/opentelemetry-exporter-otlp-pyproto-common``
+    Shared encoding logic for the pyproto exporters.
+
+``packages/opentelemetry-exporter-otlp-pyproto-http``
+    Pure-Python OTLP/HTTP exporter (stdlib ``urllib``, no native dependencies).
+    This is the exporter the distribution selects by default, and the reason a
+    Dash0 distribution can be injected into an arbitrary process' ``PYTHONPATH``
+    without risking native-dependency conflicts with the host application.
+
+``packages/opentelemetry-exporter-otlp-pyproto-grpc``
+    Pure-Python OTLP/gRPC exporter (depends on ``grpcio``).
+
+Why these live together
+=======================
+
+Injecting instrumentation into a process means loading these packages inside the
+host interpreter. A protobuf/grpc C extension there risks ABI and version
+conflicts with the host application, which is why upstream OpenTelemetry disables
+Python injection by default. The pyproto exporters remove native code entirely,
+so co-locating them with the distribution makes a self-contained, injection-safe
+distribution.
+
+Status
 ======
 
-::
-
-    src/dash0/opentelemetry/
-        distro.py          Dash0Distro
-        configurator.py    Dash0Configurator
-        version.py
-    tests/
-
-Status and open items
-======================
-
-This is a prototype. Notably:
-
-* ``opentelemetry-exporter-otlp-pyproto-http`` is not yet published to PyPI; it
-  currently lives in the ``pyproto`` branch of the OpenTelemetry Python fork. The
-  dependency is therefore not resolvable until that exporter is released or
-  vendored into the injected tree.
-* Packaging into the injector's per-``libc`` (``glibc``/``musl``) ``PYTHONPATH``
-  trees, the curated instrumentation pin set, and the integration/injection test
-  matrix are not implemented here yet.
+This is a prototype. The pyproto packages are vendored from the ``pyproto``
+branch of the OpenTelemetry Python fork. Not yet done here: the injector's
+per-``libc`` (``glibc``/``musl``) ``PYTHONPATH`` packaging, the curated
+instrumentation pin set, and the integration/injection test matrix.

@@ -1,14 +1,29 @@
 import os
 
-from opentelemetry.environment_variables import (
+import pytest
+
+from dash0.opentelemetry._environment_variables import (
+    DASH0_DISABLE,
+    DASH0_OTEL_COLLECTOR_BASE_URL,
+    OTEL_EXPORTER_OTLP_ENDPOINT,
+    OTEL_EXPORTER_OTLP_PROTOCOL,
     OTEL_LOGS_EXPORTER,
     OTEL_METRICS_EXPORTER,
+    OTEL_SDK_DISABLED,
     OTEL_TRACES_EXPORTER,
 )
-from opentelemetry.sdk.environment_variables import OTEL_EXPORTER_OTLP_PROTOCOL
-
-from dash0.opentelemetry import distro as distro_module
 from dash0.opentelemetry.distro import Dash0Distro
+
+_MANAGED_VARS = (
+    DASH0_DISABLE,
+    DASH0_OTEL_COLLECTOR_BASE_URL,
+    OTEL_TRACES_EXPORTER,
+    OTEL_METRICS_EXPORTER,
+    OTEL_LOGS_EXPORTER,
+    OTEL_EXPORTER_OTLP_PROTOCOL,
+    OTEL_EXPORTER_OTLP_ENDPOINT,
+    OTEL_SDK_DISABLED,
+)
 
 
 class _FakeEntryPoint:
@@ -20,14 +35,15 @@ class _FakeEntryPoint:
         return self._instrumentor_factory
 
 
-def test_configure_defaults_to_pyproto_http_for_all_signals(monkeypatch):
-    for variable in (
-        OTEL_TRACES_EXPORTER,
-        OTEL_METRICS_EXPORTER,
-        OTEL_LOGS_EXPORTER,
-        OTEL_EXPORTER_OTLP_PROTOCOL,
-    ):
+@pytest.fixture(autouse=True)
+def _clean_env(monkeypatch):
+    for variable in _MANAGED_VARS:
         monkeypatch.delenv(variable, raising=False)
+    monkeypatch.setenv("OTEL_RESOURCE_ATTRIBUTES", "")
+
+
+def test_configure_enabled_defaults_to_pyproto_http(monkeypatch):
+    monkeypatch.setenv(DASH0_OTEL_COLLECTOR_BASE_URL, "http://collector:4318")
 
     Dash0Distro().configure()
 
@@ -35,9 +51,11 @@ def test_configure_defaults_to_pyproto_http_for_all_signals(monkeypatch):
     assert os.environ[OTEL_METRICS_EXPORTER] == "otlp_proto_http"
     assert os.environ[OTEL_LOGS_EXPORTER] == "otlp_proto_http"
     assert os.environ[OTEL_EXPORTER_OTLP_PROTOCOL] == "http/protobuf"
+    assert os.environ[OTEL_EXPORTER_OTLP_ENDPOINT] == "http://collector:4318"
 
 
 def test_configure_does_not_override_explicit_configuration(monkeypatch):
+    monkeypatch.setenv(DASH0_OTEL_COLLECTOR_BASE_URL, "http://collector:4318")
     monkeypatch.setenv(OTEL_TRACES_EXPORTER, "console")
 
     Dash0Distro().configure()
@@ -45,23 +63,40 @@ def test_configure_does_not_override_explicit_configuration(monkeypatch):
     assert os.environ[OTEL_TRACES_EXPORTER] == "console"
 
 
-def test_load_instrumentor_skips_disabled(monkeypatch):
-    monkeypatch.setattr(
-        distro_module, "_DISABLED_INSTRUMENTORS", frozenset({"noisy"})
-    )
+def test_configure_disabled_by_flag(monkeypatch):
+    monkeypatch.setenv(DASH0_OTEL_COLLECTOR_BASE_URL, "http://collector:4318")
+    monkeypatch.setenv(DASH0_DISABLE, "true")
 
-    def _must_not_run():
-        raise AssertionError("disabled instrumentor was loaded")
+    Dash0Distro().configure()
 
-    Dash0Distro().load_instrumentor(_FakeEntryPoint("noisy", _must_not_run))
+    assert os.environ[OTEL_SDK_DISABLED] == "true"
+    assert OTEL_TRACES_EXPORTER not in os.environ
 
 
-def test_load_instrumentor_isolates_failures():
-    def _raise_on_load():
+def test_configure_disabled_when_no_collector_endpoint():
+    Dash0Distro().configure()
+
+    assert os.environ[OTEL_SDK_DISABLED] == "true"
+    assert OTEL_TRACES_EXPORTER not in os.environ
+
+
+def test_load_instrumentor_isolates_failures(monkeypatch):
+    monkeypatch.setenv(DASH0_OTEL_COLLECTOR_BASE_URL, "http://collector:4318")
+
+    def _raise_on_instantiation():
         raise RuntimeError("incompatible library version")
 
-    entry_point = _FakeEntryPoint("broken", _raise_on_load)
+    # Must not propagate: the auto-instrumentation loader re-raises generic
+    # exceptions, which would abort instrumentation of the whole process.
+    Dash0Distro().load_instrumentor(
+        _FakeEntryPoint("broken", _raise_on_instantiation)
+    )
 
-    # Must not propagate: a broken instrumentor may not abort auto-instrumentation
-    # of an injected process.
-    Dash0Distro().load_instrumentor(entry_point)
+
+def test_load_instrumentor_skips_when_disabled():
+    def _must_not_run():
+        raise AssertionError("instrumentor loaded while distribution disabled")
+
+    # Distribution is disabled (no collector endpoint) → load_instrumentor is a
+    # no-op and never touches the entry point.
+    Dash0Distro().load_instrumentor(_FakeEntryPoint("any", _must_not_run))

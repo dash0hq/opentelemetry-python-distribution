@@ -1,59 +1,77 @@
-========================
-Dash0 OpenTelemetry Distro
-========================
+==========================
+dash0-opentelemetry-distro
+==========================
 
-Prototype of the Dash0 OpenTelemetry distribution for Python.
+The Dash0 OpenTelemetry distribution for Python. It is the Python counterpart of
+the Dash0 Node.js distribution (``@dash0/opentelemetry``), adapted to Python's
+distro/configurator machinery, and is meant to be injected into a process (for
+example by the OpenTelemetry injector) with no code changes.
 
-A *distribution* ("distro") is a small package that OpenTelemetry
-auto-instrumentation discovers through entry points and uses to decide how a
-process is instrumented. This distribution is meant to be injected into customer
-processes (for example by the `OpenTelemetry injector
-<https://github.com/open-telemetry/opentelemetry-injector>`_), so it makes two
-choices that matter in that context.
+Entry points
+============
 
-What it provides
-================
+``Dash0Distro`` (``opentelemetry_distro``)
+    Runs first, before the configurator. It:
 
-``Dash0Distro`` (``opentelemetry_distro`` entry point)
+    * **Gates** the distribution: does nothing if ``DASH0_DISABLE=true`` or if
+      ``DASH0_OTEL_COLLECTOR_BASE_URL`` is unset (nowhere to send telemetry). In
+      either case it sets ``OTEL_SDK_DISABLED=true`` and skips instrumentation.
     * Defaults all three signals to the pure-Python OTLP/HTTP exporter
-      (``otlp_proto_http``) with protocol ``http/protobuf``. Because the
-      pure-Python exporter has no native dependencies, it is safe to prepend to
-      an arbitrary process' ``PYTHONPATH`` without risking ABI or version
-      conflicts with the host application. Defaults are applied with
-      ``setdefault`` so configuration coming from the injector, the operator or
-      the user is never overridden.
-    * Overrides ``load_instrumentor`` to activate each instrumentor defensively:
-      a disabled instrumentor is skipped, and one that fails to load is logged
-      and skipped instead of aborting auto-instrumentation of the host process.
-      This override is also where fixed or forked instrumentors can be swapped in
-      ahead of an upstream release.
+      (``otlp_proto_http``, ``http/protobuf``) and points
+      ``OTEL_EXPORTER_OTLP_ENDPOINT`` at ``DASH0_OTEL_COLLECTOR_BASE_URL``. The
+      pure-Python exporter has no native dependencies, which is what makes the
+      distribution safe to inject onto an arbitrary process' ``PYTHONPATH``.
+    * Injects detected **resource attributes** into ``OTEL_RESOURCE_ATTRIBUTES``/
+      ``OTEL_SERVICE_NAME`` (see below) so the SDK's Resource picks them up.
+    * Overrides ``load_instrumentor`` to activate each instrumentor
+      **defensively** — a disabled or failing instrumentor is skipped and logged
+      rather than aborting auto-instrumentation of the host process.
 
-``Dash0Configurator`` (``opentelemetry_configurator`` entry point)
-    Configures the OpenTelemetry SDK. It currently reuses the SDK configurator
-    unchanged and exists so the distribution owns a stable configurator symbol
-    (the upstream ``opentelemetry-distro`` package is intentionally not shipped)
-    and has a home for distribution-specific SDK defaults.
+``Dash0Configurator`` (``opentelemetry_configurator``)
+    Runs after the distro. Delegates to the standard OpenTelemetry SDK
+    configurator to build the providers/exporters/Resource from the environment,
+    then adds two behaviors from the Node.js distribution:
 
-Layout
+    * an optional **bootstrap span** emitted once at startup
+      (``DASH0_BOOTSTRAP_SPAN=<name>``);
+    * optional **graceful flush** on ``SIGTERM``/``SIGINT``
+      (``DASH0_FLUSH_ON_SIGTERM_SIGINT=true``) — normal-exit flushing is already
+      handled by the SDK's ``atexit`` provider shutdown.
+
+Resource detection
+==================
+
+Ported from the Node.js distribution's custom detectors:
+
+* **Kubernetes pod UID** (``k8s.pod.uid``): confirms it is running in Kubernetes
+  (via ``/etc/hosts``), then extracts the pod UID from cgroup v1
+  (``/proc/self/mountinfo``) or cgroup v2 (``/proc/self/cgroup``).
+* **Service-name fallback**: if ``OTEL_SERVICE_NAME`` / ``service.name`` are not
+  set (and ``DASH0_AUTOMATIC_SERVICE_NAME`` is not ``false``), derives a name
+  from the entrypoint script. (Node.js reads ``package.json``; Python has no
+  universal equivalent, so this is a best-effort analog.)
+* **Distribution attributes**: ``telemetry.distro.name=dash0-python`` and
+  ``telemetry.distro.version``.
+
+Existing attributes are never overridden.
+
+Environment variables
+=====================
+
+============================================  ====================================================
+Variable                                      Effect
+============================================  ====================================================
+``DASH0_OTEL_COLLECTOR_BASE_URL`` (required)  Collector base URL; also sets the OTLP endpoint.
+``DASH0_DISABLE``                             ``true`` disables the distribution entirely.
+``DASH0_AUTOMATIC_SERVICE_NAME``              ``false`` opts out of the service-name fallback.
+``DASH0_BOOTSTRAP_SPAN``                      Emit one span with this name at startup.
+``DASH0_FLUSH_ON_SIGTERM_SIGINT``             ``true`` flushes telemetry on SIGTERM/SIGINT.
+============================================  ====================================================
+
+Status
 ======
 
-::
-
-    src/dash0/opentelemetry/
-        distro.py          Dash0Distro
-        configurator.py    Dash0Configurator
-        version.py
-    tests/
-
-Status and open items
-======================
-
-This is a prototype. Notably:
-
-* ``opentelemetry-exporter-otlp-pyproto-http`` is not yet published to PyPI. It
-  is vendored into this repository as a workspace member under ``packages/`` and
-  resolved from there, so it is not consumable outside this workspace until the
-  exporter is released.
-* Packaging into the injector's per-``libc`` (``glibc``/``musl``) ``PYTHONPATH``
-  trees, the curated instrumentation pin set, and the integration/injection test
-  matrix are not implemented here yet.
+Prototype. The ``otlp_proto_http`` exporter is resolved from the in-repo pyproto
+workspace member (not yet on PyPI). Not yet done: the injector's per-``libc``
+packaging, the curated instrumentation pin set, and the integration/injection
+test matrix. Unit tests do not require a running collector.

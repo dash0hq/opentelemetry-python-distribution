@@ -1,0 +1,4 @@
+# Generated at runtime by the demo
+output/
+python-agent/
+uv.lock

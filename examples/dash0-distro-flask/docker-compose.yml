@@ -1,0 +1,103 @@
+services:
+
+  # ---------------------------------------------------------------------------
+  # Builds a virtual environment in ./python-agent/venv containing:
+  #   - the Dash0 distribution and the in-repo pure-Python (pyproto) OTLP
+  #     exporter packages, installed from ../../packages (mounted at /workspace)
+  #   - Flask + FlaskInstrumentor, so the distro's auto-instrumentation can
+  #     activate it
+  # A probe then fails the build unless google.protobuf is absent and the OTLP
+  # HTTP exporter resolves to the pure-Python implementation.
+  # ---------------------------------------------------------------------------
+  prepare-python-agent:
+    image: python:3.12-slim
+    volumes:
+      - ../..:/workspace:ro
+      - ./python-agent:/python-agent
+      - ./output:/output
+    command:
+      - sh
+      - -lc
+      - |
+        set -e
+        mkdir -p /output && chmod 0777 /output
+        rm -rf /python-agent/*
+        python -m venv /python-agent/venv
+        /python-agent/venv/bin/pip install --no-cache-dir \
+          /workspace/packages/opentelemetry-pyproto \
+          /workspace/packages/opentelemetry-exporter-otlp-pyproto-common \
+          /workspace/packages/opentelemetry-exporter-otlp-pyproto-http \
+          /workspace/packages/dash0-opentelemetry-distro \
+          flask \
+          requests \
+          opentelemetry-instrumentation-flask
+        # Fail the build unless serialization is the pure-Python pyproto
+        # implementation: google.protobuf must be absent and the OTLP HTTP
+        # exporter must resolve to opentelemetry.exporter.otlp._proto.http.
+        /python-agent/venv/bin/python -c "import importlib.util; assert importlib.util.find_spec('google') is None or importlib.util.find_spec('google.protobuf') is None, 'google.protobuf is installed — NOT pure-Python pyproto'; from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter; assert OTLPSpanExporter.__module__.startswith('opentelemetry.exporter.otlp._proto.http'), OTLPSpanExporter.__module__; print('pyproto verified: google.protobuf absent; exporter from', OTLPSpanExporter.__module__)"
+        chown -R $${SCRIPT_UID:-1000}:$${SCRIPT_GID:-1000} /python-agent
+        echo 'prepare-python-agent: done'
+
+  # ---------------------------------------------------------------------------
+  # Runs the Flask app under `opentelemetry-instrument`, which discovers and
+  # runs Dash0Distro (opentelemetry_distro entry point) + Dash0Configurator
+  # (opentelemetry_configurator entry point). The distro:
+  #   - is gated on DASH0_OTEL_COLLECTOR_BASE_URL and points the OTLP endpoint
+  #     at the collector,
+  #   - defaults all signals to the pyproto OTLP/HTTP exporter,
+  #   - auto-instruments Flask (excluding /items/42 via the standard
+  #     OTEL_PYTHON_FLASK_EXCLUDED_URLS variable).
+  # app.py itself has no OpenTelemetry imports.
+  # ---------------------------------------------------------------------------
+  app:
+    image: python:3.12-slim
+    working_dir: /app
+    volumes:
+      - .:/app
+      - ./python-agent:/python-agent
+    environment:
+      DASH0_OTEL_COLLECTOR_BASE_URL: http://collector:4318
+      OTEL_SERVICE_NAME: dash0-distro-flask-demo
+      OTEL_PYTHON_FLASK_EXCLUDED_URLS: "items/42"
+    ports:
+      - "5000:5000"
+    command:
+      - sh
+      - -lc
+      - /python-agent/venv/bin/opentelemetry-instrument /python-agent/venv/bin/python app.py
+    depends_on:
+      prepare-python-agent:
+        condition: service_completed_successfully
+      collector:
+        condition: service_started
+
+  # ---------------------------------------------------------------------------
+  # Sends a handful of requests so that Flask spans are generated.
+  # ---------------------------------------------------------------------------
+  traffic:
+    image: python:3.12-slim
+    working_dir: /app
+    volumes:
+      - .:/app
+    command:
+      - sh
+      - -lc
+      - pip install -q requests && python traffic.py
+    depends_on:
+      - app
+
+  # ---------------------------------------------------------------------------
+  # Receives OTLP HTTP from the app and writes each signal to a JSONL file
+  # under ./output/. Runs as the host user (SCRIPT_UID/SCRIPT_GID) so it can
+  # write into the bind-mounted output directory; falls back to 1000:1000.
+  # ---------------------------------------------------------------------------
+  collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    user: "${SCRIPT_UID:-1000}:${SCRIPT_GID:-1000}"
+    command: ["--config=/etc/otelcol/collector-config.yaml"]
+    volumes:
+      - ./collector-config.yaml:/etc/otelcol/collector-config.yaml
+      - ./output:/output
+    depends_on:
+      prepare-python-agent:
+        condition: service_completed_successfully

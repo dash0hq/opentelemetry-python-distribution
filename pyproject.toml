@@ -4,9 +4,13 @@
 # depends on live together as workspace members so the distribution resolves the
 # in-repo exporters instead of published ones. api/sdk/instrumentation still come
 # from PyPI.
+#
+# examples/ holds self-contained demos with their own Docker-built environments;
+# they are excluded so they are not treated as workspace members.
 
 [tool.uv.workspace]
 members = ["packages/*"]
+exclude = ["examples/*"]
 
 [tool.uv.sources]
 dash0-opentelemetry-distro = { workspace = true }

@@ -3,8 +3,10 @@
 #
 # Requires these environment variables on the collector container (supplied by
 # docker-compose.dash0.yml from your shell):
-#   DASH0_AUTH_TOKEN  - a Dash0 auth token (Settings -> Auth Tokens)
-#   DASH0_REGION      - your Dash0 region, e.g. us-west-2 or eu-west-1
+#   DASH0_ENDPOINT    - your org's OTLP/HTTP ingress URL, copied verbatim from
+#                       Dash0 -> Settings -> Endpoints -> OTLP via HTTP, e.g.
+#                       https://ingress.europe-west4.gcp.dash0.com
+#   DASH0_AUTH_TOKEN  - a Dash0 auth token (Settings -> Auth Tokens); starts auth_
 #   DASH0_DATASET     - the dataset name to route into (e.g. default)
 
 receivers:
@@ -24,7 +26,7 @@ exporters:
   file/logs:
     path: /output/logs.jsonl
   otlphttp/dash0:
-    endpoint: https://ingress.${env:DASH0_REGION}.aws.dash0.com
+    endpoint: ${env:DASH0_ENDPOINT}
     headers:
       Authorization: "Bearer ${env:DASH0_AUTH_TOKEN}"
       Dash0-Dataset: "${env:DASH0_DATASET}"

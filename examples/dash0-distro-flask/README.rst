@@ -71,28 +71,33 @@ to Dash0 and view it in the UI, overlay ``docker-compose.dash0.yml``, which
 reconfigures the collector to export to Dash0's OTLP ingress **in addition to**
 the local files. The app is unchanged.
 
-1. In Dash0, create an auth token under **Settings → Auth Tokens**, and note
-   your **region** (the ``<REGION>`` in ``ingress.<REGION>.aws.dash0.com``,
-   e.g. ``us-west-2`` or ``eu-west-1``) and the **dataset** you want the data
-   to land in (``default`` is fine).
+1. In Dash0, open **Settings → Endpoints → OTLP via HTTP** and copy the
+   **Endpoint** value verbatim — it already encodes your region and cloud, e.g.
+   ``https://ingress.europe-west4.gcp.dash0.com`` (GCP) or
+   ``https://ingress.us-west-2.aws.dash0.com`` (AWS). Do **not** hand-assemble
+   this host; copy it, because the cloud (``gcp``/``aws``) and region differ per
+   organization.
 
-2. Export the credentials and run with both compose files:
+2. In **Settings → Auth Tokens**, create a token (its value starts with
+   ``auth_``). Pick the **dataset** you want the data to land in (``default`` is
+   fine).
+
+3. Export the values and run with both compose files:
 
    .. code-block:: bash
 
        cd examples/dash0-distro-flask
        export SCRIPT_UID=$(id -u) SCRIPT_GID=$(id -g)
+       export DASH0_ENDPOINT=https://ingress.europe-west4.gcp.dash0.com  # your copied endpoint
        export DASH0_AUTH_TOKEN=auth_xxxxxxxxxxxxxxxx
-       export DASH0_REGION=us-west-2
        export DASH0_DATASET=default
        docker compose -f docker-compose.yml -f docker-compose.dash0.yml up
 
    The collector receives OTLP/HTTP from the app and forwards it to
-   ``https://ingress.$DASH0_REGION.aws.dash0.com`` with
-   ``Authorization: Bearer $DASH0_AUTH_TOKEN`` and ``Dash0-Dataset:
-   $DASH0_DATASET``.
+   ``$DASH0_ENDPOINT`` with ``Authorization: Bearer $DASH0_AUTH_TOKEN`` and
+   ``Dash0-Dataset: $DASH0_DATASET``.
 
-3. In the Dash0 UI, open **Tracing** and filter by
+4. In the Dash0 UI, open **Tracing** and filter by
    ``service.name = dash0-distro-flask-demo`` (make sure the dataset selector
    matches ``$DASH0_DATASET``). You should see ``GET /`` and
    ``GET /items/<int:item_id>`` spans — and **no** span for ``/items/42``
@@ -102,12 +107,14 @@ the local files. The app is unchanged.
 
 **Debugging:** because the collector still writes ``output/*.jsonl`` locally,
 you can tell where a problem is — if the JSONL files have data but Dash0 is
-empty, it is a credentials/region/network issue (check
-``docker compose logs collector`` for export errors); if the JSONL files are
-empty, the app never produced telemetry.
+empty, it is a credentials/endpoint issue (check ``docker compose logs
+collector`` for export errors). A ``401 invalid authentication token`` almost
+always means the endpoint's region/cloud does not match the token's
+organization — recheck ``DASH0_ENDPOINT`` against **Settings → Endpoints**. If
+the JSONL files are empty, the app never produced telemetry.
 
-Sending straight from the app (no collector) is also possible: point
-``DASH0_OTEL_COLLECTOR_BASE_URL`` at the Dash0 ingress and set
+Sending straight from the app (no collector) is also possible: set
+``DASH0_OTEL_COLLECTOR_BASE_URL`` to the Dash0 endpoint and
 ``OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer <token>,Dash0-Dataset=<ds>"``
 on the ``app`` service. The collector overlay is recommended because it keeps
 the local JSONL for debugging and handles batching/retries.

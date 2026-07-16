@@ -1,0 +1,45 @@
+# Collector config that writes telemetry to local JSONL files (for debugging)
+# AND forwards it to Dash0. Selected by docker-compose.dash0.yml.
+#
+# Requires these environment variables on the collector container (supplied by
+# docker-compose.dash0.yml from your shell):
+#   DASH0_AUTH_TOKEN  - a Dash0 auth token (Settings -> Auth Tokens)
+#   DASH0_REGION      - your Dash0 region, e.g. us-west-2 or eu-west-1
+#   DASH0_DATASET     - the dataset name to route into (e.g. default)
+
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch: {}
+
+exporters:
+  file/traces:
+    path: /output/traces.jsonl
+  file/metrics:
+    path: /output/metrics.jsonl
+  file/logs:
+    path: /output/logs.jsonl
+  otlphttp/dash0:
+    endpoint: https://ingress.${env:DASH0_REGION}.aws.dash0.com
+    headers:
+      Authorization: "Bearer ${env:DASH0_AUTH_TOKEN}"
+      Dash0-Dataset: "${env:DASH0_DATASET}"
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [file/traces, otlphttp/dash0]
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [file/metrics, otlphttp/dash0]
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [file/logs, otlphttp/dash0]

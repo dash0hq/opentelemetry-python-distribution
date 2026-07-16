@@ -1,0 +1,22 @@
+# Overlay that forwards the demo's telemetry to Dash0 in addition to writing
+# local JSONL. Use together with the base compose file:
+#
+#   export DASH0_AUTH_TOKEN=auth_...      # Settings -> Auth Tokens in Dash0
+#   export DASH0_REGION=us-west-2         # your Dash0 region
+#   export DASH0_DATASET=default          # target dataset
+#   export SCRIPT_UID=$(id -u) SCRIPT_GID=$(id -g)
+#   docker compose -f docker-compose.yml -f docker-compose.dash0.yml up
+#
+# The app is unchanged; only the collector is reconfigured to also export to
+# Dash0's OTLP ingress.
+
+services:
+  collector:
+    command: ["--config=/etc/otelcol/collector-config-dash0.yaml"]
+    environment:
+      DASH0_AUTH_TOKEN: ${DASH0_AUTH_TOKEN:?export DASH0_AUTH_TOKEN with a Dash0 auth token}
+      DASH0_REGION: ${DASH0_REGION:?export DASH0_REGION, e.g. us-west-2 or eu-west-1}
+      DASH0_DATASET: ${DASH0_DATASET:-default}
+    volumes:
+      - ./collector-config-dash0.yaml:/etc/otelcol/collector-config-dash0.yaml
+      - ./output:/output

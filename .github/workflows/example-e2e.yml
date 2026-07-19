@@ -1,0 +1,27 @@
+name: Example E2E
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - "examples/**"
+      - "packages/**"
+      - ".github/workflows/example-e2e.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  flask-demo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Run the dash0-distro-flask demo end to end (local collector, JSONL)
+        working-directory: examples/dash0-distro-flask
+        run: uv run --project . pytest tests/ -v

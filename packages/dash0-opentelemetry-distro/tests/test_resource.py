@@ -1,7 +1,6 @@
 import os
 
 import pytest
-
 from dash0.opentelemetry import resource as resource_module
 from dash0.opentelemetry._environment_variables import (
     DASH0_AUTOMATIC_SERVICE_NAME,
@@ -86,9 +85,7 @@ def test_apply_respects_service_name_opt_out(monkeypatch):
 
 
 def test_merge_does_not_override_existing_attribute(monkeypatch):
-    monkeypatch.setenv(
-        OTEL_RESOURCE_ATTRIBUTES, "telemetry.distro.name=custom"
-    )
+    monkeypatch.setenv(OTEL_RESOURCE_ATTRIBUTES, "telemetry.distro.name=custom")
     monkeypatch.setattr(resource_module.sys, "argv", ["server.py"])
 
     apply_detected_resource_attributes("9.9.9")

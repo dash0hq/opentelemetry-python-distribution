@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Ruff lint
+        run: uvx ruff@latest check packages/dash0-opentelemetry-distro examples
+      - name: Ruff format check
+        run: uvx ruff@latest format --check packages/dash0-opentelemetry-distro examples
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          python-version: ${{ matrix.python-version }}
+      - name: Run distribution unit tests
+        run: >
+          uv run --package dash0-opentelemetry-distro
+          --python ${{ matrix.python-version }}
+          python -m pytest packages/dash0-opentelemetry-distro/tests -v
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Build every workspace package (packaging smoke test)
+        run: |
+          set -euo pipefail
+          for name in \
+            opentelemetry-pyproto \
+            opentelemetry-exporter-otlp-pyproto-common \
+            opentelemetry-exporter-otlp-pyproto-http \
+            opentelemetry-exporter-otlp-pyproto-grpc \
+            dash0-opentelemetry-distro; do
+            echo "::group::build $name"
+            uv build --package "$name" --out-dir dist
+            echo "::endgroup::"
+          done
+          ls -l dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/

@@ -1,4 +1,5 @@
 """Sends a few requests to the Flask app to generate trace data."""
+
 import time
 
 import requests

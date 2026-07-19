@@ -1,7 +1,6 @@
 import os
 
 import pytest
-
 from dash0.opentelemetry._environment_variables import (
     DASH0_DISABLE,
     DASH0_OTEL_COLLECTOR_BASE_URL,
@@ -88,9 +87,7 @@ def test_load_instrumentor_isolates_failures(monkeypatch):
 
     # Must not propagate: the auto-instrumentation loader re-raises generic
     # exceptions, which would abort instrumentation of the whole process.
-    Dash0Distro().load_instrumentor(
-        _FakeEntryPoint("broken", _raise_on_instantiation)
-    )
+    Dash0Distro().load_instrumentor(_FakeEntryPoint("broken", _raise_on_instantiation))
 
 
 def test_load_instrumentor_skips_when_disabled():

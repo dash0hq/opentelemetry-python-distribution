@@ -7,7 +7,7 @@ name = "dash0-opentelemetry-distro"
 dynamic = ["version"]
 description = "Dash0 OpenTelemetry distribution for Python"
 readme = "README.rst"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = "Apache-2.0"
 authors = [{ name = "Dash0" }]
 classifiers = [

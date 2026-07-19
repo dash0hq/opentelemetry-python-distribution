@@ -131,14 +131,10 @@ def detect_fallback_service_name():
 def _merge_into_resource_attributes(attributes):
     existing = environ.get(OTEL_RESOURCE_ATTRIBUTES, "")
     present_keys = {
-        pair.partition("=")[0].strip()
-        for pair in existing.split(",")
-        if pair.strip()
+        pair.partition("=")[0].strip() for pair in existing.split(",") if pair.strip()
     }
     additions = [
-        f"{key}={value}"
-        for key, value in attributes.items()
-        if key not in present_keys
+        f"{key}={value}" for key, value in attributes.items() if key not in present_keys
     ]
     if not additions:
         return

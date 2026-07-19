@@ -1,5 +1,4 @@
 import pytest
-
 from dash0.opentelemetry._environment_variables import (
     DASH0_DISABLE,
     DASH0_OTEL_COLLECTOR_BASE_URL,
@@ -14,16 +13,30 @@ def _clean_env(monkeypatch):
 
 
 @pytest.mark.parametrize(
-    "value,expected", [("true", True), ("TRUE", True), (" True ", True),
-                        ("false", False), ("", False), (None, False)]
+    "value,expected",
+    [
+        ("true", True),
+        ("TRUE", True),
+        (" True ", True),
+        ("false", False),
+        ("", False),
+        (None, False),
+    ],
 )
 def test_is_true(value, expected):
     assert is_true(value) is expected
 
 
 @pytest.mark.parametrize(
-    "value,expected", [("false", True), ("FALSE", True), (" False ", True),
-                       ("true", False), ("", False), (None, False)]
+    "value,expected",
+    [
+        ("false", True),
+        ("FALSE", True),
+        (" False ", True),
+        ("true", False),
+        ("", False),
+        (None, False),
+    ],
 )
 def test_is_false(value, expected):
     assert is_false(value) is expected

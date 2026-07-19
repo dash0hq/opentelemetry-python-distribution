@@ -49,6 +49,7 @@ class Dash0Configurator(_OTelSDKConfigurator):
             ).end()
 
         if is_true(environ.get(DASH0_FLUSH_ON_SIGTERM_SIGINT)):
+
             def _flush_and_reraise(signum, _frame):
                 for provider in (
                     trace.get_tracer_provider(),
@@ -60,9 +61,7 @@ class Dash0Configurator(_OTelSDKConfigurator):
                         try:
                             shutdown()
                         except Exception:  # pylint: disable=broad-except
-                            _logger.exception(
-                                "dash0: error shutting down %s", provider
-                            )
+                            _logger.exception("dash0: error shutting down %s", provider)
                 # Restore the default disposition and re-raise so the process
                 # terminates with the expected exit semantics.
                 signal.signal(signum, signal.SIG_DFL)

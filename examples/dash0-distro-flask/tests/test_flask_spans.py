@@ -86,7 +86,8 @@ class TestFlaskSpans:
     def test_items_route_traced(self, output_dir):
         spans = _load_spans(join(output_dir, "traces.jsonl"))
         item_spans = [
-            span for span in spans
+            span
+            for span in spans
             if "items" in span.get("name", "").lower()
             or _attr(span, "http.route") in ("/items/<int:item_id>", "/items/<item_id>")
         ]
@@ -101,7 +102,8 @@ class TestFlaskSpans:
         /items/42 request must produce no span even though the app serves it."""
         spans = _load_spans(join(output_dir, "traces.jsonl"))
         excluded = [
-            span for span in spans
+            span
+            for span in spans
             if (_attr(span, "url.path") or _attr(span, "http.target")) == "/items/42"
         ]
         assert not excluded, (

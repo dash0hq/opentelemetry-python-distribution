@@ -1,0 +1,68 @@
+name: Release
+
+# Publishes every workspace package to a Python index.
+#
+# Prerequisites (one-time, by an org/PyPI admin) are documented in RELEASING.rst:
+#   - the PyPI (and TestPyPI) projects must exist,
+#   - each must have a Trusted Publisher configured for this repository and the
+#     `pypi` / `testpypi` GitHub Environments used below.
+#
+# Trigger:
+#   - publishing a GitHub Release  -> publishes to PyPI,
+#   - manual run (workflow_dispatch) -> publishes to TestPyPI by default.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      index:
+        description: Index to publish to
+        type: choice
+        default: testpypi
+        options: [testpypi, pypi]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Build all workspace packages
+        run: |
+          set -euo pipefail
+          for name in \
+            opentelemetry-pyproto \
+            opentelemetry-exporter-otlp-pyproto-common \
+            opentelemetry-exporter-otlp-pyproto-http \
+            opentelemetry-exporter-otlp-pyproto-grpc \
+            dash0-opentelemetry-distro; do
+            uv build --package "$name" --out-dir dist
+          done
+          ls -l dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    # For a GitHub Release, publish to PyPI; for a manual run, use the chosen input.
+    environment: ${{ (github.event_name == 'release' || inputs.index == 'pypi') && 'pypi' || 'testpypi' }}
+    permissions:
+      id-token: write  # OIDC, for PyPI Trusted Publishing (no API token needed)
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - name: Publish
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: >-
+            ${{ (github.event_name == 'release' || inputs.index == 'pypi')
+                && 'https://upload.pypi.org/legacy/'
+                || 'https://test.pypi.org/legacy/' }}

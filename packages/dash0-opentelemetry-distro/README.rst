@@ -61,7 +61,9 @@ Dependency policy
 The distribution ships a curated set of upstream OpenTelemetry packages, pinned
 exactly in its ``pyproject.toml``: each release is validated against precisely
 those versions, and the code assumes them. Version bumps are deliberate,
-standalone changes.
+standalone changes. CI enforces the policy via
+``scripts/check_pinned_dependencies.py`` (in-repo workspace members are exempt,
+as their version is fixed by the checkout).
 
 Environment variables
 =====================

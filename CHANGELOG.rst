@@ -28,3 +28,8 @@ Added
   0.64b0): it ships a curated, validated set of versions rather than a range,
   and CI now fails if a non-exact constraint is reintroduced
   (`#7 <https://github.com/dash0hq/opentelemetry-python-distribution/issues/7>`_).
+- ``declarative-config`` extra installing the dependencies for declarative
+  (file-based) configuration via ``OTEL_CONFIG_FILE``; when they are missing,
+  the configurator now logs one actionable error naming the package to install
+  instead of failing with a traceback and silently sending no telemetry
+  (`#5 <https://github.com/dash0hq/opentelemetry-python-distribution/issues/5>`_).

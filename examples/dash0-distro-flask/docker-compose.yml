@@ -6,8 +6,11 @@ services:
   #     exporter packages, installed from ../../packages (mounted at /workspace)
   #   - Flask + FlaskInstrumentor, so the distro's auto-instrumentation can
   #     activate it
-  # A probe then fails the build unless google.protobuf is absent and the OTLP
-  # HTTP exporter resolves to the pure-Python implementation.
+  # A probe (verify_pyproto.py) then fails the build unless the agent packages
+  # are pure-Python pyproto: none of them may require or import grpcio or
+  # google.protobuf. Their mere presence in the environment is not checked —
+  # the application the distribution is injected into may legitimately depend
+  # on them.
   # ---------------------------------------------------------------------------
   prepare-python-agent:
     image: python:3.12-slim
@@ -32,11 +35,14 @@ services:
           flask \
           requests \
           opentelemetry-instrumentation-flask
-        # Fail the build unless everything is the pure-Python pyproto
-        # implementation: google.protobuf and grpcio must be absent, and the
-        # OTLP HTTP and gRPC exporters must resolve to
-        # opentelemetry.exporter.otlp._proto.{http,grpc}.
-        /python-agent/venv/bin/python -c "import importlib.util; assert importlib.util.find_spec('google') is None or importlib.util.find_spec('google.protobuf') is None, 'google.protobuf is installed — NOT pure-Python pyproto'; assert importlib.util.find_spec('grpc') is None, 'grpcio is installed — NOT pure-Python pyproto'; from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter; assert OTLPSpanExporter.__module__.startswith('opentelemetry.exporter.otlp._proto.http'), OTLPSpanExporter.__module__; from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter as GrpcSpanExporter; assert GrpcSpanExporter.__module__.startswith('opentelemetry.exporter.otlp._proto.grpc'), GrpcSpanExporter.__module__; print('pyproto verified: google.protobuf and grpcio absent; exporters from', OTLPSpanExporter.__module__, 'and', GrpcSpanExporter.__module__)"
+        # Fail the build unless the agent packages are pure-Python pyproto:
+        # none of them may require grpcio/protobuf (transitively), the OTLP
+        # HTTP and gRPC exporters must resolve to
+        # opentelemetry.exporter.otlp._proto.{http,grpc}, and importing them
+        # must not import grpc or google.protobuf. Presence of grpcio/protobuf
+        # in the environment is deliberately NOT checked: the instrumented
+        # application may depend on them for its own purposes.
+        /python-agent/venv/bin/python /workspace/examples/dash0-distro-flask/verify_pyproto.py
         chown -R $${SCRIPT_UID:-1000}:$${SCRIPT_GID:-1000} /python-agent
         echo 'prepare-python-agent: done'
 

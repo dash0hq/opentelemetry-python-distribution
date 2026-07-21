@@ -5,9 +5,16 @@ grpcio or google.protobuf as application dependencies, so their mere presence
 proves nothing and must not fail the build. What must hold, and what this
 probe checks, is that:
 
-1. no agent package requires grpcio or protobuf, directly or transitively;
+1. every package the agent pulls in, transitively, is either an
+   ``opentelemetry-*`` package or one of a small, explicitly allowed set of
+   pure-Python support libraries;
 2. the OTLP exporter modules resolve to the pure-Python implementations;
 3. importing those exporters imports neither grpc nor google.protobuf.
+
+Check 1 is an allowlist, not a denylist of known-native packages: anything the
+agent starts requiring that is not vetted here - grpcio and protobuf included,
+but also anything new a version bump might drag in - fails the build until a
+human decides it belongs.
 """
 
 import re
@@ -21,7 +28,12 @@ AGENT_PACKAGES = (
     "opentelemetry-exporter-otlp-pyproto-grpc",
     "dash0-opentelemetry-distro",
 )
-FORBIDDEN_REQUIREMENTS = ("protobuf", "grpcio")
+# The non-opentelemetry-* packages the agent is allowed to pull in transitively.
+# These are the pure-Python support libraries of opentelemetry-api/sdk/
+# instrumentation (no compiled extensions). Everything else - including grpcio
+# and protobuf - is rejected. Keep this list in sync when bumping the pinned
+# opentelemetry versions in dash0-opentelemetry-distro's pyproject.toml.
+ALLOWED_NON_OTEL_REQUIREMENTS = ("packaging", "typing-extensions", "wrapt")
 FORBIDDEN_MODULES = ("grpc", "google.protobuf")
 
 
@@ -30,7 +42,7 @@ def _requirement_name(requirement):
 
 
 def check_requirements():
-    """Walk the agent packages' transitive requirements."""
+    """Walk the agent packages' transitive requirements against the allowlist."""
     seen = set()
     queue = list(AGENT_PACKAGES)
     while queue:
@@ -48,8 +60,13 @@ def check_requirements():
             if "extra ==" in requirement:
                 continue
             name = _requirement_name(requirement)
-            assert name not in FORBIDDEN_REQUIREMENTS, (
-                f"{package} requires {name} - NOT pure-Python pyproto"
+            assert (
+                name.startswith("opentelemetry-")
+                or name in ALLOWED_NON_OTEL_REQUIREMENTS
+            ), (
+                f"{package} requires {name}, which is neither an "
+                f"opentelemetry-* package nor an explicitly allowed "
+                f"pure-Python dependency - NOT pure-Python pyproto"
             )
             queue.append(name)
 
@@ -81,7 +98,8 @@ def check_exporters():
 check_requirements()
 http_exporter, grpc_exporter = check_exporters()
 print(
-    "pyproto verified: no grpcio/protobuf requirement or import; exporters from",
+    "pyproto verified: every requirement is opentelemetry-* or an allowed "
+    "pure-Python library, no grpc/protobuf import; exporters from",
     http_exporter.__module__,
     "and",
     grpc_exporter.__module__,

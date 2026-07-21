@@ -7,10 +7,12 @@ services:
   #   - Flask + FlaskInstrumentor, so the distro's auto-instrumentation can
   #     activate it
   # A probe (verify_pyproto.py) then fails the build unless the agent packages
-  # are pure-Python pyproto: none of them may require or import grpcio or
-  # google.protobuf. Their mere presence in the environment is not checked —
-  # the application the distribution is injected into may legitimately depend
-  # on them.
+  # are pure-Python pyproto: every package they pull in transitively must be an
+  # opentelemetry-* package or an explicitly allowed pure-Python library (so
+  # grpcio/protobuf, and anything else unvetted, is rejected), and importing
+  # the exporters must not import grpc or google.protobuf. Their mere presence
+  # in the environment is not checked — the application the distribution is
+  # injected into may legitimately depend on them.
   # ---------------------------------------------------------------------------
   prepare-python-agent:
     image: python:3.12-slim
@@ -36,12 +38,14 @@ services:
           requests \
           opentelemetry-instrumentation-flask
         # Fail the build unless the agent packages are pure-Python pyproto:
-        # none of them may require grpcio/protobuf (transitively), the OTLP
-        # HTTP and gRPC exporters must resolve to
-        # opentelemetry.exporter.otlp._proto.{http,grpc}, and importing them
-        # must not import grpc or google.protobuf. Presence of grpcio/protobuf
-        # in the environment is deliberately NOT checked: the instrumented
-        # application may depend on them for its own purposes.
+        # everything they require transitively must be an opentelemetry-*
+        # package or an explicitly allowed pure-Python library (grpcio/protobuf
+        # and anything else unvetted is rejected), the OTLP HTTP and gRPC
+        # exporters must resolve to opentelemetry.exporter.otlp._proto.{http,
+        # grpc}, and importing them must not import grpc or google.protobuf.
+        # Presence of grpcio/protobuf in the environment is deliberately NOT
+        # checked: the instrumented application may depend on them for its own
+        # purposes.
         /python-agent/venv/bin/python /workspace/examples/dash0-distro-flask/verify_pyproto.py
         chown -R $${SCRIPT_UID:-1000}:$${SCRIPT_GID:-1000} /python-agent
         echo 'prepare-python-agent: done'

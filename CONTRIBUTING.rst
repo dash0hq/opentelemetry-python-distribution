@@ -19,9 +19,11 @@ Project layout
   and ``Dash0Configurator`` plus resource detection and settings. **This is the
   Dash0-authored code.**
 - ``packages/opentelemetry-*`` — the pure-Python (pyproto) OTLP exporter
-  packages, vendored from the ``pyproto`` branch of the OpenTelemetry Python
-  fork. Treat these as vendored: keep them close to upstream and do not apply
-  local style changes (they are excluded from linting).
+  packages, vendored from ``packaging/common/python/vendor`` in
+  `open-telemetry/opentelemetry-packaging
+  <https://github.com/open-telemetry/opentelemetry-packaging>`_. Treat these as
+  vendored: keep them close to upstream and do not apply local style changes
+  (they are excluded from linting).
 - ``examples/`` — self-contained demos with their own Docker environments;
   excluded from the workspace.
 

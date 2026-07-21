@@ -5,7 +5,10 @@ from dash0.opentelemetry._environment_variables import (
     DASH0_DISABLE,
     DASH0_OTEL_COLLECTOR_BASE_URL,
     OTEL_EXPORTER_OTLP_ENDPOINT,
+    OTEL_EXPORTER_OTLP_LOGS_PROTOCOL,
+    OTEL_EXPORTER_OTLP_METRICS_PROTOCOL,
     OTEL_EXPORTER_OTLP_PROTOCOL,
+    OTEL_EXPORTER_OTLP_TRACES_PROTOCOL,
     OTEL_LOGS_EXPORTER,
     OTEL_METRICS_EXPORTER,
     OTEL_SDK_DISABLED,
@@ -20,6 +23,9 @@ _MANAGED_VARS = (
     OTEL_METRICS_EXPORTER,
     OTEL_LOGS_EXPORTER,
     OTEL_EXPORTER_OTLP_PROTOCOL,
+    OTEL_EXPORTER_OTLP_TRACES_PROTOCOL,
+    OTEL_EXPORTER_OTLP_METRICS_PROTOCOL,
+    OTEL_EXPORTER_OTLP_LOGS_PROTOCOL,
     OTEL_EXPORTER_OTLP_ENDPOINT,
     OTEL_SDK_DISABLED,
 )
@@ -51,6 +57,40 @@ def test_configure_enabled_defaults_to_pyproto_http(monkeypatch):
     assert os.environ[OTEL_LOGS_EXPORTER] == "otlp_proto_http"
     assert os.environ[OTEL_EXPORTER_OTLP_PROTOCOL] == "http/protobuf"
     assert os.environ[OTEL_EXPORTER_OTLP_ENDPOINT] == "http://collector:4318"
+
+
+def test_configure_selects_pyproto_grpc_for_grpc_protocol(monkeypatch):
+    monkeypatch.setenv(DASH0_OTEL_COLLECTOR_BASE_URL, "http://collector:4317")
+    monkeypatch.setenv(OTEL_EXPORTER_OTLP_PROTOCOL, "grpc")
+
+    Dash0Distro().configure()
+
+    assert os.environ[OTEL_TRACES_EXPORTER] == "otlp_proto_grpc"
+    assert os.environ[OTEL_METRICS_EXPORTER] == "otlp_proto_grpc"
+    assert os.environ[OTEL_LOGS_EXPORTER] == "otlp_proto_grpc"
+    assert os.environ[OTEL_EXPORTER_OTLP_PROTOCOL] == "grpc"
+
+
+def test_configure_honors_per_signal_protocol_overrides(monkeypatch):
+    monkeypatch.setenv(DASH0_OTEL_COLLECTOR_BASE_URL, "http://collector:4318")
+    monkeypatch.setenv(OTEL_EXPORTER_OTLP_TRACES_PROTOCOL, "grpc")
+
+    Dash0Distro().configure()
+
+    assert os.environ[OTEL_TRACES_EXPORTER] == "otlp_proto_grpc"
+    assert os.environ[OTEL_METRICS_EXPORTER] == "otlp_proto_http"
+    assert os.environ[OTEL_LOGS_EXPORTER] == "otlp_proto_http"
+
+
+def test_configure_falls_back_to_http_for_unsupported_protocol(monkeypatch):
+    monkeypatch.setenv(DASH0_OTEL_COLLECTOR_BASE_URL, "http://collector:4318")
+    monkeypatch.setenv(OTEL_EXPORTER_OTLP_PROTOCOL, "http/json")
+
+    Dash0Distro().configure()
+
+    assert os.environ[OTEL_TRACES_EXPORTER] == "otlp_proto_http"
+    assert os.environ[OTEL_METRICS_EXPORTER] == "otlp_proto_http"
+    assert os.environ[OTEL_LOGS_EXPORTER] == "otlp_proto_http"
 
 
 def test_configure_does_not_override_explicit_configuration(monkeypatch):

@@ -28,11 +28,12 @@ dependencies = [
   "opentelemetry-api == 1.43.0",
   "opentelemetry-sdk == 1.43.0",
   "opentelemetry-instrumentation == 0.64b0",
-  # Pure-Python OTLP/HTTP exporter (no native dependencies). Currently lives in
-  # the pyproto branch of the OpenTelemetry Python fork and is not yet published,
-  # so this dependency is not resolvable from PyPI until it is released or
-  # vendored into the injected tree.
+  # Pure-Python OTLP exporters (no native dependencies), vendored in this
+  # workspace from open-telemetry/opentelemetry-packaging. Not yet published,
+  # so these dependencies are not resolvable from PyPI until they are released
+  # or vendored into the injected tree.
   "opentelemetry-exporter-otlp-pyproto-http",
+  "opentelemetry-exporter-otlp-pyproto-grpc",
 ]
 
 [project.entry-points.opentelemetry_distro]

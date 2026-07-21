@@ -23,3 +23,7 @@ Added
   example workflow.
 - Release workflow (PyPI Trusted Publishing), pending the decisions in
   ``RELEASING.rst``.
+- The distribution now pins its upstream OpenTelemetry dependencies exactly
+  (``opentelemetry-api``/``-sdk`` 1.43.0, ``opentelemetry-instrumentation``
+  0.64b0): it ships a curated, validated set of versions rather than a range
+  (`#7 <https://github.com/dash0hq/opentelemetry-python-distribution/issues/7>`_).

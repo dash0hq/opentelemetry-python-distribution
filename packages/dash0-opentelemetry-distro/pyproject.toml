@@ -21,10 +21,13 @@ classifiers = [
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
 ]
+# The distribution ships a curated, exactly-pinned set of upstream packages:
+# every release is validated against precisely these versions, and the code
+# assumes them. Bump them together, deliberately, in a dedicated change.
 dependencies = [
-  "opentelemetry-api ~= 1.12",
-  "opentelemetry-sdk ~= 1.12",
-  "opentelemetry-instrumentation",
+  "opentelemetry-api == 1.43.0",
+  "opentelemetry-sdk == 1.43.0",
+  "opentelemetry-instrumentation == 0.64b0",
   # Pure-Python OTLP/HTTP exporter (no native dependencies). Currently lives in
   # the pyproto branch of the OpenTelemetry Python fork and is not yet published,
   # so this dependency is not resolvable from PyPI until it is released or

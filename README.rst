@@ -25,6 +25,10 @@ What you get
   injector): the distribution's ``Dash0Distro`` and ``Dash0Configurator`` are
   discovered through OpenTelemetry entry points and wire up the SDK before your
   application starts.
+- **The full contrib instrumentation set built in**: every upstream
+  auto-instrumentation package (plus the X-Ray propagator) ships as a pinned
+  dependency, so no ``opentelemetry-bootstrap`` step is needed and only
+  instrumentations whose target library is installed activate.
 - **Pure-Python OTLP export** with no ``google.protobuf``/``grpcio``
   dependency: OTLP/HTTP (``otlp_proto_http``) selected by default for all
   three signals, OTLP/gRPC (``otlp_proto_grpc``) when

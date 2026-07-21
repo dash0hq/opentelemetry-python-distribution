@@ -35,6 +35,11 @@ Added
   0.64b0): it ships a curated, validated set of versions rather than a range,
   and CI now fails if a non-exact constraint is reintroduced
   (`#7 <https://github.com/dash0hq/opentelemetry-python-distribution/issues/7>`_).
+- The curated instrumentation set: the distribution now depends on every
+  upstream auto-instrumentation package (contrib 0.65b0, moving
+  ``opentelemetry-api``/``-sdk`` to 1.44.0) plus
+  ``opentelemetry-propagator-aws-xray``, kept in sync with upstream by a unit
+  test and Dependabot (`#1 <https://github.com/dash0hq/opentelemetry-python-distribution/issues/1>`_).
 
 Changed
 -------

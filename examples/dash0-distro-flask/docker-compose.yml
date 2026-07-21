@@ -27,14 +27,16 @@ services:
           /workspace/packages/opentelemetry-pyproto \
           /workspace/packages/opentelemetry-exporter-otlp-pyproto-common \
           /workspace/packages/opentelemetry-exporter-otlp-pyproto-http \
+          /workspace/packages/opentelemetry-exporter-otlp-pyproto-grpc \
           /workspace/packages/dash0-opentelemetry-distro \
           flask \
           requests \
           opentelemetry-instrumentation-flask
-        # Fail the build unless serialization is the pure-Python pyproto
-        # implementation: google.protobuf must be absent and the OTLP HTTP
-        # exporter must resolve to opentelemetry.exporter.otlp._proto.http.
-        /python-agent/venv/bin/python -c "import importlib.util; assert importlib.util.find_spec('google') is None or importlib.util.find_spec('google.protobuf') is None, 'google.protobuf is installed — NOT pure-Python pyproto'; from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter; assert OTLPSpanExporter.__module__.startswith('opentelemetry.exporter.otlp._proto.http'), OTLPSpanExporter.__module__; print('pyproto verified: google.protobuf absent; exporter from', OTLPSpanExporter.__module__)"
+        # Fail the build unless everything is the pure-Python pyproto
+        # implementation: google.protobuf and grpcio must be absent, and the
+        # OTLP HTTP and gRPC exporters must resolve to
+        # opentelemetry.exporter.otlp._proto.{http,grpc}.
+        /python-agent/venv/bin/python -c "import importlib.util; assert importlib.util.find_spec('google') is None or importlib.util.find_spec('google.protobuf') is None, 'google.protobuf is installed — NOT pure-Python pyproto'; assert importlib.util.find_spec('grpc') is None, 'grpcio is installed — NOT pure-Python pyproto'; from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter; assert OTLPSpanExporter.__module__.startswith('opentelemetry.exporter.otlp._proto.http'), OTLPSpanExporter.__module__; from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter as GrpcSpanExporter; assert GrpcSpanExporter.__module__.startswith('opentelemetry.exporter.otlp._proto.grpc'), GrpcSpanExporter.__module__; print('pyproto verified: google.protobuf and grpcio absent; exporters from', OTLPSpanExporter.__module__, 'and', GrpcSpanExporter.__module__)"
         chown -R $${SCRIPT_UID:-1000}:$${SCRIPT_GID:-1000} /python-agent
         echo 'prepare-python-agent: done'
 

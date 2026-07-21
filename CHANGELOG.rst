@@ -28,3 +28,13 @@ Added
   0.64b0): it ships a curated, validated set of versions rather than a range,
   and CI now fails if a non-exact constraint is reintroduced
   (`#7 <https://github.com/dash0hq/opentelemetry-python-distribution/issues/7>`_).
+
+Changed
+-------
+
+- ``opentelemetry-exporter-otlp-pyproto-grpc`` no longer depends on ``grpcio``:
+  the exporter now ships a vendored pure-Python HTTP/2 gRPC transport
+  (``_pygrpc``, from `open-telemetry/opentelemetry-packaging
+  <https://github.com/open-telemetry/opentelemetry-packaging>`_), so it installs
+  and runs without any compiled extension (`#2
+  <https://github.com/dash0hq/opentelemetry-python-distribution/issues/2>`_).

@@ -50,6 +50,11 @@ dash0_service_name = "dash0.opentelemetry.resource:Dash0ServiceNameResourceDetec
 [dependency-groups]
 dev = [
   "pytest >= 7.0",
+  # Exercises the declarative-configuration (OTEL_CONFIG_FILE) code paths in
+  # the unit tests. On SDK 1.43 the declarative machinery ships inside the SDK
+  # behind this extra; whether it becomes a runtime dependency of the distro is
+  # tracked in issue #5.
+  "opentelemetry-sdk[file-configuration]",
 ]
 
 [tool.hatch.version]

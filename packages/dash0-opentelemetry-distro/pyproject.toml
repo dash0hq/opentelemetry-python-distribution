@@ -23,7 +23,8 @@ classifiers = [
 ]
 # The distribution ships a curated, exactly-pinned set of upstream packages:
 # every release is validated against precisely these versions, and the code
-# assumes them. Bump them together, deliberately, in a dedicated change.
+# (e.g. the declarative-configuration preflight in configurator.py) assumes
+# them. Bump them together, deliberately, in a dedicated change.
 dependencies = [
   "opentelemetry-api == 1.43.0",
   "opentelemetry-sdk == 1.43.0",
@@ -34,6 +35,13 @@ dependencies = [
   # vendored into the injected tree.
   "opentelemetry-exporter-otlp-pyproto-http",
 ]
+
+[project.optional-dependencies]
+# Dependencies for declarative (file-based) configuration via OTEL_CONFIG_FILE.
+# The pinned SDK line bundles the loader behind this extra (pyyaml, jsonschema).
+# Note for the next SDK bump: from 1.44 the loader moves to the separate
+# opentelemetry-configuration package, which replaces this extra.
+declarative-config = ["opentelemetry-sdk[file-configuration]"]
 
 [project.entry-points.opentelemetry_distro]
 dash0 = "dash0.opentelemetry.distro:Dash0Distro"

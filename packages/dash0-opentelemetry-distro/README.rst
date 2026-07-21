@@ -55,15 +55,28 @@ Ported from the Node.js distribution's custom detectors:
 
 Existing attributes are never overridden.
 
+Declarative configuration
+=========================
+
+When ``OTEL_CONFIG_FILE`` points at a declarative configuration file, the SDK is
+built from that file instead of from the environment variables above (the
+distro's exporter defaults and detected resource attributes do not apply; the
+bootstrap span and signal flushing still do). The declarative loader needs
+dependencies the SDK does not pull in by default — install the distribution as
+``dash0-opentelemetry-distro[declarative-config]``. Without them, the
+configurator logs a single actionable error naming the missing package and the
+process runs without telemetry.
+
 Dependency policy
 =================
 
 The distribution ships a curated set of upstream OpenTelemetry packages, pinned
 exactly in its ``pyproject.toml``: each release is validated against precisely
-those versions, and the code assumes them. Version bumps are deliberate,
-standalone changes. CI enforces the policy via
-``scripts/check_pinned_dependencies.py`` (in-repo workspace members are exempt,
-as their version is fixed by the checkout).
+those versions, and the code assumes them (for example, the
+declarative-configuration preflight matches where the pinned SDK keeps the
+loader). Version bumps are deliberate, standalone changes. CI enforces the
+policy via ``scripts/check_pinned_dependencies.py`` (in-repo workspace members
+are exempt, as their version is fixed by the checkout).
 
 Environment variables
 =====================

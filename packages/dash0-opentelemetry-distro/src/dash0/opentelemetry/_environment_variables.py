@@ -33,3 +33,7 @@ OTEL_EXPORTER_OTLP_ENDPOINT = "OTEL_EXPORTER_OTLP_ENDPOINT"
 OTEL_SERVICE_NAME = "OTEL_SERVICE_NAME"
 OTEL_RESOURCE_ATTRIBUTES = "OTEL_RESOURCE_ATTRIBUTES"
 OTEL_SDK_DISABLED = "OTEL_SDK_DISABLED"
+OTEL_CONFIG_FILE = "OTEL_CONFIG_FILE"
+"""Declarative (file-based) SDK configuration. Read by the SDK's configurator;
+the distribution only checks it to fail loudly when the required
+declarative-configuration dependencies are missing."""

@@ -30,6 +30,7 @@ name = "dash0-opentelemetry-distro"
 source = { editable = "packages/dash0-opentelemetry-distro" }
 dependencies = [
     { name = "opentelemetry-api" },
+    { name = "opentelemetry-exporter-otlp-pyproto-grpc" },
     { name = "opentelemetry-exporter-otlp-pyproto-http" },
     { name = "opentelemetry-instrumentation" },
     { name = "opentelemetry-sdk" },
@@ -43,6 +44,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "opentelemetry-api", specifier = "==1.43.0" },
+    { name = "opentelemetry-exporter-otlp-pyproto-grpc", editable = "packages/opentelemetry-exporter-otlp-pyproto-grpc" },
     { name = "opentelemetry-exporter-otlp-pyproto-http", editable = "packages/opentelemetry-exporter-otlp-pyproto-http" },
     { name = "opentelemetry-instrumentation", specifier = "==0.64b0" },
     { name = "opentelemetry-sdk", specifier = "==1.43.0" },

@@ -25,8 +25,11 @@ What you get
   injector): the distribution's ``Dash0Distro`` and ``Dash0Configurator`` are
   discovered through OpenTelemetry entry points and wire up the SDK before your
   application starts.
-- **Pure-Python OTLP/HTTP export** (``otlp_proto_http``) with no
-  ``google.protobuf`` dependency, selected by default for all three signals.
+- **Pure-Python OTLP export** with no ``google.protobuf``/``grpcio``
+  dependency: OTLP/HTTP (``otlp_proto_http``) selected by default for all
+  three signals, OTLP/gRPC (``otlp_proto_grpc``) when
+  ``OTEL_EXPORTER_OTLP_PROTOCOL=grpc`` (or a per-signal
+  ``OTEL_EXPORTER_OTLP_<SIGNAL>_PROTOCOL``) is set.
 - **Sensible, injection-friendly defaults**: enable/disable gate, a required
   collector endpoint, a Kubernetes pod-UID resource detector, a service-name
   fallback, a ``telemetry.distro.name`` marker, an optional startup span, and
@@ -49,11 +52,12 @@ Architecture
     examples/
       dash0-distro-flask/                       self-contained, Docker-based demo
 
-The pyproto exporter is a **drop-in** for the upstream
-``opentelemetry-exporter-otlp-proto-http``: it occupies the same import
-namespace and registers under the same ``otlp_proto_http`` entry-point name.
-Because the distribution depends on the pyproto package (and not the regular
-one), the standard name resolves to the pure-Python implementation.
+The pyproto exporters are **drop-ins** for the upstream
+``opentelemetry-exporter-otlp-proto-http`` and ``-grpc`` packages: they occupy
+the same import namespaces and register under the same ``otlp_proto_http`` /
+``otlp_proto_grpc`` entry-point names. Because the distribution depends on the
+pyproto packages (and not the regular ones), the standard names resolve to the
+pure-Python implementations.
 
 
 Quick start

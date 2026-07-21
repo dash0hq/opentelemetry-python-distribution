@@ -5,8 +5,9 @@ by ``opentelemetry-instrument`` when the Dash0 distribution is installed. It run
 before the configurator, so it is where the distribution:
 
 * gates itself off if disabled or if no collector endpoint is configured;
-* selects the pure-Python OTLP/HTTP exporter (no native dependencies, safe to
-  inject) and points it at the Dash0 collector;
+* selects the pure-Python OTLP exporters (no native dependencies, safe to
+  inject) matching the configured OTLP protocol — ``http/protobuf`` by
+  default, ``grpc`` when requested — and points them at the Dash0 collector;
 * injects the detected resource attributes (distro name/version, a fallback
   service name, and the Kubernetes pod UID) so the SDK's Resource picks them up;
 * activates every instrumentor defensively, so a single failing instrumentor
@@ -24,7 +25,10 @@ from opentelemetry.instrumentation.distro import BaseDistro
 from ._environment_variables import (
     DASH0_OTEL_COLLECTOR_BASE_URL,
     OTEL_EXPORTER_OTLP_ENDPOINT,
+    OTEL_EXPORTER_OTLP_LOGS_PROTOCOL,
+    OTEL_EXPORTER_OTLP_METRICS_PROTOCOL,
     OTEL_EXPORTER_OTLP_PROTOCOL,
+    OTEL_EXPORTER_OTLP_TRACES_PROTOCOL,
     OTEL_LOGS_EXPORTER,
     OTEL_METRICS_EXPORTER,
     OTEL_SDK_DISABLED,
@@ -36,10 +40,16 @@ from .version import __version__
 
 _logger = getLogger(__name__)
 
-# Name under which the pure-Python OTLP/HTTP exporter registers itself. In an
-# injected tree only the pyproto exporter ships under this name, so it resolves
-# to the pure-Python implementation rather than the protobuf/grpc one.
-_PYPROTO_HTTP_EXPORTER = "otlp_proto_http"
+# Entry-point names under which the pure-Python (pyproto) exporters register
+# themselves, keyed by OTLP protocol. In an injected tree only the pyproto
+# exporters ship under these names, so they resolve to the pure-Python
+# implementations rather than the protobuf/grpcio ones.
+_PYPROTO_EXPORTERS_BY_PROTOCOL = {
+    "http/protobuf": "otlp_proto_http",
+    "grpc": "otlp_proto_grpc",
+}
+
+_DEFAULT_PROTOCOL = "http/protobuf"
 
 # Instrumentor entry-point names that must never be activated by this
 # distribution. Empty by default; the standard OTEL_PYTHON_DISABLED_INSTRUMENTATIONS
@@ -62,13 +72,29 @@ class Dash0Distro(BaseDistro):
             )
             return
 
-        for exporter_variable in (
-            OTEL_TRACES_EXPORTER,
-            OTEL_METRICS_EXPORTER,
-            OTEL_LOGS_EXPORTER,
+        default_protocol = environ.setdefault(
+            OTEL_EXPORTER_OTLP_PROTOCOL, _DEFAULT_PROTOCOL
+        )
+        for exporter_variable, protocol_variable in (
+            (OTEL_TRACES_EXPORTER, OTEL_EXPORTER_OTLP_TRACES_PROTOCOL),
+            (OTEL_METRICS_EXPORTER, OTEL_EXPORTER_OTLP_METRICS_PROTOCOL),
+            (OTEL_LOGS_EXPORTER, OTEL_EXPORTER_OTLP_LOGS_PROTOCOL),
         ):
-            environ.setdefault(exporter_variable, _PYPROTO_HTTP_EXPORTER)
-        environ.setdefault(OTEL_EXPORTER_OTLP_PROTOCOL, "http/protobuf")
+            protocol = environ.get(protocol_variable, default_protocol)
+            exporter = _PYPROTO_EXPORTERS_BY_PROTOCOL.get(protocol)
+            if exporter is None:
+                _logger.warning(
+                    "dash0: unsupported OTLP protocol %r in %s; defaulting %s to"
+                    " the %r exporter",
+                    protocol,
+                    protocol_variable
+                    if protocol_variable in environ
+                    else OTEL_EXPORTER_OTLP_PROTOCOL,
+                    exporter_variable,
+                    _PYPROTO_EXPORTERS_BY_PROTOCOL[_DEFAULT_PROTOCOL],
+                )
+                exporter = _PYPROTO_EXPORTERS_BY_PROTOCOL[_DEFAULT_PROTOCOL]
+            environ.setdefault(exporter_variable, exporter)
         environ.setdefault(
             OTEL_EXPORTER_OTLP_ENDPOINT,
             environ[DASH0_OTEL_COLLECTOR_BASE_URL],

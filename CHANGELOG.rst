@@ -32,6 +32,10 @@ Added
 Changed
 -------
 
+- The distribution now depends on ``opentelemetry-exporter-otlp-pyproto-grpc``
+  and selects it when ``OTEL_EXPORTER_OTLP_PROTOCOL=grpc`` (or a per-signal
+  ``OTEL_EXPORTER_OTLP_<SIGNAL>_PROTOCOL``) is set; unsupported protocol values
+  fall back to OTLP/HTTP with a warning.
 - ``opentelemetry-exporter-otlp-pyproto-grpc`` no longer depends on ``grpcio``:
   the exporter now ships a vendored pure-Python HTTP/2 gRPC transport
   (``_pygrpc``, from `open-telemetry/opentelemetry-packaging

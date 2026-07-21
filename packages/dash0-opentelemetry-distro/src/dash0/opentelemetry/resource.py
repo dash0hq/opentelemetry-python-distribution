@@ -9,11 +9,25 @@ Injecting via ``OTEL_RESOURCE_ATTRIBUTES``/``OTEL_SERVICE_NAME`` (rather than
 registering SDK resource detectors) keeps this working across OTel SDK versions:
 the distro's ``_configure`` runs before the configurator, and the SDK's own
 ``Resource.create`` reads these variables.
+
+Declarative configuration (``OTEL_CONFIG_FILE``) deliberately ignores those
+environment variables, so the same attributes are also exposed as standard SDK
+resource detectors, registered under the ``opentelemetry_resource_detector``
+entry-point group (see ``pyproject.toml``):
+:class:`Dash0DistributionResourceDetector`,
+:class:`Dash0KubernetesResourceDetector` and
+:class:`Dash0ServiceNameResourceDetector`.
 """
 
 import re
 import sys
 from os import environ, path
+
+from opentelemetry.sdk.resources import (
+    Resource,
+    ResourceDetector,
+    ServiceInstanceIdResourceDetector,
+)
 
 from ._environment_variables import (
     DASH0_AUTOMATIC_SERVICE_NAME,
@@ -21,6 +35,7 @@ from ._environment_variables import (
     OTEL_SERVICE_NAME,
 )
 from .settings import is_false
+from .version import __version__
 
 _SERVICE_NAME = "service.name"
 _SERVICE_VERSION = "service.version"
@@ -156,3 +171,69 @@ def apply_detected_resource_attributes(version):
     if pod_uid:
         attributes[_K8S_POD_UID] = pod_uid
     _merge_into_resource_attributes(attributes)
+
+
+def _detected_service_name():
+    """The ``service.name`` the environment-variable path would produce.
+
+    ``OTEL_SERVICE_NAME`` wins (mirroring the declarative ``service`` detector,
+    which also reads it); the entrypoint-derived fallback applies only when no
+    service name is configured anywhere in the environment and
+    ``DASH0_AUTOMATIC_SERVICE_NAME`` is not ``false``. A ``service.name``
+    embedded in ``OTEL_RESOURCE_ATTRIBUTES`` suppresses the fallback but is not
+    resurrected here — declarative configuration ignores that variable by
+    design.
+    """
+    explicit = environ.get(OTEL_SERVICE_NAME, "").strip()
+    if explicit:
+        return explicit
+    if is_false(environ.get(DASH0_AUTOMATIC_SERVICE_NAME)):
+        return None
+    if _service_name_already_configured():
+        return None
+    return detect_fallback_service_name()
+
+
+class Dash0DistributionResourceDetector(ResourceDetector):
+    """Reports ``telemetry.distro.name`` and ``telemetry.distro.version``.
+
+    The environment-variable injection above does not survive declarative
+    configuration: when ``OTEL_CONFIG_FILE`` is set, the declarative resource
+    builder ignores ``OTEL_RESOURCE_ATTRIBUTES``/``OTEL_SERVICE_NAME`` and only
+    runs detectors named in the config file, resolved via the
+    ``opentelemetry_resource_detector`` entry-point group. This detector and
+    its two siblings below are registered there (``dash0_distribution``,
+    ``dash0_kubernetes``, ``dash0_service_name``) and work with
+    ``OTEL_EXPERIMENTAL_RESOURCE_DETECTORS`` as well.
+    """
+
+    def detect(self):
+        return Resource(distribution_resource_attributes(__version__))
+
+
+class Dash0KubernetesResourceDetector(ResourceDetector):
+    """Reports ``k8s.pod.uid``, detected from ``/etc/hosts`` and the cgroups."""
+
+    def detect(self):
+        pod_uid = detect_kubernetes_pod_uid()
+        if pod_uid:
+            return Resource({_K8S_POD_UID: pod_uid})
+        return Resource.get_empty()
+
+
+class Dash0ServiceNameResourceDetector(ResourceDetector):
+    """Service detection: the upstream behavior plus the Dash0 fallback.
+
+    Wraps what upstream service detection provides — a stable
+    ``service.instance.id`` (via the SDK's ``ServiceInstanceIdResourceDetector``)
+    and ``service.name`` from ``OTEL_SERVICE_NAME`` — and adds the distro's
+    entrypoint-derived ``service.name`` fallback when no service name is
+    configured (see :func:`_detected_service_name`).
+    """
+
+    def detect(self):
+        attributes = dict(ServiceInstanceIdResourceDetector().detect().attributes)
+        service_name = _detected_service_name()
+        if service_name:
+            attributes[_SERVICE_NAME] = service_name
+        return Resource(attributes)

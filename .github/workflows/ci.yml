@@ -47,6 +47,11 @@ jobs:
           uv run --package dash0-opentelemetry-distro
           --python ${{ matrix.python-version }}
           python -m pytest packages/dash0-opentelemetry-distro/tests -v
+      - name: Run bootstrap (sitecustomize) unit tests
+        run: >
+          uv run --no-project --with packaging --with pytest
+          --python ${{ matrix.python-version }}
+          python -m pytest bootstrap -v
 
   scripts-test:
     runs-on: ubuntu-latest

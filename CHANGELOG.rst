@@ -32,6 +32,15 @@ Changed
 Added
 -----
 
+- ``bootstrap/sitecustomize.py``: the injector bootstrap script that triggers
+  loading of the distribution now lives here, alongside its unit tests. It is
+  prepended to ``PYTHONPATH`` by the OpenTelemetry injector, checks the Python
+  version, guards against double instrumentation, self-deactivates for child
+  processes, and bridges ``OTEL_EXPORTER_OTLP_ENDPOINT`` to
+  ``DASH0_OTEL_COLLECTOR_BASE_URL``. Kept as a standalone, valid-Python-2.7+
+  file (never imported by the 3.10+ distribution package) so it can detect and
+  bail out gracefully on legacy interpreters; consumers copy it out of the
+  distribution rather than maintaining their own.
 - Resource detectors registered under the standard
   ``opentelemetry_resource_detector`` entry-point group, exposing the distro's
   detected resource attributes as regular SDK resource detectors:

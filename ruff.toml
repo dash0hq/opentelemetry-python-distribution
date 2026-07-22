@@ -11,6 +11,11 @@ extend-exclude = [
   "packages/opentelemetry-exporter-otlp-pyproto-grpc",
   "**/*_pb2*.py",
   "**/*_pypb2*.py",
+  # The bootstrap sitecustomize script must stay valid Python 2.7+ so it can
+  # detect and bail out gracefully on legacy interpreters. Excluded because the
+  # pyupgrade (UP) rules would rewrite its 2.7-compatible constructs
+  # (`from __future__`, `.format()`) into 3.x-only syntax.
+  "bootstrap",
 ]
 
 [lint]

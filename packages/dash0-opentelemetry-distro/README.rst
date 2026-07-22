@@ -21,6 +21,14 @@ Entry points
       ``OTEL_EXPORTER_OTLP_ENDPOINT`` at ``DASH0_OTEL_COLLECTOR_BASE_URL``. The
       pure-Python exporter has no native dependencies, which is what makes the
       distribution safe to inject onto an arbitrary process' ``PYTHONPATH``.
+      When a signal's OTLP protocol does not match the transport the shared
+      endpoint targets — its port is the *other* protocol's conventional
+      default (``4317`` gRPC / ``4318`` HTTP) — a per-signal
+      ``OTEL_EXPORTER_OTLP_<SIGNAL>_ENDPOINT`` is derived by rewriting the
+      port (appending the ``v1/<signal>`` path for HTTP), so mixed-protocol
+      setups and a base URL on the "wrong" default port still export
+      correctly. Custom ports and explicit per-signal endpoints are always
+      left untouched.
     * Injects detected **resource attributes** into ``OTEL_RESOURCE_ATTRIBUTES``/
       ``OTEL_SERVICE_NAME`` (see below) so the SDK's Resource picks them up.
     * Overrides ``load_instrumentor`` to activate each instrumentor

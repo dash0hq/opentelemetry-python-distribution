@@ -1,4 +1,6 @@
 {
+  "dash0_opentelemetry_distro-0.1.0-py3-none-any.whl": "846f51b8a6c1a159dcd1971e50c1b98baa514e20aa9e5c602fe2adc78676fb09",
+  "dash0_opentelemetry_distro-0.1.0.tar.gz": "9c464f665cd85eb1ebb743e0e50bc6cf1d90c80e894d885684b578b351009192",
   "dash0_opentelemetry_distro-0.1.0rc1-py3-none-any.whl": "d3787846cf1ce6424eae1dd9634dbd6c0a4be567ac157c507132776c7f82f9b1",
   "dash0_opentelemetry_distro-0.1.0rc1.tar.gz": "2a7dfcb3c96c7af0a767ce8c2f92877fcb4282f1b508a10f715bad7d6d43d828",
   "dash0_opentelemetry_exporter_otlp_pyproto_common-1.44.0-py3-none-any.whl": "a9ae08dca710fabc2ccbaca76902c4c42e3534d3bbcd582727e491d043ddc2f6",

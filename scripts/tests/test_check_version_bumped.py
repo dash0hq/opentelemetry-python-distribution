@@ -45,3 +45,13 @@ def test_workspace_discovery_matches_expected_packages():
     for name, package_dir in cvb.workspace_packages().items():
         version = cvb.package_version(package_dir)
         assert version[0].isdigit(), (name, version)
+
+
+def test_package_changed_counts_packaged_files_but_not_tests():
+    pkg = cvb.REPO_ROOT / "packages" / "some-pkg"
+    assert cvb.package_changed(pkg, {"packages/some-pkg/README.rst"})
+    assert cvb.package_changed(pkg, {"packages/some-pkg/src/mod.py"})
+    assert cvb.package_changed(pkg, {"packages/some-pkg/pyproject.toml"})
+    assert not cvb.package_changed(pkg, {"packages/some-pkg/tests/test_mod.py"})
+    # A trailing slash on the prefix keeps a sibling package from matching.
+    assert not cvb.package_changed(pkg, {"packages/some-pkg-other/README.rst"})

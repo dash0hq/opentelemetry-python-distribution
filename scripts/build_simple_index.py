@@ -8,9 +8,11 @@ release assets with ``#sha256=`` fragments, so consumers can install with
 third-party code runs in the job that controls what consumers hash-pin.
 
 Trust model: the committed manifest (``scripts/index-manifest.json``) is the
-source of truth for what bytes a filename may have. Assets are re-hashed on
-every run; a filename whose recomputed hash differs from its manifest entry
-aborts generation (the immutability guard) — the ``SHA256SUMS`` sidecar
+source of truth for what bytes a filename may have. By default every asset is
+re-downloaded and re-hashed; a filename whose recomputed hash differs from its
+manifest entry aborts generation (the immutability guard). ``--trust-manifest``
+skips re-downloading already-recorded filenames (immutable releases pin their
+bytes) while still fetching and guarding new ones. The ``SHA256SUMS`` sidecar
 uploaded with each release is a human-readable convenience, not what the index
 trusts. New filenames are appended to the manifest, which the release workflow
 commits back, so tampering shows up in branch-protected git history.
@@ -37,6 +39,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import tomllib
+from _workspace import workspace_packages
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -46,22 +49,15 @@ DEFAULT_YANKED = REPO_ROOT / "scripts" / "index-yanked.toml"
 DEFAULT_EXCLUDED = REPO_ROOT / "scripts" / "index-excluded.toml"
 
 
-def expected_projects(
-    root_pyproject: Path = REPO_ROOT / "pyproject.toml",
-) -> frozenset[str]:
-    """The workspace members, per the root pyproject [tool.uv.sources].
+def expected_projects() -> frozenset[str]:
+    """Normalized names of the workspace packages — the only indexable projects.
 
-    Only artifacts of these projects are ever indexed; anything else attached
-    to a release (hostile or stray) is ignored. Deriving the set from the
-    workspace definition means a sixth package cannot be silently dropped from
-    the index because a hardcoded list was missed.
+    Anything else attached to a release (hostile or stray) is ignored. Derived
+    from the shared workspace scan (see ``_workspace.py``) so the index, the
+    release build-selection step, and the version-bump check cannot disagree
+    about which packages exist.
     """
-    sources = tomllib.loads(root_pyproject.read_text())["tool"]["uv"]["sources"]
-    return frozenset(
-        _normalize(name)
-        for name, source in sources.items()
-        if isinstance(source, dict) and source.get("workspace")
-    )
+    return frozenset(_normalize(name) for name in workspace_packages())
 
 
 _ARTIFACT_RE = re.compile(
@@ -138,6 +134,7 @@ def collect_entries(
     excluded: frozenset[str],
     yanked: dict[tuple[str, str], str],
     fetch_asset: "callable",
+    trust_manifest: bool = False,
 ) -> tuple[list[Entry], dict[str, str]]:
     """Walk releases and produce index entries plus manifest additions.
 
@@ -177,16 +174,26 @@ def collect_entries(
                     f"asset {filename} resolves to {url}, outside the expected "
                     f"origin {url_prefix}"
                 )
-            digest = hashlib.sha256(fetch_asset(url)).hexdigest()
-            known = manifest.get(filename) or additions.get(filename)
-            if known is not None and known != digest:
-                raise IndexGenerationError(
-                    f"{filename} on release {release.get('tag_name')} hashes to "
-                    f"{digest}, but {known} was previously published under that "
-                    f"filename. Published artifacts are immutable; cut a new "
-                    f"version, or exclude the filename via index-excluded.toml "
-                    f"after investigating."
+            committed = manifest.get(filename)
+            if committed is not None and trust_manifest:
+                # Immutable releases plus the git-audited manifest already pin
+                # the bytes of a filename recorded on a previous run, so skip
+                # the redundant re-download. New filenames (and same-run
+                # duplicates) are still fetched and guarded below.
+                digest = committed
+            else:
+                digest = hashlib.sha256(fetch_asset(url)).hexdigest()
+                previous = (
+                    committed if committed is not None else additions.get(filename)
                 )
+                if previous is not None and previous != digest:
+                    raise IndexGenerationError(
+                        f"{filename} on release {release.get('tag_name')} hashes "
+                        f"to {digest}, but {previous} was previously published "
+                        f"under that filename. Published artifacts are immutable; "
+                        f"cut a new version, or exclude the filename via "
+                        f"index-excluded.toml after investigating."
+                    )
             if filename not in manifest:
                 additions[filename] = digest
             if filename not in entries:  # oldest release wins
@@ -267,7 +274,8 @@ def generate_site(entries: list[Entry], output_dir: Path, repo: str) -> None:
     simple = output_dir / "simple"
     simple.mkdir(parents=True, exist_ok=True)
     project_links = "".join(
-        f'<a href="{name}/">{name}</a><br>\n' for name in sorted(by_project)
+        f'<a href="{html.escape(name, quote=True)}/">{html.escape(name)}</a><br>\n'
+        for name in sorted(by_project)
     )
     (simple / "index.html").write_text(_page("Simple index", project_links))
     for name, files in sorted(by_project.items()):
@@ -279,8 +287,9 @@ def generate_site(entries: list[Entry], output_dir: Path, repo: str) -> None:
                 else ""
             )
             file_links += (
-                f'<a href="{entry.url}#sha256={entry.sha256}"{yanked}>'
-                f"{entry.filename}</a><br>\n"
+                f'<a href="{html.escape(entry.url, quote=True)}'
+                f'#sha256={entry.sha256}"{yanked}>'
+                f"{html.escape(entry.filename)}</a><br>\n"
             )
         project_dir = simple / name
         project_dir.mkdir(exist_ok=True)
@@ -315,6 +324,15 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="GitHub API token (defaults to unauthenticated access)",
     )
+    parser.add_argument(
+        "--trust-manifest",
+        action="store_true",
+        help=(
+            "skip re-downloading assets already recorded in the manifest and "
+            "trust their committed hashes; new and same-run-duplicate "
+            "filenames are still fetched and hash-checked"
+        ),
+    )
     args = parser.parse_args(argv)
 
     manifest = load_manifest(args.manifest)
@@ -326,6 +344,7 @@ def main(argv: list[str] | None = None) -> int:
             excluded=load_excluded(args.excluded),
             yanked=load_yanked(args.yanked),
             fetch_asset=_fetch_asset,
+            trust_manifest=args.trust_manifest,
         )
     except IndexGenerationError as error:
         print(f"error: {error}", file=sys.stderr)

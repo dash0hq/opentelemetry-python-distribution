@@ -1,0 +1,33 @@
+# chloggen configuration.
+#
+# CHANGELOG.rst is compiled from the individual entry files in this directory by
+# chloggen (https://github.com/open-telemetry/opentelemetry-go-build-tools/tree/main/chloggen).
+# Contributors add one entry file per user-facing change instead of editing
+# CHANGELOG.rst directly; the entries are compiled into a new version section at
+# release time. See CONTRIBUTING.rst and RELEASING.rst.
+#
+# The commands (run from the repository root) are:
+#   go run go.opentelemetry.io/build-tools/chloggen@v0.30.0 new --config .chloggen/config.yaml --filename <slug>
+#   go run go.opentelemetry.io/build-tools/chloggen@v0.30.0 validate --config .chloggen/config.yaml
+#   go run go.opentelemetry.io/build-tools/chloggen@v0.30.0 update --config .chloggen/config.yaml --version <version>
+
+# Directory holding the pending, uncompiled entry files (this directory).
+entries_dir: .chloggen
+
+# Skeleton copied by `chloggen new`. Skipped when entries are read.
+template_yaml: .chloggen/TEMPLATE.yaml
+
+# reStructuredText output template, so chloggen renders into CHANGELOG.rst rather
+# than the built-in Markdown format.
+summary_template: .chloggen/summary.tmpl
+
+# The changelog files entries are compiled into. This distribution keeps a single
+# user-facing changelog.
+change_logs:
+  default: CHANGELOG.rst
+default_change_logs:
+  - default
+
+# Allowed `component` values. Empty means any component name is accepted; add
+# names here to enforce a fixed vocabulary.
+components: []

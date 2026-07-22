@@ -76,6 +76,52 @@ pyproto packages are excluded via ``ruff.toml``):
 Apply fixes with ``ruff check --fix`` and ``ruff format`` (drop ``--check``).
 
 
+Changelog
+=========
+
+``CHANGELOG.rst`` is managed with `chloggen
+<https://github.com/open-telemetry/opentelemetry-go-build-tools/tree/main/chloggen>`_.
+Rather than editing ``CHANGELOG.rst`` directly, each user-facing change adds a
+small YAML file under ``.chloggen/``; those files are compiled into a dated
+version section at release time (see ``RELEASING.rst``).
+
+Add an entry for anything a user of the distribution would notice — behavior,
+dependencies, packaging. Purely internal changes (refactors, test-only changes,
+CI tweaks) do not need one.
+
+Create the entry file either by copying the template::
+
+    cp .chloggen/TEMPLATE.yaml .chloggen/<slug>.yaml
+
+or, if you have Go available, with chloggen itself:
+
+.. code-block:: bash
+
+    go run go.opentelemetry.io/build-tools/chloggen@v0.30.0 new \
+      --config .chloggen/config.yaml --filename <slug>
+
+Then fill it in:
+
+- ``change_type`` — one of ``breaking``, ``deprecation``, ``new_component``,
+  ``enhancement``, ``bug_fix``, ``telemetry``.
+- ``component`` — the area of concern (e.g. ``distro``, ``pyproto``,
+  ``exporter``, ``resource-detectors``, ``deps``, ``ci``, ``release``,
+  ``docs``).
+- ``note`` — a one-line description; reStructuredText inline markup (``code``
+  and links) is rendered as-is into the changelog.
+- ``issues`` — one or more related issue or PR numbers (at least one required).
+- ``subtext`` — optional additional lines; use ``|-`` for multi-line text to
+  avoid a trailing blank line.
+
+CI validates all pending entries on every pull request. Run the same check
+locally (requires Go):
+
+.. code-block:: bash
+
+    go run go.opentelemetry.io/build-tools/chloggen@v0.30.0 validate \
+      --config .chloggen/config.yaml
+
+
 Coding conventions
 =================
 

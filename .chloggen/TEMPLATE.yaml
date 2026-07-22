@@ -1,0 +1,22 @@
+# Use this template to create a changelog entry for release notes. Create one
+# with:
+#   go run go.opentelemetry.io/build-tools/chloggen@v0.30.0 new --config .chloggen/config.yaml --filename <slug>
+
+# One of 'breaking', 'deprecation', 'new_component', 'enhancement', 'bug_fix', 'telemetry'.
+change_type:
+
+# A single word describing the area of concern (e.g. distro, pyproto, exporter,
+# resource-detectors, deps, ci, release, docs).
+component:
+
+# A brief description of the change. Surround your text with quotes ("") if it
+# needs to start with a backtick (`).
+note:
+
+# One or more tracking issues related to the change. At least one is required.
+issues: []
+
+# (Optional) One or more lines of additional information to render under the
+# primary note. These lines are padded with 2 spaces and inserted directly into
+# the document. Use pipe (|) for multiline entries.
+subtext:

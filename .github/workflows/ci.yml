@@ -48,6 +48,18 @@ jobs:
           --python ${{ matrix.python-version }}
           python -m pytest packages/dash0-opentelemetry-distro/tests -v
 
+  changelog:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
+      - name: Validate changelog entries
+        run: >
+          go run go.opentelemetry.io/build-tools/chloggen@v0.30.0 validate
+          --config .chloggen/config.yaml
+
   scripts-test:
     runs-on: ubuntu-latest
     steps:

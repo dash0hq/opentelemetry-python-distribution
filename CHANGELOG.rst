@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format is based on
 `Keep a Changelog <https://keepachangelog.com/en/1.1.0/>`_ and this project aims
 to follow `Semantic Versioning <https://semver.org/>`_ once it is published.
 
+Unreleased changes are recorded as individual entry files in ``.chloggen/`` and
+compiled into a new version section here at release time by `chloggen
+<https://github.com/open-telemetry/opentelemetry-go-build-tools/tree/main/chloggen>`_;
+released sections are generated — do not edit them by hand. See
+``CONTRIBUTING.rst`` for how to add an entry and ``RELEASING.rst`` for how they
+are compiled.
+
+.. <!-- next version -->
+
 0.1.0 - 2026-07-22
 ==================
 

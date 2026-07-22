@@ -2,6 +2,7 @@
 
 import io
 import json
+import re
 import sys
 import urllib.request
 from pathlib import Path
@@ -233,9 +234,17 @@ def test_release_enumeration_paginates(monkeypatch):
 
 
 def test_config_files_parse():
-    assert bsi.load_excluded(bsi.DEFAULT_EXCLUDED) == frozenset()
-    assert bsi.load_yanked(bsi.DEFAULT_YANKED) == {}
-    assert bsi.load_manifest(bsi.DEFAULT_MANIFEST) == {}
+    # The real config files gain entries as releases are published (the index
+    # job commits manifest additions), so assert shape, not content.
+    excluded = bsi.load_excluded(bsi.DEFAULT_EXCLUDED)
+    assert all(isinstance(name, str) for name in excluded)
+    yanked = bsi.load_yanked(bsi.DEFAULT_YANKED)
+    assert all(
+        isinstance(key, tuple) and len(key) == 2 and isinstance(reason, str)
+        for key, reason in yanked.items()
+    )
+    manifest = bsi.load_manifest(bsi.DEFAULT_MANIFEST)
+    assert all(re.fullmatch(r"[0-9a-f]{64}", digest) for digest in manifest.values())
 
 
 def test_trust_manifest_skips_download_of_known_files():

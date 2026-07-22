@@ -56,6 +56,14 @@ Cutting a release
 3. Land those changes on ``main`` through a PR.
 4. Tag and push: ``git tag v<distro-version> && git push origin v<distro-version>``.
 
+**Never create or publish releases from the GitHub UI.** The pipeline
+assembles releases draft-first and publishes them itself; a release published
+by hand is immutable before any asset is attached, cannot be repaired, and its
+version must be burned. CI enforces the version side of this: a PR that
+changes a package whose current version is already published fails
+(``scripts/check_version_bumped.py``) — the release pipeline would otherwise
+silently skip rebuilding it.
+
 The workflow then: validates the tag against the distro version and rejects
 ``.dev`` versions anywhere; builds **only** artifacts whose filenames are not
 yet in ``scripts/index-manifest.json`` (published artifacts are immutable, and
@@ -67,9 +75,10 @@ incomplete asset set); regenerates the index, commits the manifest additions
 to ``main``, and deploys to Pages.
 
 Use a PEP 440 pre-release version (e.g. ``0.2.0rc1``) for rehearsal releases;
-the workflow marks the GitHub release as a pre-release automatically, and the
-index generator rejects GitHub pre-releases whose versions are not PEP 440
-pre-releases.
+the workflow marks the GitHub release as a pre-release automatically. The
+GitHub pre-release flag itself is cosmetic — resolvers act on the PEP 440
+version string per file, and vendored packages on a rehearsal release
+legitimately carry their stable versions.
 
 Runbooks
 ========
@@ -90,7 +99,9 @@ release must still be a draft or missing; published releases are immutable.
 **Withdraw a broken version** — never delete a release: its asset URLs are
 baked into every consumer lockfile that pins the version, and pip re-resolves
 via the index on every operator image build. Instead add the version to
-``scripts/index-yanked.toml`` (PEP 592 yank), land it on ``main``, and run
+``scripts/index-yanked.toml`` (PEP 592 yank) — using the version string
+exactly as it appears in the artifact filename; the index rebuild fails
+loudly on a yank entry that matches nothing — land it on ``main``, and run
 ``mode: rebuild-index``. Yanked versions stay installable for exact-pin
 consumers but are skipped by resolvers otherwise.
 

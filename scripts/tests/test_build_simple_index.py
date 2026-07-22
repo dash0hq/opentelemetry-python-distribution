@@ -62,14 +62,14 @@ def sha256(data):
 
 
 def test_identical_file_across_releases_is_indexed_once():
-    entries, additions = collect(
-        [
-            release("v0.1.0", [DISTRO_WHEEL, PYPROTO_WHEEL]),
-            release("v0.2.0", [PYPROTO_WHEEL]),
-        ]
-    )
+    # Releases arrive newest-first, as the GitHub API returns them; the
+    # OLDEST release's URL must win for the deduplicated file.
+    newer = release("v0.2.0", [PYPROTO_WHEEL])
+    newer["created_at"] = "2026-07-23T10:00:00Z"
+    older = release("v0.1.0", [DISTRO_WHEEL, PYPROTO_WHEEL])
+    older["created_at"] = "2026-07-22T10:00:00Z"
+    entries, additions = collect([newer, older])
     assert [e.filename for e in entries] == [DISTRO_WHEEL, PYPROTO_WHEEL]
-    # The first release's URL wins for the deduplicated file.
     pyproto = next(e for e in entries if e.filename == PYPROTO_WHEEL)
     assert "/v0.1.0/" in pyproto.url
     assert set(additions) == {DISTRO_WHEEL, PYPROTO_WHEEL}
@@ -107,16 +107,17 @@ def test_draft_releases_are_excluded():
     assert entries == [] and additions == {}
 
 
-def test_github_prerelease_requires_pep440_prerelease_version():
+def test_github_prerelease_assets_are_indexed():
+    # The GitHub pre-release flag is cosmetic: a rehearsal rc release
+    # legitimately carries stable-versioned vendored wheels, and a
+    # post-publish index failure on immutable assets would deadlock the
+    # pipeline. Pre-releaseness lives in the PEP 440 version string.
     rc_wheel = "dash0_opentelemetry_distro-0.1.0rc1-py3-none-any.whl"
     entries, _ = collect(
-        [release("v0.1.0rc1", [rc_wheel], prerelease=True)],
-        contents={rc_wheel: b"rc"},
+        [release("v0.1.0rc1", [rc_wheel, PYPROTO_WHEEL], prerelease=True)],
+        contents={rc_wheel: b"rc", PYPROTO_WHEEL: b"pyproto"},
     )
-    assert [e.filename for e in entries] == [rc_wheel]
-
-    with pytest.raises(bsi.IndexGenerationError):
-        collect([release("v0.1.0", [DISTRO_WHEEL], prerelease=True)])
+    assert [e.filename for e in entries] == [rc_wheel, PYPROTO_WHEEL]
 
 
 def test_unexpected_asset_names_are_ignored():
@@ -157,6 +158,28 @@ def test_yanked_versions_carry_reason():
     yanked = {("dash0-opentelemetry-distro", "0.1.0"): "broken"}
     entries, _ = collect([release("v0.1.0", [DISTRO_WHEEL])], yanked=yanked)
     assert entries[0].yanked_reason == "broken"
+
+
+def test_yank_entry_matching_nothing_aborts():
+    # A yank that matches no indexed file is a silent no-op: the withdrawn
+    # version would keep being served. Generation must fail instead.
+    yanked = {("dash0-opentelemetry-distro", "0.1.0-rc1"): "broken"}
+    with pytest.raises(bsi.IndexGenerationError) as excinfo:
+        collect([release("v0.1.0", [DISTRO_WHEEL])], yanked=yanked)
+    assert "matched no indexed file" in str(excinfo.value)
+    assert "0.1.0-rc1" in str(excinfo.value)
+
+
+def test_expected_projects_derived_from_workspace():
+    assert bsi.expected_projects() == frozenset(
+        {
+            "dash0-opentelemetry-distro",
+            "dash0-opentelemetry-pyproto",
+            "dash0-opentelemetry-exporter-otlp-pyproto-common",
+            "dash0-opentelemetry-exporter-otlp-pyproto-http",
+            "dash0-opentelemetry-exporter-otlp-pyproto-grpc",
+        }
+    )
 
 
 def test_project_names_normalize_per_pep503():

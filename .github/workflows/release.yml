@@ -68,6 +68,13 @@ jobs:
       TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.release-tag }}
       GH_TOKEN: ${{ github.token }}
     steps:
+      - name: Require a release tag
+        run: |
+          set -euo pipefail
+          if [ -z "$TAG" ]; then
+            echo "::error::the release-tag input is required for mode=rebuild-assets"
+            exit 1
+          fi
       - uses: actions/checkout@v7
         with:
           ref: ${{ env.TAG }}
@@ -79,35 +86,35 @@ jobs:
         id: select
         run: |
           set -euo pipefail
+          # The manifest is committed to main by the index job; the tag's
+          # snapshot may predate the previous release's manifest commit, and a
+          # stale manifest would rebuild (and re-upload with different bytes)
+          # filenames that are already published.
+          git fetch --depth 1 origin main
+          git show FETCH_HEAD:scripts/index-manifest.json > manifest-from-main.json
           python3 - <<'EOF'
           import json
           import os
           import re
           from pathlib import Path
 
+          import tomllib
+
           tag = os.environ["TAG"]
-          packages = {
-              "dash0-opentelemetry-pyproto": Path(
-                  "packages/opentelemetry-pyproto/src/opentelemetry/_proto/version/__init__.py"
-              ),
-              "dash0-opentelemetry-exporter-otlp-pyproto-common": Path(
-                  "packages/opentelemetry-exporter-otlp-pyproto-common/src/opentelemetry/exporter/otlp/_proto/common/version/__init__.py"
-              ),
-              "dash0-opentelemetry-exporter-otlp-pyproto-http": Path(
-                  "packages/opentelemetry-exporter-otlp-pyproto-http/src/opentelemetry/exporter/otlp/_proto/http/version/__init__.py"
-              ),
-              "dash0-opentelemetry-exporter-otlp-pyproto-grpc": Path(
-                  "packages/opentelemetry-exporter-otlp-pyproto-grpc/src/opentelemetry/exporter/otlp/_proto/grpc/version/__init__.py"
-              ),
-              "dash0-opentelemetry-distro": Path(
-                  "packages/dash0-opentelemetry-distro/src/dash0/opentelemetry/version.py"
-              ),
-          }
 
-          def version_of(path):
-              return re.search(r'__version__ = "([^"]+)"', path.read_text()).group(1)
+          def version_of(package_dir):
+              data = tomllib.loads((package_dir / "pyproject.toml").read_text())
+              version_file = package_dir / data["tool"]["hatch"]["version"]["path"]
+              return re.search(
+                  r'__version__ = "([^"]+)"', version_file.read_text()
+              ).group(1)
 
-          versions = {name: version_of(path) for name, path in packages.items()}
+          # Derive the package set from the workspace so a new member cannot
+          # be silently dropped from releases by a stale hardcoded list.
+          versions = {}
+          for pyproject in sorted(Path("packages").glob("*/pyproject.toml")):
+              name = tomllib.loads(pyproject.read_text())["project"]["name"]
+              versions[name] = version_of(pyproject.parent)
           for name, version in versions.items():
               assert ".dev" not in version, (
                   f"{name} is at development version {version}; "
@@ -120,7 +127,7 @@ jobs:
               f"expected v{distro_version}"
           )
 
-          manifest = json.loads(Path("scripts/index-manifest.json").read_text())
+          manifest = json.loads(Path("manifest-from-main.json").read_text())
           to_build = []
           for name, version in versions.items():
               wheel = f"{name.replace('-', '_')}-{version}-py3-none-any.whl"
@@ -148,6 +155,16 @@ jobs:
             (cd dist && sha256sum -- * > SHA256SUMS)
           fi
           ls -l dist
+      - name: Validate package metadata
+        run: |
+          set -euo pipefail
+          if [ -n "$(ls -A dist)" ]; then
+            # The old PyPI upload validated metadata server-side; nothing does
+            # once artifacts go straight onto an immutable release. Runs
+            # before publish, where a failure is still recoverable.
+            uv run --no-project --with twine==6.2.0 --python 3.13 \
+              python -m twine check --strict dist/*.whl dist/*.tar.gz
+          fi
       - name: Attest build provenance
         if: hashFiles('dist/*.whl') != ''
         uses: actions/attest-build-provenance@v4
@@ -174,7 +191,15 @@ jobs:
           for file in dist/*; do
             [ -e "$file" ] || continue  # empty dist: nothing new to upload
             name="$(basename "$file")"
-            if echo "$existing_assets" | grep -qx "$name"; then
+            if [ "$is_draft" != "true" ] && [ "$name" != "SHA256SUMS" ] \
+                && ! echo "$existing_assets" | grep -qxF "$name"; then
+              echo "::error::release $TAG is already published without $name." \
+                "Immutable releases cannot receive assets: never create" \
+                "releases from the GitHub UI (push a vX.Y.Z tag instead);" \
+                "this version must be burned - bump and re-tag."
+              exit 1
+            fi
+            if echo "$existing_assets" | grep -qxF "$name"; then
               if [ "$name" = "SHA256SUMS" ]; then
                 # Convenience sidecar, not the trust anchor (that is the
                 # committed manifest): refresh it on re-runs.

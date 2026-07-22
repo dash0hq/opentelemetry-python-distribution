@@ -45,23 +45,29 @@ DEFAULT_MANIFEST = REPO_ROOT / "scripts" / "index-manifest.json"
 DEFAULT_YANKED = REPO_ROOT / "scripts" / "index-yanked.toml"
 DEFAULT_EXCLUDED = REPO_ROOT / "scripts" / "index-excluded.toml"
 
-# Only artifacts of these projects are ever indexed; anything else attached to
-# a release (hostile or stray) is ignored.
-EXPECTED_PROJECTS = frozenset(
-    {
-        "dash0-opentelemetry-pyproto",
-        "dash0-opentelemetry-exporter-otlp-pyproto-common",
-        "dash0-opentelemetry-exporter-otlp-pyproto-http",
-        "dash0-opentelemetry-exporter-otlp-pyproto-grpc",
-        "dash0-opentelemetry-distro",
-    }
-)
+
+def expected_projects(
+    root_pyproject: Path = REPO_ROOT / "pyproject.toml",
+) -> frozenset[str]:
+    """The workspace members, per the root pyproject [tool.uv.sources].
+
+    Only artifacts of these projects are ever indexed; anything else attached
+    to a release (hostile or stray) is ignored. Deriving the set from the
+    workspace definition means a sixth package cannot be silently dropped from
+    the index because a hardcoded list was missed.
+    """
+    sources = tomllib.loads(root_pyproject.read_text())["tool"]["uv"]["sources"]
+    return frozenset(
+        _normalize(name)
+        for name, source in sources.items()
+        if isinstance(source, dict) and source.get("workspace")
+    )
+
 
 _ARTIFACT_RE = re.compile(
     r"^(?P<project>[A-Za-z0-9_.]+)-(?P<version>[0-9][^-]*?)"
     r"(?:-py3-none-any\.whl|\.tar\.gz)$"
 )
-_PRERELEASE_VERSION_RE = re.compile(r"(?:a|b|rc)[0-9]+|\.dev[0-9]+")
 
 
 class IndexGenerationError(Exception):
@@ -143,27 +149,28 @@ def collect_entries(
     downloads.
     """
     url_prefix = expected_asset_url_prefix(repo)
+    projects = expected_projects()
     additions: dict[str, str] = {}
     entries: dict[str, Entry] = {}
-    for release in releases:
+    unmatched_yanks = dict(yanked)
+    # The GitHub API returns releases newest-first; process oldest-first so
+    # the ORIGINAL release's asset URL wins when a filename legitimately
+    # appears on several releases (identical bytes) — that URL is the stable
+    # one consumers' lockfiles should capture.
+    for release in sorted(releases, key=lambda r: r.get("created_at", "")):
         if release.get("draft"):
             continue
+        # The GitHub pre-release flag is cosmetic here: pre-releaseness lives
+        # in the PEP 440 version string, which resolvers act on per file, and
+        # a post-publish index failure on immutable assets would deadlock the
+        # pipeline.
         for asset in release.get("assets", []):
             filename = asset["name"]
             match = _ARTIFACT_RE.match(filename)
-            if not match or _normalize(match["project"]) not in EXPECTED_PROJECTS:
+            if not match or _normalize(match["project"]) not in projects:
                 continue
             if filename in excluded:
                 continue
-            if release.get("prerelease") and not _PRERELEASE_VERSION_RE.search(
-                match["version"]
-            ):
-                raise IndexGenerationError(
-                    f"release {release.get('tag_name')} is marked as a GitHub "
-                    f"pre-release but {filename} does not carry a PEP 440 "
-                    f"pre-release version; publish it as a full release or "
-                    f"use an rc/dev version"
-                )
             url = asset["browser_download_url"]
             if not url.startswith(url_prefix):
                 raise IndexGenerationError(
@@ -182,16 +189,25 @@ def collect_entries(
                 )
             if filename not in manifest:
                 additions[filename] = digest
-            if filename not in entries:  # first (oldest) release wins
+            if filename not in entries:  # oldest release wins
+                yank_key = (_normalize(match["project"]), match["version"])
+                unmatched_yanks.pop(yank_key, None)
                 entries[filename] = Entry(
                     filename=filename,
                     url=url,
                     sha256=digest,
                     uploaded_at=asset.get("created_at", ""),
-                    yanked_reason=yanked.get(
-                        (_normalize(match["project"]), match["version"])
-                    ),
+                    yanked_reason=yanked.get(yank_key),
                 )
+    if unmatched_yanks:
+        # A yank that matches nothing is a silent no-op: the "withdrawn"
+        # version would keep being served while the maintainer believes it
+        # was pulled. Fail so the entry gets corrected.
+        listed = ", ".join(f"{p} {v}" for p, v in sorted(unmatched_yanks))
+        raise IndexGenerationError(
+            f"index-yanked.toml entries matched no indexed file: {listed}. "
+            f"Use the exact version as it appears in the artifact filename."
+        )
     return sorted(entries.values(), key=lambda e: e.filename), additions
 
 

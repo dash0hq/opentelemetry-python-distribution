@@ -36,6 +36,12 @@ Changed
   and selects it when ``OTEL_EXPORTER_OTLP_PROTOCOL=grpc`` (or a per-signal
   ``OTEL_EXPORTER_OTLP_<SIGNAL>_PROTOCOL``) is set; unsupported protocol values
   fall back to OTLP/HTTP with a warning.
+- ``opentelemetry-exporter-otlp-pyproto-grpc`` no longer depends on ``grpcio``:
+  the exporter now ships a vendored pure-Python HTTP/2 gRPC transport
+  (``_pygrpc``, from `open-telemetry/opentelemetry-packaging
+  <https://github.com/open-telemetry/opentelemetry-packaging>`_), so it installs
+  and runs without any compiled extension (`#2
+  <https://github.com/dash0hq/opentelemetry-python-distribution/issues/2>`_).
 
 Fixed
 -----
@@ -50,9 +56,3 @@ Fixed
   protocol's default only when the base URL carries the other protocol's default
   port; custom ports and explicit per-signal endpoints are left untouched (`#14
   <https://github.com/dash0hq/opentelemetry-python-distribution/issues/14>`_).
-- ``opentelemetry-exporter-otlp-pyproto-grpc`` no longer depends on ``grpcio``:
-  the exporter now ships a vendored pure-Python HTTP/2 gRPC transport
-  (``_pygrpc``, from `open-telemetry/opentelemetry-packaging
-  <https://github.com/open-telemetry/opentelemetry-packaging>`_), so it installs
-  and runs without any compiled extension (`#2
-  <https://github.com/dash0hq/opentelemetry-python-distribution/issues/2>`_).

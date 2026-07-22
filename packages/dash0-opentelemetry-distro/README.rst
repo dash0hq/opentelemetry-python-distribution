@@ -134,6 +134,7 @@ Status
 ======
 
 Prototype. The ``otlp_proto_http`` exporter is resolved from the in-repo pyproto
-workspace member (not yet on PyPI). Not yet done: the injector's per-``libc``
-packaging and the integration/injection test matrix. Unit tests do not require
-a running collector.
+workspace member, published as ``dash0-opentelemetry-exporter-otlp-pyproto-http``
+on the Dash0 package index (not on public PyPI). Not yet done: the injector's
+per-``libc`` packaging and the integration/injection test matrix. Unit tests do
+not require a running collector.

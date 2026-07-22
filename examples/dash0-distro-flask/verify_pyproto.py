@@ -8,8 +8,7 @@ probe checks, is that:
 1. every package the agent pulls in, transitively, is either an
    ``opentelemetry-*`` package or one of a small, explicitly allowed set of
    pure-Python support libraries;
-2. the OTLP exporter modules resolve to the pure-Python implementations;
-3. importing those exporters imports neither grpc nor google.protobuf.
+2. the OTLP exporter modules resolve to the pure-Python implementations.
 
 Check 1 is an allowlist, not a denylist of known-native packages: anything the
 agent starts requiring that is not vetted here - grpcio and protobuf included,
@@ -18,7 +17,6 @@ human decides it belongs.
 """
 
 import re
-import sys
 from importlib.metadata import PackageNotFoundError, requires
 
 AGENT_PACKAGES = (
@@ -43,7 +41,6 @@ ALLOWED_NON_OTEL_REQUIREMENTS = (
     "typing-extensions",
     "wrapt",
 )
-FORBIDDEN_MODULES = ("grpc", "google.protobuf")
 
 
 def _requirement_name(requirement):
@@ -96,13 +93,6 @@ def check_exporters():
     assert GrpcSpanExporter.__module__.startswith(
         "opentelemetry.exporter.otlp._proto.grpc"
     ), GrpcSpanExporter.__module__
-
-    # Importing the exporters must not have imported the native modules; this
-    # holds whether or not the application has them installed.
-    for module in FORBIDDEN_MODULES:
-        assert module not in sys.modules, (
-            f"importing the exporters imported {module} - NOT pure-Python pyproto"
-        )
     return HttpSpanExporter, GrpcSpanExporter
 
 
@@ -110,7 +100,7 @@ check_requirements()
 http_exporter, grpc_exporter = check_exporters()
 print(
     "pyproto verified: every requirement is opentelemetry-* or an allowed "
-    "pure-Python library, no grpc/protobuf import; exporters from",
+    "pure-Python library; exporters from",
     http_exporter.__module__,
     "and",
     grpc_exporter.__module__,

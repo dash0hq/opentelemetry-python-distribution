@@ -186,6 +186,70 @@ def test_configure_does_not_override_explicit_per_signal_endpoint(monkeypatch):
     assert os.environ[OTEL_EXPORTER_OTLP_TRACES_ENDPOINT] == "http://sidecar:12345"
 
 
+def test_configure_skips_derivation_for_user_selected_exporter(monkeypatch):
+    # The user picked the traces exporter directly, without a protocol override:
+    # the distro cannot know which transport that exporter speaks, so it must
+    # not derive a traces endpoint from the (defaulted) protocol variable —
+    # doing so would redirect the working gRPC exporter to the HTTP port.
+    monkeypatch.setenv(DASH0_OTEL_COLLECTOR_BASE_URL, "http://collector:4317")
+    monkeypatch.setenv(OTEL_TRACES_EXPORTER, "otlp_proto_grpc")
+
+    Dash0Distro().configure()
+
+    assert os.environ[OTEL_TRACES_EXPORTER] == "otlp_proto_grpc"
+    assert OTEL_EXPORTER_OTLP_TRACES_ENDPOINT not in os.environ
+    # The other signals still default to HTTP and get healed endpoints.
+    assert (
+        os.environ[OTEL_EXPORTER_OTLP_METRICS_ENDPOINT]
+        == "http://collector:4318/v1/metrics"
+    )
+    assert (
+        os.environ[OTEL_EXPORTER_OTLP_LOGS_ENDPOINT] == "http://collector:4318/v1/logs"
+    )
+
+
+def test_configure_derives_endpoints_after_unsupported_protocol_fallback(monkeypatch):
+    # An unsupported protocol falls back to HTTP, and that fallback protocol
+    # drives endpoint derivation: against a gRPC-port base URL every signal
+    # gets a per-signal HTTP endpoint.
+    monkeypatch.setenv(DASH0_OTEL_COLLECTOR_BASE_URL, "http://collector:4317")
+    monkeypatch.setenv(OTEL_EXPORTER_OTLP_PROTOCOL, "http/json")
+
+    Dash0Distro().configure()
+
+    assert os.environ[OTEL_TRACES_EXPORTER] == "otlp_proto_http"
+    assert (
+        os.environ[OTEL_EXPORTER_OTLP_TRACES_ENDPOINT]
+        == "http://collector:4318/v1/traces"
+    )
+    assert (
+        os.environ[OTEL_EXPORTER_OTLP_METRICS_ENDPOINT]
+        == "http://collector:4318/v1/metrics"
+    )
+    assert (
+        os.environ[OTEL_EXPORTER_OTLP_LOGS_ENDPOINT] == "http://collector:4318/v1/logs"
+    )
+
+
+def test_configure_derives_from_user_set_shared_endpoint(monkeypatch):
+    # A user-set OTEL_EXPORTER_OTLP_ENDPOINT wins over the collector base URL
+    # and becomes the base for per-signal endpoint derivation.
+    monkeypatch.setenv(DASH0_OTEL_COLLECTOR_BASE_URL, "http://collector:4318")
+    monkeypatch.setenv(OTEL_EXPORTER_OTLP_ENDPOINT, "http://custom:4317")
+
+    Dash0Distro().configure()
+
+    assert os.environ[OTEL_EXPORTER_OTLP_ENDPOINT] == "http://custom:4317"
+    assert (
+        os.environ[OTEL_EXPORTER_OTLP_TRACES_ENDPOINT] == "http://custom:4318/v1/traces"
+    )
+    assert (
+        os.environ[OTEL_EXPORTER_OTLP_METRICS_ENDPOINT]
+        == "http://custom:4318/v1/metrics"
+    )
+    assert os.environ[OTEL_EXPORTER_OTLP_LOGS_ENDPOINT] == "http://custom:4318/v1/logs"
+
+
 def test_configure_falls_back_to_http_for_unsupported_protocol(monkeypatch):
     monkeypatch.setenv(DASH0_OTEL_COLLECTOR_BASE_URL, "http://collector:4318")
     monkeypatch.setenv(OTEL_EXPORTER_OTLP_PROTOCOL, "http/json")

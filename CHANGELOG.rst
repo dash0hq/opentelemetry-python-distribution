@@ -36,6 +36,20 @@ Changed
   and selects it when ``OTEL_EXPORTER_OTLP_PROTOCOL=grpc`` (or a per-signal
   ``OTEL_EXPORTER_OTLP_<SIGNAL>_PROTOCOL``) is set; unsupported protocol values
   fall back to OTLP/HTTP with a warning.
+
+Fixed
+-----
+
+- When signals resolve to different OTLP protocols (via the per-signal
+  ``OTEL_EXPORTER_OTLP_<SIGNAL>_PROTOCOL`` overrides), the distribution now
+  derives a matching per-signal endpoint instead of pointing every signal at a
+  single shared ``OTEL_EXPORTER_OTLP_ENDPOINT``. OTLP/gRPC (port 4317) and
+  OTLP/HTTP (port 4318, signal path appended) cannot share one endpoint, so a
+  gRPC signal against an HTTP-port base URL — or the reverse — was previously
+  sent to the wrong port and silently failed. The port is rewritten to the
+  protocol's default only when the base URL carries the other protocol's default
+  port; custom ports and explicit per-signal endpoints are left untouched (`#14
+  <https://github.com/dash0hq/opentelemetry-python-distribution/issues/14>`_).
 - ``opentelemetry-exporter-otlp-pyproto-grpc`` no longer depends on ``grpcio``:
   the exporter now ships a vendored pure-Python HTTP/2 gRPC transport
   (``_pygrpc``, from `open-telemetry/opentelemetry-packaging

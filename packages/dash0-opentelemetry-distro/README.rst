@@ -38,6 +38,15 @@ Entry points
       (``DASH0_FLUSH_ON_SIGTERM_SIGINT=true``) — normal-exit flushing is already
       handled by the SDK's ``atexit`` provider shutdown.
 
+    When **declarative configuration** is active (``OTEL_CONFIG_FILE``), the
+    configurator loads the config file itself and adds the distro's resource
+    detectors (see below) to the parsed configuration before handing it to the
+    SDK. Declarative configuration ignores
+    ``OTEL_RESOURCE_ATTRIBUTES``/``OTEL_SERVICE_NAME``, so without this the
+    distro's detected resource attributes would silently disappear. Attributes
+    declared in the config file always take precedence over detected ones, and
+    detectors already listed in the file are not added twice.
+
 Resource detectors (``opentelemetry_resource_detector``)
     The detected resource attributes (see below) as standard SDK resource
     detectors, one per concern so each can be used (or omitted) independently:
@@ -50,11 +59,13 @@ Resource detectors (``opentelemetry_resource_detector``)
       ``service.name`` fallback, so there is no need to also list the built-in
       ``service`` detector.
 
-    They can be referenced via ``OTEL_EXPERIMENTAL_RESOURCE_DETECTORS``, or
-    explicitly in a declarative config file under
-    ``resource.detection/development.detectors``. (Note: on the pinned SDK
-    1.43, the upstream loader rejects the ``detection/development`` config-file
-    key — fixed upstream in 1.44.)
+    All three are added automatically in the declarative-configuration path;
+    they can also be referenced explicitly in a config file under
+    ``resource.detection/development.detectors``, or via
+    ``OTEL_EXPERIMENTAL_RESOURCE_DETECTORS``. (Note: on the pinned SDK 1.43,
+    the upstream loader rejects the ``detection/development`` config-file key —
+    fixed upstream in 1.44 — so the automatic injection is currently the only
+    way detectors run under declarative configuration.)
 
 Resource detection
 ==================

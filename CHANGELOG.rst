@@ -18,7 +18,12 @@ Added
   ``dash0_distribution`` (``telemetry.distro.*``), ``dash0_kubernetes``
   (``k8s.pod.uid``) and ``dash0_service_name`` (upstream service detection —
   ``service.instance.id`` and ``OTEL_SERVICE_NAME`` — plus the distro's
-  service-name fallback).
+  service-name fallback). When declarative configuration is active
+  (``OTEL_CONFIG_FILE``), ``Dash0Configurator`` now adds these detectors to the
+  parsed configuration automatically, so those attributes are no longer dropped
+  (`#6
+  <https://github.com/dash0hq/opentelemetry-python-distribution/issues/6>`_);
+  attributes declared in the config file still take precedence.
 - ``Dash0Distro`` and ``Dash0Configurator`` providing zero-code instrumentation,
   pure-Python OTLP/HTTP export by default, an enable/disable gate, a Kubernetes
   pod-UID resource detector, a service-name fallback, a ``telemetry.distro.name``

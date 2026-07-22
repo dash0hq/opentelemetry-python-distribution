@@ -117,22 +117,20 @@ One-time administrative setup
 
 Repository (an admin, before the first release):
 
-1. The repository must be public — release-asset URLs and GitHub Pages depend
-   on it.
-2. Enable **immutable releases** (Settings → General → Releases).
+1. Enable **immutable releases** (Settings → General → Releases).
 3. Add a **tag ruleset** for ``v*`` forbidding tag updates and deletions.
 4. Enable **GitHub Pages** with "GitHub Actions" as the source.
 5. Configure the ``github-pages`` environment's deployment policy to allow
    the default branch **and the ``v*`` tag pattern** — release-triggered runs
    deploy from tag refs; a branch-only policy silently blocks every release
    deploy.
-6. Create the **index deploy key**: generate an SSH keypair, add the public
+5. Create the **index deploy key**: generate an SSH keypair, add the public
    key as a repository deploy key with write access, store the private key as
    the ``INDEX_DEPLOY_KEY`` secret, and grant the deploy key bypass on the
    ``main`` branch ruleset. This is the only credential that can push the
    manifest commits; do not widen branch protection for the generic Actions
    token instead.
-7. Create the ``pypi`` environment with **required reviewers** and a
+6. Create the ``pypi`` environment with **required reviewers** and a
    deployment policy restricted to the default branch (used only by the name
    reservation below).
 
@@ -159,11 +157,36 @@ moment it merges):
 5. When the PEP 755 namespace-grant process goes live on PyPI, apply for a
    restricted grant on the ``dash0`` prefix through the organization account.
 
+While the repository is private
+===============================
+
+The pipeline works unchanged on the private repository — releases, assets,
+manifest commits, and attestations all function — but the *anonymous*
+consumption paths do not: access-controlled Pages sites authenticate with
+GitHub SSO cookies (no token/header auth exists for them, so pip can never
+read the index), and release-asset ``browser_download_url``\ s do not honor
+token auth from pip's fetcher. Until the repository goes public, consumers
+must fetch the wheels with an authenticated client *before* pip runs::
+
+    gh release download "v${VERSION}" --repo dash0hq/opentelemetry-python-distribution \
+      --pattern '*.whl' --dir wheels/
+    pip install --no-index --find-links wheels/ \
+      --require-hashes --only-binary :all: -r requirements.txt
+
+Renovate tracks versions with its ``github-releases`` datasource (same token)
+instead of the ``pypi`` datasource below.
+
+Going public later requires no re-publishing: asset URLs are stable across the
+visibility flip, the Pages site moves from its obfuscated
+``*.pages.github.io`` domain to the canonical URL below automatically, and the
+index-based consumer contract takes over from this section.
+
 Consumer contract
 =================
 
 Consumers (today: the dash0-operator's instrumentation image build) install
-with the index as an *extra* index and full hash pinning::
+with the index as an *extra* index and full hash pinning (**requires the
+repository to be public**; see the previous section until then)::
 
     pip install \
       --extra-index-url https://dash0hq.github.io/opentelemetry-python-distribution/simple/ \

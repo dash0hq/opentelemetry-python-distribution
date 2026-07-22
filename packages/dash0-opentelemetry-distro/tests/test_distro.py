@@ -267,6 +267,14 @@ def test_load_instrumentor_skips_when_disabled():
         ),
         # IPv6 literal keeps its brackets around the rewritten port.
         ("http://[::1]:4318", "grpc", "v1/traces", "http://[::1]:4317"),
+        # A query string stays a query string: the HTTP signal path lands on the
+        # URL path, not appended after the query.
+        (
+            "http://collector:4317?x=1",
+            "http/protobuf",
+            "v1/metrics",
+            "http://collector:4318/v1/metrics?x=1",
+        ),
         # Custom and absent ports are left alone.
         ("http://collector:9999", "grpc", "v1/traces", None),
         ("http://collector", "grpc", "v1/traces", None),

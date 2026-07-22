@@ -28,17 +28,28 @@ AGENT_PACKAGES = (
     "opentelemetry-exporter-otlp-pyproto-grpc",
     "dash0-opentelemetry-distro",
 )
-# The non-opentelemetry-* packages the agent is allowed to pull in transitively.
-# These are the pure-Python support libraries of opentelemetry-api/sdk/
-# instrumentation (no compiled extensions). Everything else - including grpcio
-# and protobuf - is rejected. Keep this list in sync when bumping the pinned
-# opentelemetry versions in dash0-opentelemetry-distro's pyproject.toml.
-ALLOWED_NON_OTEL_REQUIREMENTS = ("packaging", "typing-extensions", "wrapt")
+# The non-opentelemetry-* packages the agent is allowed to pull in transitively,
+# as PEP 503-normalized names. Most are pure-Python support libraries of
+# opentelemetry-api/sdk/instrumentation; psutil (required by
+# opentelemetry-instrumentation-system-metrics) is the one exception - it carries
+# a compiled extension but is deliberately accepted so the curated set can ship
+# system metrics. Everything else - including grpcio and protobuf - is rejected.
+# Keep this list in sync when bumping the pinned opentelemetry versions in
+# dash0-opentelemetry-distro's pyproject.toml.
+ALLOWED_NON_OTEL_REQUIREMENTS = (
+    "asgiref",
+    "packaging",
+    "psutil",
+    "typing-extensions",
+    "wrapt",
+)
 FORBIDDEN_MODULES = ("grpc", "google.protobuf")
 
 
 def _requirement_name(requirement):
-    return re.split(r"[\s\[<>=!~;(]", requirement.strip(), maxsplit=1)[0].lower()
+    name = re.split(r"[\s\[<>=!~;(]", requirement.strip(), maxsplit=1)[0].lower()
+    # Normalize per PEP 503 so e.g. "typing_extensions" matches "typing-extensions".
+    return re.sub(r"[-_.]+", "-", name)
 
 
 def check_requirements():

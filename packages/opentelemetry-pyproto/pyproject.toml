@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "opentelemetry-pyproto"
+name = "dash0-opentelemetry-pyproto"
 dynamic = ["version"]
 description = "OpenTelemetry Python Proto — pure-Python protobuf message classes (no google.protobuf)"
 readme = "README.rst"

@@ -9,6 +9,21 @@ to follow `Semantic Versioning <https://semver.org/>`_ once it is published.
 Unreleased
 ==========
 
+Changed
+-------
+
+- The vendored pure-Python OTLP packages are renamed at the distribution level
+  to Dash0-owned names — ``dash0-opentelemetry-pyproto`` and
+  ``dash0-opentelemetry-exporter-otlp-pyproto-{common,http,grpc}`` — so they
+  can be published without claiming ``opentelemetry-*`` names the upstream
+  OpenTelemetry project intends to release itself. Import paths and entry-point
+  names are unchanged; when upstream publishes the official packages, the
+  distribution will switch its dependencies over and deprecate the renamed
+  copies.
+  The distribution now pins the renamed exporters exactly, like every other
+  dependency, and package versions moved to release form (``1.44.0``; the
+  distribution itself is ``0.1.0``).
+
 Added
 -----
 

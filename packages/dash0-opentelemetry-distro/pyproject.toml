@@ -31,11 +31,12 @@ dependencies = [
   "opentelemetry-instrumentation == 0.65b0",
   "opentelemetry-semantic-conventions == 0.65b0",
   # Pure-Python OTLP exporters (no native dependencies), vendored in this
-  # workspace from open-telemetry/opentelemetry-packaging. Not yet published,
-  # so these dependencies are not resolvable from PyPI until they are released
-  # or vendored into the injected tree.
-  "opentelemetry-exporter-otlp-pyproto-http",
-  "opentelemetry-exporter-otlp-pyproto-grpc",
+  # workspace from open-telemetry/opentelemetry-packaging under Dash0-owned
+  # distribution names (import paths and entry points stay upstream-shaped).
+  # Published on the Dash0 package index, not on public PyPI; resolvable there
+  # or from this workspace.
+  "dash0-opentelemetry-exporter-otlp-pyproto-http == 1.44.0",
+  "dash0-opentelemetry-exporter-otlp-pyproto-grpc == 1.44.0",
 
   # --- Curated instrumentation set ---
   # The full upstream auto-instrumentation list (the bootstrap_gen module of

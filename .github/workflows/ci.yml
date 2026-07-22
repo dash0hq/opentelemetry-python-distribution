@@ -55,10 +55,10 @@ jobs:
         run: |
           set -euo pipefail
           for name in \
-            opentelemetry-pyproto \
-            opentelemetry-exporter-otlp-pyproto-common \
-            opentelemetry-exporter-otlp-pyproto-http \
-            opentelemetry-exporter-otlp-pyproto-grpc \
+            dash0-opentelemetry-pyproto \
+            dash0-opentelemetry-exporter-otlp-pyproto-common \
+            dash0-opentelemetry-exporter-otlp-pyproto-http \
+            dash0-opentelemetry-exporter-otlp-pyproto-grpc \
             dash0-opentelemetry-distro; do
             echo "::group::build $name"
             uv build --package "$name" --out-dir dist

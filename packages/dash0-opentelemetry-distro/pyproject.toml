@@ -106,6 +106,21 @@ dependencies = [
   # covers instrumentations: the X-Ray propagator was always part of the Dash0
   # operator's instrumentation image.
   "opentelemetry-propagator-aws-xray == 1.0.2",
+
+  # --- Transitive dependencies ---
+  # Everything the packages above pull in transitively, declared here with an
+  # exact pin so the full injected tree is spelled out in this file and no
+  # version is left to transitive resolution.
+  # scripts/check_pinned_dependencies.py fails the build when this block
+  # drifts from the resolved closure.
+  "asgiref == 3.12.1",
+  "opentelemetry-semantic-conventions == 0.65b0",
+  "opentelemetry-util-genai == 0.2b0",
+  "opentelemetry-util-http == 0.65b0",
+  "packaging == 26.2",
+  "psutil == 7.2.2",
+  "typing-extensions == 4.16.0",
+  "wrapt == 1.17.3",
 ]
 
 [project.entry-points.opentelemetry_distro]

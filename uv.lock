@@ -41,6 +41,7 @@ wheels = [
 name = "dash0-opentelemetry-distro"
 source = { editable = "packages/dash0-opentelemetry-distro" }
 dependencies = [
+    { name = "asgiref" },
     { name = "opentelemetry-api" },
     { name = "opentelemetry-exporter-otlp-pyproto-grpc" },
     { name = "opentelemetry-exporter-otlp-pyproto-http" },
@@ -99,6 +100,13 @@ dependencies = [
     { name = "opentelemetry-instrumentation-wsgi" },
     { name = "opentelemetry-propagator-aws-xray" },
     { name = "opentelemetry-sdk" },
+    { name = "opentelemetry-semantic-conventions" },
+    { name = "opentelemetry-util-genai" },
+    { name = "opentelemetry-util-http" },
+    { name = "packaging" },
+    { name = "psutil" },
+    { name = "typing-extensions" },
+    { name = "wrapt" },
 ]
 
 [package.dev-dependencies]
@@ -108,6 +116,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "asgiref", specifier = "==3.12.1" },
     { name = "opentelemetry-api", specifier = "==1.44.0" },
     { name = "opentelemetry-exporter-otlp-pyproto-grpc", editable = "packages/opentelemetry-exporter-otlp-pyproto-grpc" },
     { name = "opentelemetry-exporter-otlp-pyproto-http", editable = "packages/opentelemetry-exporter-otlp-pyproto-http" },
@@ -166,6 +175,13 @@ requires-dist = [
     { name = "opentelemetry-instrumentation-wsgi", specifier = "==0.65b0" },
     { name = "opentelemetry-propagator-aws-xray", specifier = "==1.0.2" },
     { name = "opentelemetry-sdk", specifier = "==1.44.0" },
+    { name = "opentelemetry-semantic-conventions", specifier = "==0.65b0" },
+    { name = "opentelemetry-util-genai", specifier = "==0.2b0" },
+    { name = "opentelemetry-util-http", specifier = "==0.65b0" },
+    { name = "packaging", specifier = "==26.2" },
+    { name = "psutil", specifier = "==7.2.2" },
+    { name = "typing-extensions", specifier = "==4.16.0" },
+    { name = "wrapt", specifier = "==1.17.3" },
 ]
 
 [package.metadata.requires-dev]

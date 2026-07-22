@@ -35,6 +35,9 @@ Added
   0.64b0): it ships a curated, validated set of versions rather than a range,
   and CI now fails if a non-exact constraint is reintroduced
   (`#7 <https://github.com/dash0hq/opentelemetry-python-distribution/issues/7>`_).
+  The pins now also cover the full transitive closure: every package the
+  distribution pulls in is declared directly with an exact pin, and CI fails
+  when the declared set drifts from the resolved closure.
 - The curated instrumentation set: the distribution now depends on every
   upstream auto-instrumentation package (contrib 0.65b0, moving
   ``opentelemetry-api``/``-sdk`` to 1.44.0) plus

@@ -21,6 +21,8 @@ jobs:
         run: uvx ruff@latest check packages/dash0-opentelemetry-distro examples scripts
       - name: Ruff format check
         run: uvx ruff@latest format --check packages/dash0-opentelemetry-distro examples scripts
+      - name: Check uv.lock is up to date
+        run: uv lock --check
       - name: Check exact dependency pins
         run: uv run --no-project --python 3.13 scripts/check_pinned_dependencies.py
 

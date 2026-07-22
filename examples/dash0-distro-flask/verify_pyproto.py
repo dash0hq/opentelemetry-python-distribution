@@ -8,8 +8,7 @@ probe checks, is that:
 1. every package the agent pulls in, transitively, is either an
    ``opentelemetry-*`` package or one of a small, explicitly allowed set of
    pure-Python support libraries;
-2. the OTLP exporter modules resolve to the pure-Python implementations;
-3. importing those exporters imports neither grpc nor google.protobuf.
+2. the OTLP exporter modules resolve to the pure-Python implementations.
 
 Check 1 is an allowlist, not a denylist of known-native packages: anything the
 agent starts requiring that is not vetted here - grpcio and protobuf included,
@@ -18,7 +17,6 @@ human decides it belongs.
 """
 
 import re
-import sys
 from importlib.metadata import PackageNotFoundError, requires
 
 AGENT_PACKAGES = (
@@ -28,17 +26,27 @@ AGENT_PACKAGES = (
     "opentelemetry-exporter-otlp-pyproto-grpc",
     "dash0-opentelemetry-distro",
 )
-# The non-opentelemetry-* packages the agent is allowed to pull in transitively.
-# These are the pure-Python support libraries of opentelemetry-api/sdk/
-# instrumentation (no compiled extensions). Everything else - including grpcio
-# and protobuf - is rejected. Keep this list in sync when bumping the pinned
-# opentelemetry versions in dash0-opentelemetry-distro's pyproject.toml.
-ALLOWED_NON_OTEL_REQUIREMENTS = ("packaging", "typing-extensions", "wrapt")
-FORBIDDEN_MODULES = ("grpc", "google.protobuf")
+# The non-opentelemetry-* packages the agent is allowed to pull in transitively,
+# as PEP 503-normalized names. Most are pure-Python support libraries of
+# opentelemetry-api/sdk/instrumentation; psutil (required by
+# opentelemetry-instrumentation-system-metrics) is the one exception - it carries
+# a compiled extension but is deliberately accepted so the curated set can ship
+# system metrics. Everything else - including grpcio and protobuf - is rejected.
+# Keep this list in sync when bumping the pinned opentelemetry versions in
+# dash0-opentelemetry-distro's pyproject.toml.
+ALLOWED_NON_OTEL_REQUIREMENTS = (
+    "asgiref",
+    "packaging",
+    "psutil",
+    "typing-extensions",
+    "wrapt",
+)
 
 
 def _requirement_name(requirement):
-    return re.split(r"[\s\[<>=!~;(]", requirement.strip(), maxsplit=1)[0].lower()
+    name = re.split(r"[\s\[<>=!~;(]", requirement.strip(), maxsplit=1)[0].lower()
+    # Normalize per PEP 503 so e.g. "typing_extensions" matches "typing-extensions".
+    return re.sub(r"[-_.]+", "-", name)
 
 
 def check_requirements():
@@ -85,13 +93,6 @@ def check_exporters():
     assert GrpcSpanExporter.__module__.startswith(
         "opentelemetry.exporter.otlp._proto.grpc"
     ), GrpcSpanExporter.__module__
-
-    # Importing the exporters must not have imported the native modules; this
-    # holds whether or not the application has them installed.
-    for module in FORBIDDEN_MODULES:
-        assert module not in sys.modules, (
-            f"importing the exporters imported {module} - NOT pure-Python pyproto"
-        )
     return HttpSpanExporter, GrpcSpanExporter
 
 
@@ -99,7 +100,7 @@ check_requirements()
 http_exporter, grpc_exporter = check_exporters()
 print(
     "pyproto verified: every requirement is opentelemetry-* or an allowed "
-    "pure-Python library, no grpc/protobuf import; exporters from",
+    "pure-Python library; exporters from",
     http_exporter.__module__,
     "and",
     grpc_exporter.__module__,

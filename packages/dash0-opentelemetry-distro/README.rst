@@ -52,9 +52,33 @@ Resource detectors (``opentelemetry_resource_detector``)
 
     They can be referenced via ``OTEL_EXPERIMENTAL_RESOURCE_DETECTORS``, or
     explicitly in a declarative config file under
-    ``resource.detection/development.detectors``. (Note: on the pinned SDK
-    1.43, the upstream loader rejects the ``detection/development`` config-file
-    key — fixed upstream in 1.44.)
+    ``resource.detection/development.detectors``.
+
+Instrumentations
+================
+
+The distribution depends on the full upstream auto-instrumentation set — every
+package enumerated by the ``bootstrap_gen`` module of
+``opentelemetry-instrumentation`` (the list behind ``opentelemetry-bootstrap``)
+— pinned to a single contrib version, so injected processes need no bootstrap
+step. Instrumentations only activate when their target library is present,
+which makes carrying all of them safe.
+
+Deviations from the upstream list:
+
+* ``opentelemetry-propagator-aws-xray`` is shipped although upstream's
+  bootstrap list only covers instrumentations (the Dash0 operator's
+  instrumentation image always carried it).
+* ``opentelemetry-exporter-prometheus``,
+  ``opentelemetry-propagator-ot-trace``, and
+  ``opentelemetry-instrumentation-aws-lambda`` are deliberately not shipped.
+
+``tests/test_instrumentations.py`` cross-checks the dependency block against
+the installed upstream list, so a contrib version bump that adds or removes
+instrumentations fails CI until the block is re-synced. Dependabot keeps the
+pins themselves moving (all ``opentelemetry-*`` packages are grouped into one
+update, since the contrib instrumentations only resolve when they share one
+contrib version).
 
 Resource detection
 ==================
@@ -79,7 +103,9 @@ Dependency policy
 The distribution ships a curated set of upstream OpenTelemetry packages, pinned
 exactly in its ``pyproject.toml``: each release is validated against precisely
 those versions, and the code assumes them. Version bumps are deliberate,
-standalone changes. CI enforces the policy via
+standalone changes. The pins cover the *entire* installed tree: every package
+the distribution pulls in transitively is also declared directly with an exact
+pin, so no version is left to transitive resolution. CI enforces both rules via
 ``scripts/check_pinned_dependencies.py`` (in-repo workspace members are exempt,
 as their version is fixed by the checkout).
 
@@ -101,5 +127,5 @@ Status
 
 Prototype. The ``otlp_proto_http`` exporter is resolved from the in-repo pyproto
 workspace member (not yet on PyPI). Not yet done: the injector's per-``libc``
-packaging, the curated instrumentation pin set, and the integration/injection
-test matrix. Unit tests do not require a running collector.
+packaging and the integration/injection test matrix. Unit tests do not require
+a running collector.

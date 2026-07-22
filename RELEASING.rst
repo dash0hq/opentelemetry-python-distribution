@@ -59,16 +59,15 @@ Cutting a release
 
    .. code-block:: bash
 
-       go run go.opentelemetry.io/build-tools/chloggen@v0.30.0 update \
-         --config .chloggen/config.yaml --version "<distro-version> - <YYYY-MM-DD>"
+       make chlog-update VERSION="<distro-version> - <YYYY-MM-DD>"
        uv lock
 
-   ``chloggen update`` inserts the rendered section below the
+   ``make chlog-update`` inserts the rendered section below the
    ``.. <!-- next version -->`` marker and deletes the entry files it consumed;
-   commit both the ``CHANGELOG.rst`` edit and the deletions. Pass ``--version``
+   commit both the ``CHANGELOG.rst`` edit and the deletions. Pass ``VERSION``
    exactly as the heading should read — this project uses ``<version> - <date>``
-   — and preview without writing using ``--dry``. Released sections are
-   generated: never hand-edit them.
+   — and preview without writing using ``make chlog-preview``. Released sections
+   are generated: never hand-edit them. See ``docs/changelog-maintenance.rst``.
 3. Land those changes on ``main`` through a PR.
 4. Tag and push: ``git tag v<distro-version> && git push origin v<distro-version>``.
 

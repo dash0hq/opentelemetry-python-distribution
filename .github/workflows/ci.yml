@@ -56,9 +56,7 @@ jobs:
         with:
           go-version: stable
       - name: Validate changelog entries
-        run: >
-          go run go.opentelemetry.io/build-tools/chloggen@v0.30.0 validate
-          --config .chloggen/config.yaml
+        run: make chlog-validate
 
   scripts-test:
     runs-on: ubuntu-latest

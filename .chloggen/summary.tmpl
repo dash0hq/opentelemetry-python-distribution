@@ -9,7 +9,7 @@
 ========================================
 {{- if .BreakingChanges }}
 
-Breaking changes
+Breaking Changes
 ----------------
 {{ range .BreakingChanges }}
 {{ template "entry" . }}{{ end }}
@@ -23,7 +23,7 @@ Deprecations
 {{- end }}
 {{- if .NewComponents }}
 
-New components
+New Components
 --------------
 {{ range .NewComponents }}
 {{ template "entry" . }}{{ end }}
@@ -37,7 +37,7 @@ Enhancements
 {{- end }}
 {{- if .BugFixes }}
 
-Bug fixes
+Bug Fixes
 ---------
 {{ range .BugFixes }}
 {{ template "entry" . }}{{ end }}

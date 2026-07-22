@@ -24,9 +24,9 @@ summary_template: .chloggen/summary.tmpl
 # The changelog files entries are compiled into. This distribution keeps a single
 # user-facing changelog.
 change_logs:
-  default: CHANGELOG.rst
+  user: CHANGELOG.rst
 default_change_logs:
-  - default
+  - user
 
 # Allowed `component` values. Empty means any component name is accepted; add
 # names here to enforce a fixed vocabulary.

@@ -25,9 +25,11 @@ classifiers = [
 # every release is validated against precisely these versions, and the code
 # assumes them. Bump them together, deliberately, in a dedicated change.
 dependencies = [
+  # --- OpenTelemetry packages ---
   "opentelemetry-api == 1.44.0",
   "opentelemetry-sdk == 1.44.0",
   "opentelemetry-instrumentation == 0.65b0",
+  "opentelemetry-semantic-conventions == 0.65b0",
   # Pure-Python OTLP exporters (no native dependencies), vendored in this
   # workspace from open-telemetry/opentelemetry-packaging. Not yet published,
   # so these dependencies are not resolvable from PyPI until they are released
@@ -102,21 +104,20 @@ dependencies = [
   # while vertexai 2.2b0 requires < 0.3b0.
   "opentelemetry-instrumentation-openai-v2 == 2.3b0",
   "opentelemetry-instrumentation-vertexai == 2.2b0",
+  "opentelemetry-util-genai == 0.2b0",
+  "opentelemetry-util-http == 0.65b0",
   # Shipped on top of the upstream auto-instrumentation list, which only
   # covers instrumentations: the X-Ray propagator was always part of the Dash0
   # operator's instrumentation image.
   "opentelemetry-propagator-aws-xray == 1.0.2",
 
-  # --- Transitive dependencies ---
-  # Everything the packages above pull in transitively, declared here with an
-  # exact pin so the full injected tree is spelled out in this file and no
-  # version is left to transitive resolution.
-  # scripts/check_pinned_dependencies.py fails the build when this block
+  # --- Non-OpenTelemetry packages ---
+  # The support libraries the OpenTelemetry packages above pull in
+  # transitively, declared here with an exact pin so the full injected tree is
+  # spelled out in this file and no version is left to transitive resolution.
+  # scripts/check_pinned_dependencies.py fails the build when the declared set
   # drifts from the resolved closure.
   "asgiref == 3.12.1",
-  "opentelemetry-semantic-conventions == 0.65b0",
-  "opentelemetry-util-genai == 0.2b0",
-  "opentelemetry-util-http == 0.65b0",
   "packaging == 26.2",
   "psutil == 7.2.2",
   "typing-extensions == 4.16.0",

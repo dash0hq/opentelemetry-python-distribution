@@ -180,8 +180,16 @@ class Dash0Distro(BaseDistro):
             signal_endpoint = _per_signal_endpoint_override(
                 base_endpoint, protocol, signal_path
             )
-            if signal_endpoint is not None:
-                environ.setdefault(endpoint_variable, signal_endpoint)
+            if signal_endpoint is not None and endpoint_variable not in environ:
+                environ[endpoint_variable] = signal_endpoint
+                _logger.debug(
+                    "dash0: shared endpoint %r targets the other OTLP transport;"
+                    " derived %s=%s for protocol %r",
+                    base_endpoint,
+                    endpoint_variable,
+                    signal_endpoint,
+                    protocol,
+                )
 
         apply_detected_resource_attributes(__version__)
 

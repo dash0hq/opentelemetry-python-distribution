@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format is based on
 `Keep a Changelog <https://keepachangelog.com/en/1.1.0/>`_ and this project aims
 to follow `Semantic Versioning <https://semver.org/>`_ once it is published.
 
+0.1.0 - 2026-07-22
+==================
+
+Final release of the changes rehearsed in 0.1.0rc1 below; no code changes.
+
 0.1.0rc1 - 2026-07-22
 =====================
 

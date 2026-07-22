@@ -113,13 +113,14 @@ def _per_signal_endpoint_override(base_endpoint, protocol, signal_path):
     host = parsed.hostname or ""
     if ":" in host:  # bracket an IPv6 literal so the port stays unambiguous
         host = f"[{host}]"
+    netloc = f"{host}:{_OTLP_DEFAULT_PORT[protocol]}"
+    if "@" in parsed.netloc:  # keep userinfo credentials, verbatim
+        netloc = f"{parsed.netloc.rsplit('@', 1)[0]}@{netloc}"
     path = parsed.path
     if protocol == _HTTP_PROTOCOL:
         separator = "" if path.endswith("/") else "/"
         path = path + separator + signal_path
-    return urlunparse(
-        parsed._replace(netloc=f"{host}:{_OTLP_DEFAULT_PORT[protocol]}", path=path)
-    )
+    return urlunparse(parsed._replace(netloc=netloc, path=path))
 
 
 # Instrumentor entry-point names that must never be activated by this

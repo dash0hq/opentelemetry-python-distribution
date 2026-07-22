@@ -1,68 +1,297 @@
+# Release pipeline: build wheels/sdists as GitHub release assets and serve the
+# PEP 503 simple index from GitHub Pages (see RELEASING.rst).
+#
+# Draft-first: assets upload to a draft release and the release is published
+# as the final build step, because the repo's immutable-releases setting
+# freezes assets at publish time — a release is never published with an
+# incomplete asset set. The index job then regenerates the whole index from
+# every published release, re-hashing assets against the committed manifest
+# (scripts/index-manifest.json) so no filename can ever change bytes.
+#
+# The index job chains via `needs:` — publishing the release with the
+# workflow's own GITHUB_TOKEN does not fire a `release: published` event
+# (GitHub suppresses workflow-token events to prevent recursion). The
+# `release` trigger below still covers releases published manually in the UI.
+#
+# Security posture: per-job least-privilege permissions; event fields reach
+# shell only via env indirection; third-party actions are SHA-pinned; no
+# dependency cache (a cache is a cross-workflow write channel into the release
+# build); the build backend is pinned via scripts/build-constraints.txt; the
+# index generator is stdlib-only; manifest commits use a dedicated deploy key
+# (secret INDEX_DEPLOY_KEY) that is the only ruleset-bypass actor for main.
+
 name: Release
 
-# Publishes every workspace package to a Python index.
-#
-# Prerequisites (one-time, by an org/PyPI admin) are documented in RELEASING.rst:
-#   - the PyPI (and TestPyPI) projects must exist,
-#   - each must have a Trusted Publisher configured for this repository and the
-#     `pypi` / `testpypi` GitHub Environments used below.
-#
-# Trigger:
-#   - publishing a GitHub Release  -> publishes to PyPI,
-#   - manual run (workflow_dispatch) -> publishes to TestPyPI by default.
-
 on:
+  push:
+    tags: ["v*"]
   release:
     types: [published]
   workflow_dispatch:
     inputs:
-      index:
-        description: Index to publish to
+      mode:
+        description: Maintenance operation
         type: choice
-        default: testpypi
-        options: [testpypi, pypi]
+        default: rebuild-index
+        options:
+          - rebuild-index
+          - dry-run
+          - rebuild-assets
+      release-tag:
+        description: >-
+          Tag to (re)build assets for (mode: rebuild-assets). The release must
+          still be a draft or missing; published releases are immutable.
+        required: false
+        default: ""
+
+permissions: {}
+
+# Queued, not cancelling: a cancelled run would skip building its release's
+# assets. Note GitHub keeps only the single newest pending run per group; if
+# 3+ releases land while one run is in progress, re-run the cancelled runs via
+# mode=rebuild-assets (see RELEASING.rst).
+concurrency:
+  group: release-publish
+  cancel-in-progress: false
 
 jobs:
   build:
+    if: >-
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && inputs.mode == 'rebuild-assets')
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    env:
+      TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.release-tag }}
+      GH_TOKEN: ${{ github.token }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
-      - name: Build all workspace packages
+      - name: Require a release tag
         run: |
           set -euo pipefail
-          for name in \
-            opentelemetry-pyproto \
-            opentelemetry-exporter-otlp-pyproto-common \
-            opentelemetry-exporter-otlp-pyproto-http \
-            opentelemetry-exporter-otlp-pyproto-grpc \
-            dash0-opentelemetry-distro; do
-            uv build --package "$name" --out-dir dist
-          done
+          if [ -z "$TAG" ]; then
+            echo "::error::the release-tag input is required for mode=rebuild-assets"
+            exit 1
+          fi
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.TAG }}
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.30"
+          enable-cache: false
+      - name: Validate tag and select packages to build
+        id: select
+        run: |
+          set -euo pipefail
+          # The manifest is committed to main by the index job; the tag's
+          # snapshot may predate the previous release's manifest commit, and a
+          # stale manifest would rebuild (and re-upload with different bytes)
+          # filenames that are already published.
+          git fetch --depth 1 origin main
+          git show FETCH_HEAD:scripts/index-manifest.json > manifest-from-main.json
+          python3 - <<'EOF'
+          import json
+          import os
+          import re
+          import sys
+          from pathlib import Path
+
+          sys.path.insert(0, "scripts")
+          from _workspace import package_version, workspace_packages
+
+          tag = os.environ["TAG"]
+
+          # Derive the package set from the workspace so a new member cannot
+          # be silently dropped from releases by a stale hardcoded list. The
+          # same scan backs check_version_bumped.py and the index generator.
+          versions = {
+              name: package_version(package_dir)
+              for name, package_dir in workspace_packages().items()
+          }
+          for name, version in versions.items():
+              assert ".dev" not in version, (
+                  f"{name} is at development version {version}; "
+                  f"releases must carry release-form versions"
+              )
+
+          distro_version = versions["dash0-opentelemetry-distro"]
+          assert tag == f"v{distro_version}", (
+              f"tag {tag} does not match the distro version: "
+              f"expected v{distro_version}"
+          )
+
+          manifest = json.loads(Path("manifest-from-main.json").read_text())
+          to_build = []
+          for name, version in versions.items():
+              wheel = f"{name.replace('-', '_')}-{version}-py3-none-any.whl"
+              if wheel in manifest:
+                  print(f"skip {name} {version}: {wheel} already indexed")
+              else:
+                  to_build.append(name)
+          Path("packages-to-build.txt").write_text("\n".join(to_build) + "\n")
+
+          prerelease = bool(re.search(r"(?:a|b|rc)[0-9]+", distro_version))
+          with open(os.environ["GITHUB_OUTPUT"], "a") as out:
+              out.write(f"prerelease={str(prerelease).lower()}\n")
+          print(f"building: {to_build or 'nothing (all filenames already indexed)'}")
+          EOF
+      - name: Build packages
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          while IFS= read -r name; do
+            [ -n "$name" ] || continue
+            uv build --package "$name" --out-dir dist \
+              --build-constraints scripts/build-constraints.txt
+          done < packages-to-build.txt
+          if [ -n "$(ls -A dist)" ]; then
+            (cd dist && sha256sum -- * > SHA256SUMS)
+          fi
           ls -l dist
+      - name: Validate package metadata
+        run: |
+          set -euo pipefail
+          if [ -n "$(ls -A dist)" ]; then
+            # The old PyPI upload validated metadata server-side; nothing does
+            # once artifacts go straight onto an immutable release. Runs
+            # before publish, where a failure is still recoverable.
+            uv run --no-project --with twine==6.2.0 --python 3.13 \
+              python -m twine check --strict dist/*.whl dist/*.tar.gz
+          fi
+      - name: Attest build provenance
+        if: hashFiles('dist/*.whl') != ''
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: |
+            dist/*.whl
+            dist/*.tar.gz
+      - name: Upload assets to the draft release and publish it
+        env:
+          PRERELEASE: ${{ steps.select.outputs.prerelease }}
+        run: |
+          set -euo pipefail
+          if ! gh release view "$TAG" --json isDraft --jq .isDraft > release-state 2>/dev/null; then
+            extra=""
+            [ "$PRERELEASE" = "true" ] && extra="--prerelease"
+            gh release create "$TAG" --draft --verify-tag --generate-notes \
+              --title "$TAG" $extra
+            echo "true" > release-state
+          fi
+          is_draft="$(cat release-state)"
+
+          existing_assets="$(gh release view "$TAG" --json assets \
+            --jq '.assets[].name')"
+          for file in dist/*; do
+            [ -e "$file" ] || continue  # empty dist: nothing new to upload
+            name="$(basename "$file")"
+            if [ "$is_draft" != "true" ] && [ "$name" != "SHA256SUMS" ] \
+                && ! echo "$existing_assets" | grep -qxF "$name"; then
+              echo "::error::release $TAG is already published without $name." \
+                "Immutable releases cannot receive assets: never create" \
+                "releases from the GitHub UI (push a vX.Y.Z tag instead);" \
+                "this version must be burned - bump and re-tag."
+              exit 1
+            fi
+            if echo "$existing_assets" | grep -qxF "$name"; then
+              if [ "$name" = "SHA256SUMS" ]; then
+                # Convenience sidecar, not the trust anchor (that is the
+                # committed manifest): refresh it on re-runs.
+                gh release upload "$TAG" "$file" --clobber
+                continue
+              fi
+              gh release download "$TAG" --pattern "$name" --output existing-asset
+              if ! cmp -s "$file" existing-asset; then
+                echo "::error::asset $name already exists on $TAG with different bytes"
+                exit 1
+              fi
+              rm existing-asset
+              echo "skip $name: identical asset already uploaded"
+            else
+              gh release upload "$TAG" "$file"
+            fi
+          done
+
+          if [ "$is_draft" = "true" ]; then
+            extra=""
+            [ "$PRERELEASE" = "true" ] || extra="--latest"
+            gh release edit "$TAG" --draft=false $extra
+          fi
+
+  index:
+    needs: [build]
+    # Runs after a successful build, on manually-published releases, and on
+    # mode=rebuild-index dispatches (where the build job is skipped).
+    if: >-
+      !cancelled() && needs.build.result != 'failure' &&
+      (needs.build.result == 'success' ||
+       github.event_name == 'release' ||
+       (github.event_name == 'workflow_dispatch' && inputs.mode == 'rebuild-index'))
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Generate the index
+        run: |
+          set -euo pipefail
+          python3 scripts/build_simple_index.py \
+            --output-dir site --update-manifest --github-token "$GH_TOKEN"
+      - name: Commit manifest additions
+        env:
+          DEPLOY_KEY: ${{ secrets.INDEX_DEPLOY_KEY }}
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- scripts/index-manifest.json; then
+            echo "manifest unchanged"
+            exit 0
+          fi
+          mkdir -p ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/index_deploy_key
+          chmod 600 ~/.ssh/index_deploy_key
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/index_deploy_key -o StrictHostKeyChecking=accept-new"
+          git config user.name "dash0-index-bot"
+          git config user.email "index-bot@dash0.com"
+          git remote set-url origin "git@github.com:${GITHUB_REPOSITORY}.git"
+          git add scripts/index-manifest.json
+          git commit -m "Record index manifest additions (run ${GITHUB_RUN_ID})"
+          git pull --rebase origin main
+          git push origin HEAD:main
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site/
+      - uses: actions/deploy-pages@v5
+        id: deploy
+
+  index-dry-run:
+    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'dry-run'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+      - name: Generate the index (no manifest update, no deploy)
+        run: |
+          set -euo pipefail
+          python3 scripts/build_simple_index.py --output-dir site \
+            --github-token "$GH_TOKEN"
       - uses: actions/upload-artifact@v7
         with:
-          name: dist
-          path: dist/
-
-  publish:
-    needs: build
-    runs-on: ubuntu-latest
-    # For a GitHub Release, publish to PyPI; for a manual run, use the chosen input.
-    environment: ${{ (github.event_name == 'release' || inputs.index == 'pypi') && 'pypi' || 'testpypi' }}
-    permissions:
-      id-token: write  # OIDC, for PyPI Trusted Publishing (no API token needed)
-    steps:
-      - uses: actions/download-artifact@v8
-        with:
-          name: dist
-          path: dist/
-      - name: Publish
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          repository-url: >-
-            ${{ (github.event_name == 'release' || inputs.index == 'pypi')
-                && 'https://upload.pypi.org/legacy/'
-                || 'https://test.pypi.org/legacy/' }}
+          name: index-site
+          path: site/

@@ -20,10 +20,10 @@ import re
 from importlib.metadata import PackageNotFoundError, requires
 
 AGENT_PACKAGES = (
-    "opentelemetry-pyproto",
-    "opentelemetry-exporter-otlp-pyproto-common",
-    "opentelemetry-exporter-otlp-pyproto-http",
-    "opentelemetry-exporter-otlp-pyproto-grpc",
+    "dash0-opentelemetry-pyproto",
+    "dash0-opentelemetry-exporter-otlp-pyproto-common",
+    "dash0-opentelemetry-exporter-otlp-pyproto-http",
+    "dash0-opentelemetry-exporter-otlp-pyproto-grpc",
     "dash0-opentelemetry-distro",
 )
 # The non-opentelemetry-* packages the agent is allowed to pull in transitively,
@@ -70,10 +70,11 @@ def check_requirements():
             name = _requirement_name(requirement)
             assert (
                 name.startswith("opentelemetry-")
+                or name.startswith("dash0-opentelemetry-")
                 or name in ALLOWED_NON_OTEL_REQUIREMENTS
             ), (
                 f"{package} requires {name}, which is neither an "
-                f"opentelemetry-* package nor an explicitly allowed "
+                f"(dash0-)opentelemetry-* package nor an explicitly allowed "
                 f"pure-Python dependency - NOT pure-Python pyproto"
             )
             queue.append(name)

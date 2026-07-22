@@ -9,6 +9,21 @@ to follow `Semantic Versioning <https://semver.org/>`_ once it is published.
 Unreleased
 ==========
 
+Changed
+-------
+
+- The vendored pure-Python OTLP packages are renamed at the distribution level
+  to Dash0-owned names — ``dash0-opentelemetry-pyproto`` and
+  ``dash0-opentelemetry-exporter-otlp-pyproto-{common,http,grpc}`` — so they
+  can be published without claiming ``opentelemetry-*`` names the upstream
+  OpenTelemetry project intends to release itself. Import paths and entry-point
+  names are unchanged; when upstream publishes the official packages, the
+  distribution will switch its dependencies over and deprecate the renamed
+  copies.
+  The distribution now pins the renamed exporters exactly, like every other
+  dependency, and package versions moved to release form (``1.44.0``; the
+  distribution itself is ``0.1.0``).
+
 Added
 -----
 
@@ -28,8 +43,15 @@ Added
   ingress).
 - CI (lint, unit tests on Python 3.10–3.13, packaging build) and an end-to-end
   example workflow.
-- Release workflow (PyPI Trusted Publishing), pending the decisions in
-  ``RELEASING.rst``.
+- Release pipeline publishing to the Dash0 package index: wheels and sdists
+  are attached to immutable GitHub releases (draft-first, with provenance
+  attestations), and a static PEP 503 simple index on GitHub Pages points at
+  them with ``#sha256=`` fragments so consumers can install with
+  ``--require-hashes``. A committed hash manifest guards that no published
+  filename can ever change bytes; yanking and filename exclusion are
+  git-audited metadata (see ``RELEASING.rst``). PyPI/TestPyPI publishing of
+  the real packages is removed; the five ``dash0-opentelemetry-*`` names are
+  defensively registered on public PyPI as inert stubs.
 - The distribution now pins its upstream OpenTelemetry dependencies exactly
   (``opentelemetry-api``/``-sdk`` 1.43.0, ``opentelemetry-instrumentation``
   0.64b0): it ships a curated, validated set of versions rather than a range,

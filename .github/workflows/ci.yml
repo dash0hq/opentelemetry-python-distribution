@@ -14,6 +14,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
       - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
@@ -25,6 +27,8 @@ jobs:
         run: uv lock --check
       - name: Check exact dependency pins
         run: uv run --no-project --python 3.13 scripts/check_pinned_dependencies.py
+      - name: Check changed packages bumped their released versions
+        run: uv run --no-project --python 3.13 scripts/check_version_bumped.py
 
   test:
     runs-on: ubuntu-latest
@@ -44,6 +48,18 @@ jobs:
           --python ${{ matrix.python-version }}
           python -m pytest packages/dash0-opentelemetry-distro/tests -v
 
+  scripts-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      - name: Run repo script tests
+        run: >
+          uv run --no-project --with pytest --python 3.13
+          python -m pytest scripts/tests -v
+
   build:
     runs-on: ubuntu-latest
     steps:
@@ -54,16 +70,8 @@ jobs:
       - name: Build every workspace package (packaging smoke test)
         run: |
           set -euo pipefail
-          for name in \
-            opentelemetry-pyproto \
-            opentelemetry-exporter-otlp-pyproto-common \
-            opentelemetry-exporter-otlp-pyproto-http \
-            opentelemetry-exporter-otlp-pyproto-grpc \
-            dash0-opentelemetry-distro; do
-            echo "::group::build $name"
-            uv build --package "$name" --out-dir dist
-            echo "::endgroup::"
-          done
+          uv build --all-packages --out-dir dist \
+            --build-constraints scripts/build-constraints.txt
           ls -l dist
       - uses: actions/upload-artifact@v7
         with:

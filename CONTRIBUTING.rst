@@ -21,9 +21,10 @@ Project layout
 - ``packages/opentelemetry-*`` — the pure-Python (pyproto) OTLP exporter
   packages, vendored from ``packaging/common/python/vendor`` in
   `open-telemetry/opentelemetry-packaging
-  <https://github.com/open-telemetry/opentelemetry-packaging>`_. Treat these as
-  vendored: keep them close to upstream and do not apply local style changes
-  (they are excluded from linting).
+  <https://github.com/open-telemetry/opentelemetry-packaging>`_ and published
+  under ``dash0-opentelemetry-*`` distribution names (the directories keep the
+  upstream names). Treat these as vendored: keep them close to upstream and do
+  not apply local style changes (they are excluded from linting).
 - ``examples/`` — self-contained demos with their own Docker environments;
   excluded from the workspace.
 

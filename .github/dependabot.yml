@@ -15,6 +15,7 @@ updates:
       opentelemetry:
         patterns:
           - "opentelemetry-*"
+          - "dash0-opentelemetry-*"
 
   - package-ecosystem: "github-actions"
     directory: "/"

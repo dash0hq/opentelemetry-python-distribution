@@ -63,6 +63,14 @@ the same import namespaces and register under the same ``otlp_proto_http`` /
 pyproto packages (and not the regular ones), the standard names resolve to the
 pure-Python implementations.
 
+The directories keep their upstream names, but the packages are *published* as
+``dash0-opentelemetry-pyproto`` and
+``dash0-opentelemetry-exporter-otlp-pyproto-{common,http,grpc}``: the
+``opentelemetry-*`` distribution names belong to the upstream OpenTelemetry
+project, which has not released these packages yet. Once it does, the
+distribution will depend on the official releases and deprecate the renamed
+copies.
+
 
 Quick start
 ===========
@@ -113,12 +121,24 @@ Standard ``OTEL_*`` variables are honored as usual; the distribution only sets
 defaults (with ``setdefault``) and never overrides values you provide.
 
 
-Installation status
-===================
+Installation
+============
 
-The pyproto packages are not yet published to a public index, so today the
-distribution is consumed from this workspace (or bundled into an injected tree).
-Publishing is set up but gated on the decisions in `RELEASING.rst`_. Until then:
+Releases are published on the Dash0 package index — a static PEP 503 simple
+index on GitHub Pages whose artifacts are GitHub release assets of this
+repository — not on public PyPI:
+
+.. code-block:: bash
+
+    pip install \
+      --extra-index-url https://dash0hq.github.io/opentelemetry-python-distribution/simple/ \
+      dash0-opentelemetry-distro
+
+Production consumers (such as the dash0-operator's instrumentation image
+build) should install with a fully hashed lockfile, ``--require-hashes``, and
+``--only-binary :all:``; see the consumer contract in `RELEASING.rst`_.
+
+For development, consume the workspace directly:
 
 .. code-block:: bash
 

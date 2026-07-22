@@ -1,0 +1,11 @@
+# Build-backend pins for `uv build --build-constraints` in the release
+# workflow. Wheels must be byte-stable across rebuilds of the same commit:
+# hatchling stamps its own version into the WHEEL file, so an unpinned backend
+# breaks reproducibility the first release after any hatchling upgrade.
+# (The vendored packages' pyprojects are kept upstream-shaped, so the pin
+# lives here rather than in their [build-system] tables.)
+hatchling==1.31.0
+packaging==26.2
+pathspec==1.1.1
+pluggy==1.6.0
+trove-classifiers==2026.6.1.19

@@ -1,1 +1,12 @@
-{}
+{
+  "dash0_opentelemetry_distro-0.1.0rc1-py3-none-any.whl": "d3787846cf1ce6424eae1dd9634dbd6c0a4be567ac157c507132776c7f82f9b1",
+  "dash0_opentelemetry_distro-0.1.0rc1.tar.gz": "2a7dfcb3c96c7af0a767ce8c2f92877fcb4282f1b508a10f715bad7d6d43d828",
+  "dash0_opentelemetry_exporter_otlp_pyproto_common-1.44.0-py3-none-any.whl": "a9ae08dca710fabc2ccbaca76902c4c42e3534d3bbcd582727e491d043ddc2f6",
+  "dash0_opentelemetry_exporter_otlp_pyproto_common-1.44.0.tar.gz": "c8a6d7ae91fad9f85524147c1398559619116e4b4b46454cbb131f4d062b097d",
+  "dash0_opentelemetry_exporter_otlp_pyproto_grpc-1.44.0-py3-none-any.whl": "fe18dbaea1649947380520d192037dc811c6b1ebdc85a638f9c53b4bf45bb006",
+  "dash0_opentelemetry_exporter_otlp_pyproto_grpc-1.44.0.tar.gz": "879873f738ea875eccf919d702d80ae03595277982837bceaa2a00b6fe074922",
+  "dash0_opentelemetry_exporter_otlp_pyproto_http-1.44.0-py3-none-any.whl": "7d6aa1d242c0282a223e9eec692fbb569313b21804a0115cdccb3f2b35c840ab",
+  "dash0_opentelemetry_exporter_otlp_pyproto_http-1.44.0.tar.gz": "566e4757e719f193031f5f1f5ac8ae65446cc5a23c46727d852a821188433757",
+  "dash0_opentelemetry_pyproto-1.44.0-py3-none-any.whl": "4771a2c74b814967d689ff3d52ab98fdc945968b74fe110757d09631e1999933",
+  "dash0_opentelemetry_pyproto-1.44.0.tar.gz": "15fecebd935d53184d74e4bde9107b8f3d046d8374930e495c1db1e4a7f3ec4f"
+}

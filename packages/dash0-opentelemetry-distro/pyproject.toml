@@ -42,6 +42,11 @@ dash0 = "dash0.opentelemetry.distro:Dash0Distro"
 [project.entry-points.opentelemetry_configurator]
 dash0 = "dash0.opentelemetry.configurator:Dash0Configurator"
 
+[project.entry-points.opentelemetry_resource_detector]
+dash0_distribution = "dash0.opentelemetry.resource:Dash0DistributionResourceDetector"
+dash0_kubernetes = "dash0.opentelemetry.resource:Dash0KubernetesResourceDetector"
+dash0_service_name = "dash0.opentelemetry.resource:Dash0ServiceNameResourceDetector"
+
 [dependency-groups]
 dev = [
   "pytest >= 7.0",

@@ -38,6 +38,24 @@ Entry points
       (``DASH0_FLUSH_ON_SIGTERM_SIGINT=true``) — normal-exit flushing is already
       handled by the SDK's ``atexit`` provider shutdown.
 
+Resource detectors (``opentelemetry_resource_detector``)
+    The detected resource attributes (see below) as standard SDK resource
+    detectors, one per concern so each can be used (or omitted) independently:
+
+    * ``dash0_distribution`` — ``telemetry.distro.name``/``telemetry.distro.version``;
+    * ``dash0_kubernetes`` — ``k8s.pod.uid``;
+    * ``dash0_service_name`` — wraps the upstream service detection (a
+      process-stable ``service.instance.id`` and ``service.name`` from
+      ``OTEL_SERVICE_NAME``) and adds the distro's entrypoint-derived
+      ``service.name`` fallback, so there is no need to also list the built-in
+      ``service`` detector.
+
+    They can be referenced via ``OTEL_EXPERIMENTAL_RESOURCE_DETECTORS``, or
+    explicitly in a declarative config file under
+    ``resource.detection/development.detectors``. (Note: on the pinned SDK
+    1.43, the upstream loader rejects the ``detection/development`` config-file
+    key — fixed upstream in 1.44.)
+
 Resource detection
 ==================
 

@@ -12,6 +12,13 @@ Unreleased
 Added
 -----
 
+- Resource detectors registered under the standard
+  ``opentelemetry_resource_detector`` entry-point group, exposing the distro's
+  detected resource attributes as regular SDK resource detectors:
+  ``dash0_distribution`` (``telemetry.distro.*``), ``dash0_kubernetes``
+  (``k8s.pod.uid``) and ``dash0_service_name`` (upstream service detection —
+  ``service.instance.id`` and ``OTEL_SERVICE_NAME`` — plus the distro's
+  service-name fallback).
 - ``Dash0Distro`` and ``Dash0Configurator`` providing zero-code instrumentation,
   pure-Python OTLP/HTTP export by default, an enable/disable gate, a Kubernetes
   pod-UID resource detector, a service-name fallback, a ``telemetry.distro.name``

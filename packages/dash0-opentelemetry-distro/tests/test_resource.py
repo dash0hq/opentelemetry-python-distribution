@@ -8,11 +8,15 @@ from dash0.opentelemetry._environment_variables import (
     OTEL_SERVICE_NAME,
 )
 from dash0.opentelemetry.resource import (
+    Dash0DistributionResourceDetector,
+    Dash0KubernetesResourceDetector,
+    Dash0ServiceNameResourceDetector,
     apply_detected_resource_attributes,
     detect_fallback_service_name,
     pod_uid_from_cgroup_v1,
     pod_uid_from_cgroup_v2,
 )
+from dash0.opentelemetry.version import __version__
 
 _POD_UID = "2edc9ee8-c9a2-4f3e-9f5e-1a2b3c4d5e6f"
 
@@ -93,3 +97,72 @@ def test_merge_does_not_override_existing_attribute(monkeypatch):
     attributes = os.environ[OTEL_RESOURCE_ATTRIBUTES]
     assert "telemetry.distro.name=custom" in attributes
     assert "telemetry.distro.name=dash0-python" not in attributes
+
+
+def test_distribution_detector_reports_distro_attributes():
+    attributes = Dash0DistributionResourceDetector().detect().attributes
+
+    assert attributes["telemetry.distro.name"] == "dash0-python"
+    assert attributes["telemetry.distro.version"] == __version__
+
+
+def test_kubernetes_detector_reports_pod_uid(monkeypatch):
+    monkeypatch.setattr(resource_module, "detect_kubernetes_pod_uid", lambda: _POD_UID)
+
+    attributes = Dash0KubernetesResourceDetector().detect().attributes
+
+    assert attributes["k8s.pod.uid"] == _POD_UID
+
+
+def test_kubernetes_detector_is_empty_outside_kubernetes():
+    assert not Dash0KubernetesResourceDetector().detect().attributes
+
+
+def test_service_name_detector_reports_fallback_service_name(monkeypatch):
+    monkeypatch.setattr(resource_module.sys, "argv", ["/opt/app/server.py"])
+
+    attributes = Dash0ServiceNameResourceDetector().detect().attributes
+
+    assert attributes["service.name"] == "server"
+
+
+def test_service_name_detector_wraps_upstream_instance_id(monkeypatch):
+    monkeypatch.setattr(resource_module.sys, "argv", ["/opt/app/server.py"])
+
+    attributes = Dash0ServiceNameResourceDetector().detect().attributes
+
+    # Mirrors the upstream declarative `service` detector, which reports a
+    # process-stable service.instance.id alongside the service name.
+    assert attributes["service.instance.id"]
+
+
+def test_service_name_detector_prefers_otel_service_name(monkeypatch):
+    monkeypatch.setattr(resource_module.sys, "argv", ["/opt/app/server.py"])
+    monkeypatch.setenv(OTEL_SERVICE_NAME, "explicit")
+
+    attributes = Dash0ServiceNameResourceDetector().detect().attributes
+
+    assert attributes["service.name"] == "explicit"
+
+
+def test_service_name_detector_respects_opt_out(monkeypatch):
+    monkeypatch.setattr(resource_module.sys, "argv", ["/opt/app/server.py"])
+    monkeypatch.setenv(DASH0_AUTOMATIC_SERVICE_NAME, "false")
+
+    attributes = Dash0ServiceNameResourceDetector().detect().attributes
+
+    assert "service.name" not in attributes
+
+
+def test_service_name_detector_suppresses_fallback_for_resource_attributes(
+    monkeypatch,
+):
+    monkeypatch.setattr(resource_module.sys, "argv", ["/opt/app/server.py"])
+    monkeypatch.setenv(OTEL_RESOURCE_ATTRIBUTES, "service.name=elsewhere")
+
+    attributes = Dash0ServiceNameResourceDetector().detect().attributes
+
+    # Declarative configuration ignores OTEL_RESOURCE_ATTRIBUTES by design, so
+    # the detector neither resurrects the value nor papers over it with the
+    # entrypoint fallback.
+    assert "service.name" not in attributes

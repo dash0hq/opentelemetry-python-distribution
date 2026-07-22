@@ -44,6 +44,18 @@ jobs:
           --python ${{ matrix.python-version }}
           python -m pytest packages/dash0-opentelemetry-distro/tests -v
 
+  scripts-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      - name: Run repo script tests
+        run: >
+          uv run --no-project --with pytest --python 3.13
+          python -m pytest scripts/tests -v
+
   build:
     runs-on: ubuntu-latest
     steps:

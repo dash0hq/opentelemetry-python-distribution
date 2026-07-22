@@ -1,0 +1,10 @@
+# Filenames the index generator skips entirely — both the immutability guard
+# and the generated index ignore them. This is the audited recovery lever when
+# the guard trips on a filename that was published with two different byte
+# contents (see RELEASING.rst): add the filename here, cut a new version, and
+# dispatch an index rebuild.
+#
+# excluded = [
+#   "dash0_opentelemetry_distro-0.2.0-py3-none-any.whl",
+# ]
+excluded = []

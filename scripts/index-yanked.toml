@@ -1,0 +1,9 @@
+# Versions marked yanked (PEP 592) in the generated index. Yanking is how a
+# published version is withdrawn — releases and their assets are append-only
+# and never deleted (existing hash-pinned consumers keep resolving). After
+# editing, dispatch an index rebuild (see RELEASING.rst).
+#
+# [[yanked]]
+# project = "dash0-opentelemetry-distro"
+# version = "0.2.0"
+# reason = "broken exporter wiring, use 0.2.1"

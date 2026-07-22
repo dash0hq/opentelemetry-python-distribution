@@ -138,8 +138,8 @@ def collect_entries(
 ) -> tuple[list[Entry], dict[str, str]]:
     """Walk releases and produce index entries plus manifest additions.
 
-    ``fetch_asset`` maps an asset download URL to its bytes; it is injectable
-    so tests never touch the network.
+    ``fetch_asset`` maps an asset (the GitHub API dict) to its bytes; it is
+    injectable so tests never touch the network.
 
     Raises IndexGenerationError on any trust violation: a hash that differs
     from the manifest, or an asset URL outside this repository's release
@@ -182,7 +182,7 @@ def collect_entries(
                 # duplicates) are still fetched and guarded below.
                 digest = committed
             else:
-                digest = hashlib.sha256(fetch_asset(url)).hexdigest()
+                digest = hashlib.sha256(fetch_asset(asset)).hexdigest()
                 previous = (
                     committed if committed is not None else additions.get(filename)
                 )
@@ -238,9 +238,27 @@ def _github_api(repo: str, token: str | None) -> list[dict]:
         page += 1
 
 
-def _fetch_asset(url: str) -> bytes:
-    with urllib.request.urlopen(url) as response:
-        return response.read()
+def make_asset_fetcher(token: str | None):
+    """Download an asset's bytes via its API URL.
+
+    ``browser_download_url`` (what the index embeds) is only anonymously
+    fetchable on public repositories and does not honor token auth; the REST
+    asset endpoint with ``Accept: application/octet-stream`` works on both, so
+    hashing always downloads through it.
+    """
+
+    def fetch(asset: dict) -> bytes:
+        request = urllib.request.Request(
+            asset["url"],
+            headers={
+                "Accept": "application/octet-stream",
+                **({"Authorization": f"Bearer {token}"} if token else {}),
+            },
+        )
+        with urllib.request.urlopen(request) as response:
+            return response.read()
+
+    return fetch
 
 
 def _page(title: str, body: str) -> str:
@@ -343,7 +361,7 @@ def main(argv: list[str] | None = None) -> int:
             manifest=manifest,
             excluded=load_excluded(args.excluded),
             yanked=load_yanked(args.yanked),
-            fetch_asset=_fetch_asset,
+            fetch_asset=make_asset_fetcher(args.github_token),
             trust_manifest=args.trust_manifest,
         )
     except IndexGenerationError as error:

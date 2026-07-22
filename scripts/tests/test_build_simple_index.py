@@ -29,6 +29,7 @@ def release(tag, filenames, *, draft=False, prerelease=False, url_prefix=None):
             {
                 "name": name,
                 "browser_download_url": f"{prefix}/{name}",
+                "url": f"https://api.github.com/repos/{REPO}/releases/assets/{name}",
                 "created_at": "2026-07-22T10:00:00Z",
             }
             for name in filenames
@@ -37,8 +38,8 @@ def release(tag, filenames, *, draft=False, prerelease=False, url_prefix=None):
 
 
 def fetcher(contents_by_filename):
-    def fetch(url):
-        return contents_by_filename[url.rsplit("/", 1)[-1]]
+    def fetch(asset):
+        return contents_by_filename[asset["name"]]
 
     return fetch
 
@@ -86,8 +87,8 @@ def test_hash_mismatch_with_manifest_aborts():
 
 
 def test_hash_mismatch_across_releases_in_same_run_aborts():
-    def fetch(url):
-        return b"one" if "/v0.1.0/" in url else b"two"
+    def fetch(asset):
+        return b"one" if "/v0.1.0/" in asset["browser_download_url"] else b"two"
 
     with pytest.raises(bsi.IndexGenerationError):
         bsi.collect_entries(
@@ -240,8 +241,8 @@ def test_config_files_parse():
 def test_trust_manifest_skips_download_of_known_files():
     # With trust_manifest, a filename already in the manifest is not fetched;
     # its committed hash is trusted. A raising fetcher proves no download.
-    def exploding_fetch(url):
-        raise AssertionError(f"should not download {url}")
+    def exploding_fetch(asset):
+        raise AssertionError(f"should not download {asset['name']}")
 
     entries, additions = bsi.collect_entries(
         [release("v0.1.0", [DISTRO_WHEEL])],
@@ -260,8 +261,8 @@ def test_trust_manifest_skips_download_of_known_files():
 def test_trust_manifest_still_guards_new_files():
     # A filename NOT yet in the manifest is fetched and hashed even under
     # trust_manifest, so same-run byte divergence is still caught.
-    def fetch(url):
-        return b"one" if "/v0.1.0/" in url else b"two"
+    def fetch(asset):
+        return b"one" if "/v0.1.0/" in asset["browser_download_url"] else b"two"
 
     with pytest.raises(bsi.IndexGenerationError):
         bsi.collect_entries(

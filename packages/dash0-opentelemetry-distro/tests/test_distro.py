@@ -124,6 +124,44 @@ def test_configure_derives_http_per_signal_endpoint_from_grpc_base(monkeypatch):
     assert OTEL_EXPORTER_OTLP_LOGS_ENDPOINT not in os.environ
 
 
+def test_configure_heals_uniform_grpc_on_http_port_base(monkeypatch):
+    # Endpoint derivation is not limited to mixed protocols: with every signal
+    # on gRPC but the base URL carrying the HTTP default port, each signal gets
+    # a per-signal endpoint rewritten to the gRPC port instead of silently
+    # failing against 4318.
+    monkeypatch.setenv(DASH0_OTEL_COLLECTOR_BASE_URL, "http://collector:4318")
+    monkeypatch.setenv(OTEL_EXPORTER_OTLP_PROTOCOL, "grpc")
+
+    Dash0Distro().configure()
+
+    assert os.environ[OTEL_EXPORTER_OTLP_ENDPOINT] == "http://collector:4318"
+    assert os.environ[OTEL_EXPORTER_OTLP_TRACES_ENDPOINT] == "http://collector:4317"
+    assert os.environ[OTEL_EXPORTER_OTLP_METRICS_ENDPOINT] == "http://collector:4317"
+    assert os.environ[OTEL_EXPORTER_OTLP_LOGS_ENDPOINT] == "http://collector:4317"
+
+
+def test_configure_heals_uniform_http_on_grpc_port_base(monkeypatch):
+    # Same healing in the other direction: all signals on the default HTTP
+    # protocol against a gRPC-port base URL get per-signal HTTP endpoints (port
+    # rewritten, signal path appended).
+    monkeypatch.setenv(DASH0_OTEL_COLLECTOR_BASE_URL, "http://collector:4317")
+
+    Dash0Distro().configure()
+
+    assert os.environ[OTEL_EXPORTER_OTLP_ENDPOINT] == "http://collector:4317"
+    assert (
+        os.environ[OTEL_EXPORTER_OTLP_TRACES_ENDPOINT]
+        == "http://collector:4318/v1/traces"
+    )
+    assert (
+        os.environ[OTEL_EXPORTER_OTLP_METRICS_ENDPOINT]
+        == "http://collector:4318/v1/metrics"
+    )
+    assert (
+        os.environ[OTEL_EXPORTER_OTLP_LOGS_ENDPOINT] == "http://collector:4318/v1/logs"
+    )
+
+
 def test_configure_leaves_custom_port_untouched(monkeypatch):
     # A non-default port is assumed to serve the requested protocol (e.g. a
     # gateway), so no port rewriting happens even for a mixed protocol.

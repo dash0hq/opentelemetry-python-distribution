@@ -96,25 +96,21 @@ jobs:
           import json
           import os
           import re
+          import sys
           from pathlib import Path
 
-          import tomllib
+          sys.path.insert(0, "scripts")
+          from _workspace import package_version, workspace_packages
 
           tag = os.environ["TAG"]
 
-          def version_of(package_dir):
-              data = tomllib.loads((package_dir / "pyproject.toml").read_text())
-              version_file = package_dir / data["tool"]["hatch"]["version"]["path"]
-              return re.search(
-                  r'__version__ = "([^"]+)"', version_file.read_text()
-              ).group(1)
-
           # Derive the package set from the workspace so a new member cannot
-          # be silently dropped from releases by a stale hardcoded list.
-          versions = {}
-          for pyproject in sorted(Path("packages").glob("*/pyproject.toml")):
-              name = tomllib.loads(pyproject.read_text())["project"]["name"]
-              versions[name] = version_of(pyproject.parent)
+          # be silently dropped from releases by a stale hardcoded list. The
+          # same scan backs check_version_bumped.py and the index generator.
+          versions = {
+              name: package_version(package_dir)
+              for name, package_dir in workspace_packages().items()
+          }
           for name, version in versions.items():
               assert ".dev" not in version, (
                   f"{name} is at development version {version}; "

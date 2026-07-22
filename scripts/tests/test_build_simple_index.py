@@ -235,3 +235,69 @@ def test_config_files_parse():
     assert bsi.load_excluded(bsi.DEFAULT_EXCLUDED) == frozenset()
     assert bsi.load_yanked(bsi.DEFAULT_YANKED) == {}
     assert bsi.load_manifest(bsi.DEFAULT_MANIFEST) == {}
+
+
+def test_trust_manifest_skips_download_of_known_files():
+    # With trust_manifest, a filename already in the manifest is not fetched;
+    # its committed hash is trusted. A raising fetcher proves no download.
+    def exploding_fetch(url):
+        raise AssertionError(f"should not download {url}")
+
+    entries, additions = bsi.collect_entries(
+        [release("v0.1.0", [DISTRO_WHEEL])],
+        repo=REPO,
+        manifest={DISTRO_WHEEL: sha256(b"distro")},
+        excluded=frozenset(),
+        yanked={},
+        fetch_asset=exploding_fetch,
+        trust_manifest=True,
+    )
+    assert [e.filename for e in entries] == [DISTRO_WHEEL]
+    assert entries[0].sha256 == sha256(b"distro")
+    assert additions == {}
+
+
+def test_trust_manifest_still_guards_new_files():
+    # A filename NOT yet in the manifest is fetched and hashed even under
+    # trust_manifest, so same-run byte divergence is still caught.
+    def fetch(url):
+        return b"one" if "/v0.1.0/" in url else b"two"
+
+    with pytest.raises(bsi.IndexGenerationError):
+        bsi.collect_entries(
+            [release("v0.1.0", [PYPROTO_WHEEL]), release("v0.2.0", [PYPROTO_WHEEL])],
+            repo=REPO,
+            manifest={},
+            excluded=frozenset(),
+            yanked={},
+            fetch_asset=fetch,
+            trust_manifest=True,
+        )
+
+
+def test_generated_site_escapes_hostile_filename_and_url(tmp_path):
+    # The artifact regex admits HTML metacharacters in the version segment, so
+    # a hostile asset name must not break out of the href/text it is rendered
+    # into. (Requires release-write access; this is defense in depth.)
+    hostile = 'dash0_opentelemetry_distro-0.1.0"><script>-py3-none-any.whl'
+    entry = bsi.Entry(
+        filename=hostile,
+        url=f"{URL_PREFIX}/v0.1.0/{hostile}",
+        sha256="a" * 64,
+        uploaded_at="2026-07-22T10:00:00Z",
+    )
+    bsi.generate_site([entry], tmp_path, REPO)
+    page = (
+        tmp_path / "simple" / "dash0-opentelemetry-distro" / "index.html"
+    ).read_text()
+    assert "<script>" not in page
+    assert "&lt;script&gt;" in page
+    assert "&quot;&gt;" in page
+
+
+def test_workspace_membership_and_declared_sources_agree():
+    # packages/* on disk must match [tool.uv.sources] workspace members;
+    # divergence would break editable resolution while the scripts carried on.
+    from _workspace import declared_workspace_sources, workspace_packages
+
+    assert set(workspace_packages()) == declared_workspace_sources()

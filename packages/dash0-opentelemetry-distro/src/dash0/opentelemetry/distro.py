@@ -99,7 +99,8 @@ def _per_signal_endpoint_override(base_endpoint, protocol, signal_path):
     appended here, because the exporter appends it only to the shared endpoint,
     not to a per-signal one. A custom or absent port is left untouched (the
     collector is assumed to serve that protocol there, or the user supplies an
-    explicit per-signal endpoint, which is always honored)."""
+    explicit per-signal endpoint, which is always honored).
+    """
     parsed = urlparse(base_endpoint)
     try:
         current_port = parsed.port
@@ -176,7 +177,13 @@ class Dash0Distro(BaseDistro):
                 )
                 protocol = _DEFAULT_PROTOCOL
                 exporter = _PYPROTO_EXPORTERS_BY_PROTOCOL[protocol]
-            environ.setdefault(exporter_variable, exporter)
+            selected_exporter = environ.setdefault(exporter_variable, exporter)
+            if selected_exporter != exporter:
+                # The user picked this signal's exporter directly; the distro
+                # cannot know which transport it speaks, so deriving an endpoint
+                # from the protocol variables could redirect a working exporter
+                # to the wrong port.
+                continue
             signal_endpoint = _per_signal_endpoint_override(
                 base_endpoint, protocol, signal_path
             )

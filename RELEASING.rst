@@ -52,7 +52,22 @@ Cutting a release
 1. Bump the versions being released: the distro's ``version.py`` always
    (the tag is derived from it), plus any vendored package that changed
    (``.postN``) together with the distro's ``==`` pins on it.
-2. Update ``CHANGELOG.rst`` and regenerate ``uv.lock`` (``uv lock``).
+2. Compile the changelog and regenerate ``uv.lock``. ``CHANGELOG.rst`` is
+   managed by `chloggen
+   <https://github.com/open-telemetry/opentelemetry-go-build-tools/tree/main/chloggen>`_:
+   fold the pending ``.chloggen/`` entries into a new dated section, then relock.
+
+   .. code-block:: bash
+
+       make chlog-update VERSION="<distro-version> - <YYYY-MM-DD>"
+       uv lock
+
+   ``make chlog-update`` inserts the rendered section below the
+   ``.. <!-- next version -->`` marker and deletes the entry files it consumed;
+   commit both the ``CHANGELOG.rst`` edit and the deletions. Pass ``VERSION``
+   exactly as the heading should read — this project uses ``<version> - <date>``
+   — and preview without writing using ``make chlog-preview``. Released sections
+   are generated: never hand-edit them. See ``docs/changelog-maintenance.rst``.
 3. Land those changes on ``main`` through a PR.
 4. Tag and push: ``git tag v<distro-version> && git push origin v<distro-version>``.
 

@@ -76,6 +76,30 @@ pyproto packages are excluded via ``ruff.toml``):
 Apply fixes with ``ruff check --fix`` and ``ruff format`` (drop ``--check``).
 
 
+Changelog
+=========
+
+Every pull request that affects end users must include a changelog entry.
+``CHANGELOG.rst`` is managed with `chloggen
+<https://github.com/open-telemetry/opentelemetry-go-build-tools/tree/main/chloggen>`_:
+rather than editing ``CHANGELOG.rst`` directly, each user-facing change adds a
+small YAML file under ``.chloggen/`` that is compiled into a dated version
+section at release time. See ``docs/changelog-maintenance.rst`` for full
+instructions on creating, validating, and previewing entries.
+
+Quick start:
+
+.. code-block:: bash
+
+    make chlog-new        # create .chloggen/<branch-name>.yaml
+    # edit the file
+    make chlog-validate   # check it is well-formed
+
+If the change does not affect end users (refactoring, CI, etc.), prefix the PR
+title with ``chore`` or add the "Skip Changelog" label. CI validates all
+pending entries on every pull request.
+
+
 Coding conventions
 =================
 

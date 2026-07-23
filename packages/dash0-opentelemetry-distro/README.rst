@@ -117,6 +117,35 @@ pin, so no version is left to transitive resolution. CI enforces both rules via
 ``scripts/check_pinned_dependencies.py`` (in-repo workspace members are exempt,
 as their version is fixed by the checkout).
 
+Injector bootstrap (``sitecustomize.py``)
+=========================================
+
+The wheel ships the bootstrap script used for ``PYTHONPATH``-based injection at
+``dash0/opentelemetry/injector/sitecustomize.py``. It is not meant to be
+imported from that location (importing it executes it); instead, a consumer
+building an injectable tree — such as the dash0-operator's instrumentation
+image —
+
+1. installs the distribution into a self-contained directory:
+   ``pip install --target <dir> dash0-opentelemetry-distro``;
+2. copies the script to ``<dir>/sitecustomize.py``;
+3. generates ``<dir>/all-dependencies.txt``, a flattened list of every
+   requirement of the installed tree (one PEP 508 requirement per line).
+
+The `OpenTelemetry injector
+<https://github.com/open-telemetry/opentelemetry-injector>`_ then prepends
+``<dir>`` to the ``PYTHONPATH`` of the processes to instrument, so Python's
+``site`` machinery runs the script on interpreter startup. The script
+initializes the auto-instrumentation only after a set of safety checks —
+supported interpreter version, no OpenTelemetry packages already shipped with
+the application (double instrumentation), no version conflicts between the
+application's dependencies and ``all-dependencies.txt`` — and otherwise
+deactivates the injection gracefully, for the current process and its children.
+It also bridges ``OTEL_EXPORTER_OTLP_ENDPOINT`` to
+``DASH0_OTEL_COLLECTOR_BASE_URL`` when only the former is set. The script stays
+valid Python 2.7+ so it can self-deactivate instead of crashing on interpreters
+the distribution does not support.
+
 Environment variables
 =====================
 

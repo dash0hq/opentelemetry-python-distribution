@@ -1,0 +1,32 @@
+# One of 'breaking', 'deprecation', 'new_component', 'enhancement', 'bug_fix'.
+change_type: enhancement
+
+# A single word describing the area of concern (e.g. distro, pyproto, exporter,
+# resource-detectors, deps, ci, release, docs).
+component: distro
+
+# A brief description of the change. Surround your text with quotes ("") if it
+# needs to start with a backtick (`).
+note: Ship the OpenTelemetry-injector bootstrap script (``sitecustomize.py``) in the wheel, at ``dash0/opentelemetry/injector/sitecustomize.py``
+
+# One or more tracking issues related to the change. At least one is required.
+issues: [32]
+
+# (Optional) One or more lines of additional information to render under the
+# primary note. These lines are padded with 2 spaces and inserted directly into
+# the document. Use pipe (|) for multiline entries.
+subtext: |
+  The script was previously maintained in the dash0-operator repository. Consumers building an
+  injectable tree (``pip install --target <dir> dash0-opentelemetry-distro``) copy it from its
+  packaged location to ``<dir>/sitecustomize.py``, where the OpenTelemetry injector triggers it by
+  prepending ``<dir>`` to ``PYTHONPATH``. Compared to the operator's copy: the script now splits
+  ``PYTHONPATH`` on ``os.pathsep`` (previously ``,``), so self-deactivation also removes the
+  injected site when ``PYTHONPATH`` has multiple entries; and the double-instrumentation check
+  flags overlap between the application's packages and the OpenTelemetry packages actually
+  installed in the injected tree (except the API layer, which applications legitimately use for
+  manual instrumentation), instead of a hardcoded package list.
+
+# Optional: The change log or logs in which this entry should be included.
+# e.g. '[user]'. Include 'user' if the change is relevant to end users.
+# Default: '[user]'
+change_logs: []

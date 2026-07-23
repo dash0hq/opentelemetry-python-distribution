@@ -1,0 +1,29 @@
+# One of 'breaking', 'deprecation', 'new_component', 'enhancement', 'bug_fix'.
+change_type: bug_fix
+
+# A single word describing the area of concern (e.g. distro, pyproto, exporter,
+# resource-detectors, deps, ci, release, docs).
+component: distro
+
+# A brief description of the change. Surround your text with quotes ("") if it
+# needs to start with a backtick (`).
+note: Add the PEP-263 encoding declaration to the injector bootstrap script (sitecustomize.py), so that it parses on Python 2.7 and deactivates itself gracefully instead of failing with a SyntaxError.
+
+# One or more tracking issues related to the change. At least one is required.
+issues: [36]
+
+# (Optional) One or more lines of additional information to render under the
+# primary note. These lines are padded with 2 spaces and inserted directly into
+# the document. Use pipe (|) for multiline entries.
+subtext: |
+  The script contains non-ASCII characters (em-dashes) in its header comments. Without an encoding
+  declaration, Python 2.7 rejected the whole file at parse time, so the self-deactivation logic never
+  ran and injected processes logged "'import sitecustomize' failed".
+
+# If your change doesn't affect end users or the exported elements of any package,
+# you should instead start your pull request title with "chore" or use the "Skip
+# Changelog" label.
+# Optional: The change log or logs in which this entry should be included.
+# e.g. '[user]'. Include 'user' if the change is relevant to end users.
+# Default: '[user]'
+change_logs: [user]

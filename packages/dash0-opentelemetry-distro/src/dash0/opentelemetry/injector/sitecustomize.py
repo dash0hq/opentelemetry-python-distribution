@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Bootstrap script for injector-based activation of the Dash0 OpenTelemetry distribution for Python.
 #
 # This file ships inside the dash0-opentelemetry-distro wheel, but it is not meant to be imported from its packaged
@@ -17,7 +18,9 @@
 #
 # IMPORTANT: This file must be valid Python 2.7+. The injector prepends its directory to the PYTHONPATH of any Python
 # process, including processes running interpreters this distribution does not support; this script must at least
-# parse there, so it can deactivate itself gracefully instead of crashing the process.
+# parse there, so it can deactivate itself gracefully instead of crashing the process. The PEP-263 encoding
+# declaration above must stay on the first or second line: without it, Python 2.7 rejects the file's non-ASCII
+# characters at parse time.
 
 from __future__ import print_function
 import os

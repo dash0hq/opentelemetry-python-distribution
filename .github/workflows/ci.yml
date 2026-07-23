@@ -48,30 +48,12 @@ jobs:
           --python ${{ matrix.python-version }}
           python -m pytest packages/dash0-opentelemetry-distro/tests -v
 
-  # The injector bootstrap script must parse on interpreters the distribution does not support, so it can
-  # deactivate itself gracefully instead of crashing the injected process (see the script's header and issue #36).
-  # Python 2.7 is the oldest interpreter the OpenTelemetry injector may reach; parse the script there and verify
-  # the warn-and-continue behavior end to end.
   sitecustomize-python27:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - name: Check sitecustomize.py parses and self-deactivates on Python 2.7
-        run: |
-          set -euo pipefail
-          site_dir="$(mktemp -d)"
-          cp packages/dash0-opentelemetry-distro/src/dash0/opentelemetry/injector/sitecustomize.py "$site_dir/"
-          docker run --rm -v "$site_dir:/agents" python:2.7.18-buster \
-            python -m py_compile /agents/sitecustomize.py
-          output="$(docker run --rm -v "$site_dir:/agents" -e PYTHONPATH=/agents python:2.7.18-buster \
-            python -c "print('application-ran')" 2>&1)"
-          echo "$output"
-          grep -q '"unsupported Python version: 2.7' <<<"$output"
-          grep -q '^application-ran$' <<<"$output"
-          if grep -q "import sitecustomize' failed" <<<"$output"; then
-            echo "sitecustomize.py did not run cleanly on Python 2.7" >&2
-            exit 1
-          fi
+        run: python3 scripts/check_sitecustomize_python27.py
 
   changelog:
     runs-on: ubuntu-latest

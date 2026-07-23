@@ -38,6 +38,12 @@ What you get
   collector endpoint, a Kubernetes pod-UID resource detector, a service-name
   fallback, a ``telemetry.distro.name`` marker, an optional startup span, and
   graceful flushing on ``SIGTERM``/``SIGINT``.
+- **An injector-ready bootstrap script**: the wheel ships the
+  ``sitecustomize.py`` that the OpenTelemetry injector triggers via
+  ``PYTHONPATH`` (``dash0/opentelemetry/injector/sitecustomize.py``), with
+  interpreter-version, double-instrumentation, and dependency-conflict guards
+  and graceful self-deactivation; see the package README for the deployment
+  contract.
 - **Defensive instrumentation loading**: a single failing instrumentor is
   logged and skipped rather than aborting instrumentation of the whole process.
 

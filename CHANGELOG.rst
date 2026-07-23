@@ -15,6 +15,25 @@ are compiled.
 
 .. <!-- next version -->
 
+0.2.0 - 2026-07-23
+========================================
+
+Enhancements
+------------
+
+- ``distro``: Ship the OpenTelemetry-injector bootstrap script (``sitecustomize.py``) in the wheel, at ``dash0/opentelemetry/injector/sitecustomize.py`` (`#32 <https://github.com/dash0hq/opentelemetry-python-distribution/issues/32>`__)
+
+  The script was previously maintained in the dash0-operator repository. Consumers building an
+  injectable tree (``pip install --target <dir> dash0-opentelemetry-distro``) copy it from its
+  packaged location to ``<dir>/sitecustomize.py``, where the OpenTelemetry injector triggers it by
+  prepending ``<dir>`` to ``PYTHONPATH``. Compared to the operator's copy: the script now splits
+  ``PYTHONPATH`` on ``os.pathsep`` (previously ``,``), so self-deactivation also removes the
+  injected site when ``PYTHONPATH`` has multiple entries; and the double-instrumentation check
+  flags overlap between the application's packages and the OpenTelemetry packages actually
+  installed in the injected tree (except the API layer, which applications legitimately use for
+  manual instrumentation), instead of a hardcoded package list.
+  
+
 0.1.0 - 2026-07-22
 ==================
 

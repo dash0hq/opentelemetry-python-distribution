@@ -48,6 +48,17 @@ jobs:
           --python ${{ matrix.python-version }}
           python -m pytest packages/dash0-opentelemetry-distro/tests -v
 
+  sitecustomize-python27:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # The script runs sitecustomize.py under real Python 2.7: it stages it alone in a
+      # directory, as consumers deploy it, and starts python:2.7.18 docker containers that
+      # byte-compile it and run a Python 2.7 process with the directory on the PYTHONPATH.
+      # python3 only orchestrates docker and asserts the warn-and-continue behavior.
+      - name: Check sitecustomize.py parses and self-deactivates on Python 2.7
+        run: python3 scripts/check_sitecustomize_python27.py
+
   changelog:
     runs-on: ubuntu-latest
     steps:

@@ -15,6 +15,19 @@ are compiled.
 
 .. <!-- next version -->
 
+0.2.1 - 2026-07-23
+========================================
+
+Bug Fixes
+---------
+
+- ``distro``: Add the PEP-263 encoding declaration to the injector bootstrap script (sitecustomize.py), so that it parses on Python 2.7 and deactivates itself gracefully instead of failing with a SyntaxError. (`#36 <https://github.com/dash0hq/opentelemetry-python-distribution/issues/36>`__)
+
+  The script contains non-ASCII characters (em-dashes) in its header comments. Without an encoding
+  declaration, Python 2.7 rejected the whole file at parse time, so the self-deactivation logic never
+  ran and injected processes logged "'import sitecustomize' failed".
+  
+
 0.2.0 - 2026-07-23
 ========================================
 

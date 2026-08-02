@@ -1,0 +1,117 @@
+# One-time (rarely repeated) defensive registration of the dash0-opentelemetry-*
+# distribution names on public PyPI.
+#
+# The real packages are served from the Dash0 package index (GitHub Pages), not
+# from PyPI. Consumers install with --extra-index-url, and pip resolves the
+# highest version across all configured indexes: if these names were unregistered
+# on PyPI, anyone could squat them with a higher version and win that resolution
+# (dependency confusion). Owning the names closes that hole — PyPI name ownership
+# is exclusive from the first upload.
+#
+# The stubs are honest placeholders: version 0.0.0.devN (below every real
+# version, and dev-only so default pip resolution never selects them) with a
+# README pointing at the real index. N increments on refresh because PyPI
+# permanently forbids re-uploading a filename, even after deletion.
+#
+# Security posture (see RELEASING.rst):
+# - The PyPI (pending) trusted publishers for these five names must be bound to
+#   THIS workflow filename and to the `pypi` environment, never to release.yml.
+# - The `pypi` environment must require reviewers and restrict deployments to
+#   the default branch.
+# - After a successful run, REMOVE the trusted publishers on PyPI. Leaving them
+#   in place is a standing publish capability to the public names.
+
+name: Reserve PyPI names
+
+on:
+  workflow_dispatch:
+    inputs:
+      dev-suffix:
+        description: >-
+          N in the stub version 0.0.0.devN. Increment when refreshing the
+          stubs; PyPI forbids re-uploading an existing filename.
+        required: false
+        default: "0"
+
+permissions: {}
+
+jobs:
+  build-stubs:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: astral-sh/setup-uv@v7
+      - name: Generate and build stub packages
+        env:
+          DEV_SUFFIX: ${{ inputs.dev-suffix }}
+        run: |
+          set -euo pipefail
+          case "$DEV_SUFFIX" in
+            ''|*[!0-9]*) echo "dev-suffix must be a non-negative integer"; exit 1;;
+          esac
+          version="0.0.0.dev${DEV_SUFFIX}"
+          mkdir -p dist
+          for name in \
+            dash0-opentelemetry-pyproto \
+            dash0-opentelemetry-exporter-otlp-pyproto-common \
+            dash0-opentelemetry-exporter-otlp-pyproto-http \
+            dash0-opentelemetry-exporter-otlp-pyproto-grpc \
+            dash0-opentelemetry-distro; do
+            dir="$(mktemp -d)"
+            cat > "$dir/README.md" <<EOF
+          # $name
+
+          This name is registered by [Dash0](https://www.dash0.com) to protect
+          consumers of the Dash0 OpenTelemetry distribution for Python against
+          dependency-confusion attacks. This placeholder release contains no code.
+
+          The real package is served from the Dash0 package index:
+          https://dash0hq.github.io/opentelemetry-python-distribution/simple/
+
+          Source and documentation:
+          https://github.com/dash0hq/opentelemetry-python-distribution
+          EOF
+            cat > "$dir/pyproject.toml" <<EOF
+          [build-system]
+          requires = ["hatchling"]
+          build-backend = "hatchling.build"
+
+          [project]
+          name = "$name"
+          version = "$version"
+          description = "Name registered by Dash0; the real package is served from the Dash0 package index."
+          readme = "README.md"
+          license = "Apache-2.0"
+          requires-python = ">=3.8"
+
+          [project.urls]
+          Homepage = "https://github.com/dash0hq/opentelemetry-python-distribution"
+
+          [tool.hatch.build.targets.wheel]
+          bypass-selection = true
+          EOF
+            uv build --project "$dir" --out-dir dist
+          done
+          ls -l dist
+      - uses: actions/upload-artifact@v7
+        with:
+          name: stub-dist
+          path: dist/
+
+  publish-stubs:
+    needs: build-stubs
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: stub-dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          # A partial earlier run may have claimed some of the five names
+          # already; re-runs must not fail on those.
+          skip-existing: true

@@ -63,6 +63,30 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Require a changelog entry
+        if: github.event_name == 'pull_request'
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          SKIP_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'Skip Changelog') }}
+        run: |
+          set -euo pipefail
+          skip_re='^(chore|docs)(\([^)]*\))?:'
+          if [[ "$PR_TITLE" =~ $skip_re ]] || [[ "$SKIP_LABEL" == "true" ]]; then
+            echo "Skipping changelog requirement (chore/docs PR or 'Skip Changelog' label)."
+            exit 0
+          fi
+          entries=$(git diff --name-only "origin/${{ github.base_ref }}"...HEAD \
+            -- '.chloggen/*.yaml' | grep -v 'TEMPLATE.yaml' || true)
+          if [ -z "$entries" ]; then
+            echo "::error::No .chloggen entry found for this PR."
+            echo "::error::Add one with 'make chlog-new', or prefix the PR title"
+            echo "::error::with 'chore:' / 'docs:' (with optional scope) or add the"
+            echo "::error::'Skip Changelog' label to opt out."
+            exit 1
+          fi
+          echo "Found: $entries"
       - uses: actions/setup-go@v7
         with:
           go-version: stable

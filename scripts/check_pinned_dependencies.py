@@ -1,7 +1,7 @@
 """Enforce the distribution's dependency policy (see its README).
 
 The distro ships a curated set of upstream packages, so every dependency in
-``packages/dash0-opentelemetry-distro/pyproject.toml`` must be pinned to an
+``packages/dash0-opentelemetry/pyproject.toml`` must be pinned to an
 exact version (``== X.Y.Z``). Two exemptions:
 
 * uv workspace members (the in-repo pyproto packages): their version is fixed
@@ -27,7 +27,7 @@ from pathlib import Path
 import tomllib
 
 ROOT = Path(__file__).resolve().parent.parent
-DISTRO_PYPROJECT = ROOT / "packages" / "dash0-opentelemetry-distro" / "pyproject.toml"
+DISTRO_PYPROJECT = ROOT / "packages" / "dash0-opentelemetry" / "pyproject.toml"
 
 # name, optional [extras], remainder (version specifier); the environment
 # marker (after ';') is split off before matching.
@@ -73,7 +73,7 @@ def _distro_closure():
             "uv",
             "export",
             "--package",
-            "dash0-opentelemetry-distro",
+            "dash0-opentelemetry",
             "--frozen",
             "--no-dev",
             "--no-hashes",

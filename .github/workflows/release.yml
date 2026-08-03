@@ -117,7 +117,7 @@ jobs:
                   f"releases must carry release-form versions"
               )
 
-          distro_version = versions["dash0-opentelemetry-distro"]
+          distro_version = versions["dash0-opentelemetry"]
           assert tag == f"v{distro_version}", (
               f"tag {tag} does not match the distro version: "
               f"expected v{distro_version}"
@@ -274,6 +274,63 @@ jobs:
           path: site/
       - uses: actions/deploy-pages@v5
         id: deploy
+
+  publish-pypi:
+    needs: [build]
+    # Publish to PyPI only on tag-triggered runs (not manual dispatches or
+    # UI-published events) and only when the build job actually produced
+    # artifacts (result == success, not skipped).
+    if: github.event_name == 'push' && needs.build.result == 'success'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - package: dash0-opentelemetry
+            file_prefix: dash0_opentelemetry
+            environment: pypi-dash0-opentelemetry
+            url: https://pypi.org/project/dash0-opentelemetry/
+          - package: dash0-opentelemetry-pyproto
+            file_prefix: dash0_opentelemetry_pyproto
+            environment: pypi-dash0-opentelemetry-pyproto
+            url: https://pypi.org/project/dash0-opentelemetry-pyproto/
+          - package: dash0-opentelemetry-exporter-otlp-pyproto-common
+            file_prefix: dash0_opentelemetry_exporter_otlp_pyproto_common
+            environment: pypi-dash0-opentelemetry-exporter-otlp-pyproto-common
+            url: https://pypi.org/project/dash0-opentelemetry-exporter-otlp-pyproto-common/
+          - package: dash0-opentelemetry-exporter-otlp-pyproto-http
+            file_prefix: dash0_opentelemetry_exporter_otlp_pyproto_http
+            environment: pypi-dash0-opentelemetry-exporter-otlp-pyproto-http
+            url: https://pypi.org/project/dash0-opentelemetry-exporter-otlp-pyproto-http/
+          - package: dash0-opentelemetry-exporter-otlp-pyproto-grpc
+            file_prefix: dash0_opentelemetry_exporter_otlp_pyproto_grpc
+            environment: pypi-dash0-opentelemetry-exporter-otlp-pyproto-grpc
+            url: https://pypi.org/project/dash0-opentelemetry-exporter-otlp-pyproto-grpc/
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ matrix.environment }}
+      url: ${{ matrix.url }}
+    permissions:
+      id-token: write
+    env:
+      TAG: ${{ github.ref_name }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Download release assets
+        run: |
+          set -euo pipefail
+          mkdir dist
+          gh release download "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern "${{ matrix.file_prefix }}-*.whl" \
+            --pattern "${{ matrix.file_prefix }}-*.tar.gz" \
+            --dir dist/ 2>/dev/null || true
+          ls -l dist/
+      # SHA-pin this action before enabling the pypi environments for production.
+      # See https://github.com/pypa/gh-action-pypi-publish for the current SHA.
+      - if: hashFiles('dist/*.whl') != '' || hashFiles('dist/*.tar.gz') != ''
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
 
   index-dry-run:
     if: github.event_name == 'workflow_dispatch' && inputs.mode == 'dry-run'

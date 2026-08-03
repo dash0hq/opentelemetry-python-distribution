@@ -9,7 +9,7 @@ resolution-markers = [
 
 [manifest]
 members = [
-    "dash0-opentelemetry-distro",
+    "dash0-opentelemetry",
     "dash0-opentelemetry-exporter-otlp-pyproto-common",
     "dash0-opentelemetry-exporter-otlp-pyproto-grpc",
     "dash0-opentelemetry-exporter-otlp-pyproto-http",
@@ -38,8 +38,8 @@ wheels = [
 ]
 
 [[package]]
-name = "dash0-opentelemetry-distro"
-source = { editable = "packages/dash0-opentelemetry-distro" }
+name = "dash0-opentelemetry"
+source = { editable = "packages/dash0-opentelemetry" }
 dependencies = [
     { name = "asgiref" },
     { name = "dash0-opentelemetry-exporter-otlp-pyproto-grpc" },
@@ -117,8 +117,8 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "asgiref", specifier = "==3.12.1" },
-    { name = "dash0-opentelemetry-exporter-otlp-pyproto-grpc", editable = "packages/opentelemetry-exporter-otlp-pyproto-grpc" },
-    { name = "dash0-opentelemetry-exporter-otlp-pyproto-http", editable = "packages/opentelemetry-exporter-otlp-pyproto-http" },
+    { name = "dash0-opentelemetry-exporter-otlp-pyproto-grpc", editable = "packages/dash0-opentelemetry-exporter-otlp-pyproto-grpc" },
+    { name = "dash0-opentelemetry-exporter-otlp-pyproto-http", editable = "packages/dash0-opentelemetry-exporter-otlp-pyproto-http" },
     { name = "opentelemetry-api", specifier = "==1.44.0" },
     { name = "opentelemetry-instrumentation", specifier = "==0.65b0" },
     { name = "opentelemetry-instrumentation-aio-pika", specifier = "==0.65b0" },
@@ -189,7 +189,7 @@ dev = [{ name = "pytest", specifier = ">=7.0" }]
 
 [[package]]
 name = "dash0-opentelemetry-exporter-otlp-pyproto-common"
-source = { editable = "packages/opentelemetry-exporter-otlp-pyproto-common" }
+source = { editable = "packages/dash0-opentelemetry-exporter-otlp-pyproto-common" }
 dependencies = [
     { name = "dash0-opentelemetry-pyproto" },
     { name = "opentelemetry-api" },
@@ -198,14 +198,14 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "dash0-opentelemetry-pyproto", editable = "packages/opentelemetry-pyproto" },
+    { name = "dash0-opentelemetry-pyproto", editable = "packages/dash0-opentelemetry-pyproto" },
     { name = "opentelemetry-api", specifier = "~=1.12" },
     { name = "opentelemetry-sdk", specifier = "~=1.12" },
 ]
 
 [[package]]
 name = "dash0-opentelemetry-exporter-otlp-pyproto-grpc"
-source = { editable = "packages/opentelemetry-exporter-otlp-pyproto-grpc" }
+source = { editable = "packages/dash0-opentelemetry-exporter-otlp-pyproto-grpc" }
 dependencies = [
     { name = "dash0-opentelemetry-exporter-otlp-pyproto-common" },
     { name = "opentelemetry-api" },
@@ -219,7 +219,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "dash0-opentelemetry-exporter-otlp-pyproto-common", editable = "packages/opentelemetry-exporter-otlp-pyproto-common" },
+    { name = "dash0-opentelemetry-exporter-otlp-pyproto-common", editable = "packages/dash0-opentelemetry-exporter-otlp-pyproto-common" },
     { name = "opentelemetry-api", specifier = "~=1.12" },
     { name = "opentelemetry-sdk", specifier = "~=1.12" },
 ]
@@ -229,7 +229,7 @@ dev = [{ name = "pytest", specifier = ">=7.0" }]
 
 [[package]]
 name = "dash0-opentelemetry-exporter-otlp-pyproto-http"
-source = { editable = "packages/opentelemetry-exporter-otlp-pyproto-http" }
+source = { editable = "packages/dash0-opentelemetry-exporter-otlp-pyproto-http" }
 dependencies = [
     { name = "dash0-opentelemetry-exporter-otlp-pyproto-common" },
     { name = "opentelemetry-api" },
@@ -238,21 +238,21 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "dash0-opentelemetry-exporter-otlp-pyproto-common", editable = "packages/opentelemetry-exporter-otlp-pyproto-common" },
+    { name = "dash0-opentelemetry-exporter-otlp-pyproto-common", editable = "packages/dash0-opentelemetry-exporter-otlp-pyproto-common" },
     { name = "opentelemetry-api", specifier = "~=1.12" },
     { name = "opentelemetry-sdk", specifier = "~=1.12" },
 ]
 
 [[package]]
 name = "dash0-opentelemetry-pyproto"
-source = { editable = "packages/opentelemetry-pyproto" }
+source = { editable = "packages/dash0-opentelemetry-pyproto" }
 
 [[package]]
 name = "exceptiongroup"
 version = "1.3.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "typing-extensions" },
+    { name = "typing-extensions", marker = "python_full_version < '3.13'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/50/79/66800aadf48771f6b62f7eb014e352e5d06856655206165d775e675a02c9/exceptiongroup-1.3.1.tar.gz", hash = "sha256:8b412432c6055b0b7d14c310000ae93352ed6754f70fa8f7c34141f91c4e3219", size = 30371, upload-time = "2025-11-21T23:01:54.787Z" }
 wheels = [

@@ -29,7 +29,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 SITECUSTOMIZE = (
     REPO_ROOT
     / "packages"
-    / "dash0-opentelemetry-distro"
+    / "dash0-opentelemetry"
     / "src"
     / "dash0"
     / "opentelemetry"

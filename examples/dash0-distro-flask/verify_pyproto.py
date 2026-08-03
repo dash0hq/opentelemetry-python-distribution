@@ -24,7 +24,7 @@ AGENT_PACKAGES = (
     "dash0-opentelemetry-exporter-otlp-pyproto-common",
     "dash0-opentelemetry-exporter-otlp-pyproto-http",
     "dash0-opentelemetry-exporter-otlp-pyproto-grpc",
-    "dash0-opentelemetry-distro",
+    "dash0-opentelemetry",
 )
 # The non-opentelemetry-* packages the agent is allowed to pull in transitively,
 # as PEP 503-normalized names. Most are pure-Python support libraries of
@@ -33,7 +33,7 @@ AGENT_PACKAGES = (
 # a compiled extension but is deliberately accepted so the curated set can ship
 # system metrics. Everything else - including grpcio and protobuf - is rejected.
 # Keep this list in sync when bumping the pinned opentelemetry versions in
-# dash0-opentelemetry-distro's pyproject.toml.
+# dash0-opentelemetry's pyproject.toml.
 ALLOWED_NON_OTEL_REQUIREMENTS = (
     "asgiref",
     "packaging",

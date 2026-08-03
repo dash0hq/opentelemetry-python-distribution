@@ -29,11 +29,11 @@ services:
         rm -rf /python-agent/*
         python -m venv /python-agent/venv
         /python-agent/venv/bin/pip install --no-cache-dir \
-          /workspace/packages/opentelemetry-pyproto \
-          /workspace/packages/opentelemetry-exporter-otlp-pyproto-common \
-          /workspace/packages/opentelemetry-exporter-otlp-pyproto-http \
-          /workspace/packages/opentelemetry-exporter-otlp-pyproto-grpc \
-          /workspace/packages/dash0-opentelemetry-distro \
+          /workspace/packages/dash0-opentelemetry-pyproto \
+          /workspace/packages/dash0-opentelemetry-exporter-otlp-pyproto-common \
+          /workspace/packages/dash0-opentelemetry-exporter-otlp-pyproto-http \
+          /workspace/packages/dash0-opentelemetry-exporter-otlp-pyproto-grpc \
+          /workspace/packages/dash0-opentelemetry \
           flask \
           requests \
           opentelemetry-instrumentation-flask

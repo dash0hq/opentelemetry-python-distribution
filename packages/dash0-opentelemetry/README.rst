@@ -1,6 +1,6 @@
-==================
+===================
 dash0-opentelemetry
-==================
+===================
 
 The Dash0 OpenTelemetry distribution for Python. It is the Python counterpart of
 the Dash0 Node.js distribution (``@dash0/opentelemetry``), adapted to Python's

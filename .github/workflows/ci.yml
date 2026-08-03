@@ -118,6 +118,14 @@ jobs:
           uv build --all-packages --out-dir dist \
             --build-constraints scripts/build-constraints.txt
           ls -l dist
+      - name: Validate package metadata
+        run: |
+          set -euo pipefail
+          # Mirrors release.yml so a long_description that would fail
+          # `twine check --strict` at publish time is caught here, on every PR,
+          # instead of only when the release build runs.
+          uv run --no-project --with twine==6.2.0 --python 3.13 \
+            python -m twine check --strict dist/*.whl dist/*.tar.gz
       - uses: actions/upload-artifact@v7
         with:
           name: dist

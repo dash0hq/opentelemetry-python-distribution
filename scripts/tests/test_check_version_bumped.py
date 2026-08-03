@@ -36,7 +36,7 @@ def test_bumped_or_unchanged_packages_pass():
 def test_workspace_discovery_matches_expected_packages():
     names = set(cvb.workspace_packages())
     assert names == {
-        "dash0-opentelemetry-distro",
+        "dash0-opentelemetry",
         "dash0-opentelemetry-pyproto",
         "dash0-opentelemetry-exporter-otlp-pyproto-common",
         "dash0-opentelemetry-exporter-otlp-pyproto-http",

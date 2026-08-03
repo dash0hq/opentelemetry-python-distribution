@@ -54,7 +54,7 @@ Architecture
 ::
 
     packages/
-      dash0-opentelemetry-distro/               the distribution (distro + configurator)
+      dash0-opentelemetry/                      the distribution (distro + configurator)
       opentelemetry-pyproto/                    pure-Python protobuf message classes
       opentelemetry-exporter-otlp-pyproto-common/   shared OTLP encoding
       opentelemetry-exporter-otlp-pyproto-http/     pure-Python OTLP/HTTP exporter (default)
@@ -130,25 +130,23 @@ defaults (with ``setdefault``) and never overrides values you provide.
 Installation
 ============
 
-Releases are published on the Dash0 package index — a static PEP 503 simple
-index on GitHub Pages whose artifacts are GitHub release assets of this
-repository — not on public PyPI:
+Releases are published on **public PyPI** and on the Dash0 package index (a
+static PEP 503 simple index on GitHub Pages):
 
 .. code-block:: bash
 
-    pip install \
-      --extra-index-url https://dash0hq.github.io/opentelemetry-python-distribution/simple/ \
-      dash0-opentelemetry-distro
+    pip install dash0-opentelemetry
 
-Production consumers (such as the dash0-operator's instrumentation image
-build) should install with a fully hashed lockfile, ``--require-hashes``, and
+The Dash0 index hosts the full set of workspace packages (including the
+vendored pyproto exporters) and remains the authoritative source for
+production consumers that install with ``--require-hashes`` and
 ``--only-binary :all:``; see the consumer contract in `RELEASING.rst`_.
 
 For development, consume the workspace directly:
 
 .. code-block:: bash
 
-    uv sync --package dash0-opentelemetry-distro
+    uv sync --package dash0-opentelemetry
 
 
 Development

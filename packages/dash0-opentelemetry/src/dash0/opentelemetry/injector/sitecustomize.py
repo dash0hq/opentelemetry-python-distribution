@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 # Bootstrap script for injector-based activation of the Dash0 OpenTelemetry distribution for Python.
 #
-# This file ships inside the dash0-opentelemetry-distro wheel, but it is not meant to be imported from its packaged
+# This file ships inside the dash0-opentelemetry wheel, but it is not meant to be imported from its packaged
 # location (importing it executes it). Consumers that build an injectable tree — such as the dash0-operator's
 # instrumentation image build — install the distribution into a self-contained directory
-# (`pip install --target <dir> dash0-opentelemetry-distro`) and copy this file from its packaged location to
+# (`pip install --target <dir> dash0-opentelemetry`) and copy this file from its packaged location to
 # `<dir>/sitecustomize.py`. The OpenTelemetry injector (https://github.com/open-telemetry/opentelemetry-injector) then
 # prepends `<dir>` to the PYTHONPATH environment variable of the processes to instrument, so that Python's `site`
 # machinery imports this script on interpreter startup. The script initializes the OpenTelemetry
@@ -110,7 +110,7 @@ def _self_deactivate(current_site):
 
 def _shipped_opentelemetry_package_names(current_site):
     # The OpenTelemetry packages this distribution ships: the injected tree at current_site is exactly the pinned
-    # dependency closure of dash0-opentelemetry-distro (see its pyproject.toml), so enumerate the packages installed
+    # dependency closure of dash0-opentelemetry (see its pyproject.toml), so enumerate the packages installed
     # there instead of maintaining a hardcoded list. Only the OpenTelemetry-related packages count for the double
     # instrumentation check; overlap on the general-purpose support packages we also ship (wrapt, psutil, ...) is
     # common and is handled by the dependency version conflict check instead.

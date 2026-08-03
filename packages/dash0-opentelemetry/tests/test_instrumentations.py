@@ -13,7 +13,7 @@ from importlib.metadata import requires, version
 from opentelemetry.instrumentation import bootstrap_gen
 from packaging.requirements import Requirement
 
-_DISTRO = "dash0-opentelemetry-distro"
+_DISTRO = "dash0-opentelemetry"
 
 
 def _declared():

@@ -16,7 +16,7 @@ import build_simple_index as bsi  # noqa: E402
 REPO = "dash0hq/opentelemetry-python-distribution"
 URL_PREFIX = f"https://github.com/{REPO}/releases/download"
 
-DISTRO_WHEEL = "dash0_opentelemetry_distro-0.1.0-py3-none-any.whl"
+DISTRO_WHEEL = "dash0_opentelemetry-0.1.0-py3-none-any.whl"
 PYPROTO_WHEEL = "dash0_opentelemetry_pyproto-1.44.0-py3-none-any.whl"
 
 
@@ -114,7 +114,7 @@ def test_github_prerelease_assets_are_indexed():
     # legitimately carries stable-versioned vendored wheels, and a
     # post-publish index failure on immutable assets would deadlock the
     # pipeline. Pre-releaseness lives in the PEP 440 version string.
-    rc_wheel = "dash0_opentelemetry_distro-0.1.0rc1-py3-none-any.whl"
+    rc_wheel = "dash0_opentelemetry-0.1.0rc1-py3-none-any.whl"
     entries, _ = collect(
         [release("v0.1.0rc1", [rc_wheel, PYPROTO_WHEEL], prerelease=True)],
         contents={rc_wheel: b"rc", PYPROTO_WHEEL: b"pyproto"},
@@ -157,7 +157,7 @@ def test_excluded_filenames_skip_both_guard_and_index():
 
 
 def test_yanked_versions_carry_reason():
-    yanked = {("dash0-opentelemetry-distro", "0.1.0"): "broken"}
+    yanked = {("dash0-opentelemetry", "0.1.0"): "broken"}
     entries, _ = collect([release("v0.1.0", [DISTRO_WHEEL])], yanked=yanked)
     assert entries[0].yanked_reason == "broken"
 
@@ -165,7 +165,7 @@ def test_yanked_versions_carry_reason():
 def test_yank_entry_matching_nothing_aborts():
     # A yank that matches no indexed file is a silent no-op: the withdrawn
     # version would keep being served. Generation must fail instead.
-    yanked = {("dash0-opentelemetry-distro", "0.1.0-rc1"): "broken"}
+    yanked = {("dash0-opentelemetry", "0.1.0-rc1"): "broken"}
     with pytest.raises(bsi.IndexGenerationError) as excinfo:
         collect([release("v0.1.0", [DISTRO_WHEEL])], yanked=yanked)
     assert "matched no indexed file" in str(excinfo.value)
@@ -175,7 +175,7 @@ def test_yank_entry_matching_nothing_aborts():
 def test_expected_projects_derived_from_workspace():
     assert bsi.expected_projects() == frozenset(
         {
-            "dash0-opentelemetry-distro",
+            "dash0-opentelemetry",
             "dash0-opentelemetry-pyproto",
             "dash0-opentelemetry-exporter-otlp-pyproto-common",
             "dash0-opentelemetry-exporter-otlp-pyproto-http",
@@ -186,7 +186,7 @@ def test_expected_projects_derived_from_workspace():
 
 def test_project_names_normalize_per_pep503():
     entries, _ = collect([release("v0.1.0", [DISTRO_WHEEL])])
-    assert entries[0].project == "dash0-opentelemetry-distro"
+    assert entries[0].project == "dash0-opentelemetry"
 
 
 def test_generated_site_shape(tmp_path):
@@ -197,12 +197,12 @@ def test_generated_site_shape(tmp_path):
     bsi.generate_site(entries, tmp_path, REPO)
 
     simple = (tmp_path / "simple" / "index.html").read_text()
-    assert '<a href="dash0-opentelemetry-distro/">' in simple
+    assert '<a href="dash0-opentelemetry/">' in simple
     assert '<a href="dash0-opentelemetry-pyproto/">' in simple
     assert '<meta name="pypi:repository-version" content="1.0">' in simple
 
     distro = (
-        tmp_path / "simple" / "dash0-opentelemetry-distro" / "index.html"
+        tmp_path / "simple" / "dash0-opentelemetry" / "index.html"
     ).read_text()
     assert f'href="{URL_PREFIX}/v0.1.0/{DISTRO_WHEEL}#sha256={sha256(b"distro")}"' in (
         distro
@@ -289,7 +289,7 @@ def test_generated_site_escapes_hostile_filename_and_url(tmp_path):
     # The artifact regex admits HTML metacharacters in the version segment, so
     # a hostile asset name must not break out of the href/text it is rendered
     # into. (Requires release-write access; this is defense in depth.)
-    hostile = 'dash0_opentelemetry_distro-0.1.0"><script>-py3-none-any.whl'
+    hostile = 'dash0_opentelemetry-0.1.0"><script>-py3-none-any.whl'
     entry = bsi.Entry(
         filename=hostile,
         url=f"{URL_PREFIX}/v0.1.0/{hostile}",
@@ -298,7 +298,7 @@ def test_generated_site_escapes_hostile_filename_and_url(tmp_path):
     )
     bsi.generate_site([entry], tmp_path, REPO)
     page = (
-        tmp_path / "simple" / "dash0-opentelemetry-distro" / "index.html"
+        tmp_path / "simple" / "dash0-opentelemetry" / "index.html"
     ).read_text()
     assert "<script>" not in page
     assert "&lt;script&gt;" in page

@@ -8,7 +8,7 @@ extend-exclude = [
   # The injector bootstrap script must stay valid Python 2.7+ (it runs, and
   # gracefully self-deactivates, on any interpreter the injector touches), so
   # the py310 style rules cannot apply to it.
-  "packages/dash0-opentelemetry-distro/src/dash0/opentelemetry/injector/sitecustomize.py",
+  "packages/dash0-opentelemetry/src/dash0/opentelemetry/injector/sitecustomize.py",
   "packages/opentelemetry-pyproto",
   "packages/opentelemetry-exporter-otlp-pyproto-common",
   "packages/opentelemetry-exporter-otlp-pyproto-http",

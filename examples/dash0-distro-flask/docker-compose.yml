@@ -33,7 +33,7 @@ services:
           /workspace/packages/opentelemetry-exporter-otlp-pyproto-common \
           /workspace/packages/opentelemetry-exporter-otlp-pyproto-http \
           /workspace/packages/opentelemetry-exporter-otlp-pyproto-grpc \
-          /workspace/packages/dash0-opentelemetry-distro \
+          /workspace/packages/dash0-opentelemetry \
           flask \
           requests \
           opentelemetry-instrumentation-flask

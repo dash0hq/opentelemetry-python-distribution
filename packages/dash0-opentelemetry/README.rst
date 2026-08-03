@@ -1,6 +1,6 @@
-==========================
-dash0-opentelemetry-distro
-==========================
+==================
+dash0-opentelemetry
+==================
 
 The Dash0 OpenTelemetry distribution for Python. It is the Python counterpart of
 the Dash0 Node.js distribution (``@dash0/opentelemetry``), adapted to Python's
@@ -127,7 +127,7 @@ building an injectable tree — such as the dash0-operator's instrumentation
 image —
 
 1. installs the distribution into a self-contained directory:
-   ``pip install --target <dir> dash0-opentelemetry-distro``;
+   ``pip install --target <dir> dash0-opentelemetry``;
 2. copies the script to ``<dir>/sitecustomize.py``;
 3. generates ``<dir>/all-dependencies.txt``, a flattened list of every
    requirement of the installed tree (one PEP 508 requirement per line).
@@ -164,6 +164,6 @@ Status
 
 Prototype. The ``otlp_proto_http`` exporter is resolved from the in-repo pyproto
 workspace member, published as ``dash0-opentelemetry-exporter-otlp-pyproto-http``
-on the Dash0 package index (not on public PyPI). Not yet done: the injector's
+on the Dash0 package index and on public PyPI. Not yet done: the injector's
 per-``libc`` packaging and the integration/injection test matrix. Unit tests do
 not require a running collector.

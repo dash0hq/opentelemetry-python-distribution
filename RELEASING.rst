@@ -9,12 +9,20 @@ on.
 Publishing channel
 ==================
 
-Packages are **not** published to public PyPI. Each release attaches wheels
-and sdists as GitHub release assets, and a static `PEP 503
-<https://peps.python.org/pep-0503/>`_ "simple" index served from GitHub Pages
-points at them with ``#sha256=`` fragments:
+Each release publishes packages to **two channels**:
 
-    https://dash0hq.github.io/opentelemetry-python-distribution/simple/
+1. **Public PyPI** — via OIDC trusted publishing in the ``release.yml``
+   ``publish-pypi`` job. Consumers can install with a plain
+   ``pip install dash0-opentelemetry``.
+2. **Dash0 package index** — a static `PEP 503
+   <https://peps.python.org/pep-0503/>`_ "simple" index served from GitHub
+   Pages, backed by GitHub release assets with ``#sha256=`` fragments:
+
+       https://dash0hq.github.io/opentelemetry-python-distribution/simple/
+
+   This index hosts all five workspace packages (including the vendored pyproto
+   exporters) and is the authoritative source for production consumers that
+   install with ``--require-hashes`` and ``--only-binary :all:``.
 
 ``.github/workflows/release.yml`` implements the pipeline; the index is
 regenerated statelessly from all published releases by
@@ -33,11 +41,10 @@ The three decisions that used to gate publishing are resolved:
    entry-point names stay upstream-shaped: when upstream publishes the
    official packages, the distribution switches its dependencies over and the
    renamed copies are deprecated. The ``dash0-opentelemetry-*`` names are
-   defensively registered on public PyPI (see `Name reservation`_).
+   claimed on public PyPI via the first real release.
 2. **Scope.** All five workspace packages are published to the self-hosted
-   index. Public PyPI publication of the real packages is deferred until
-   there is a non-operator audience; the artifacts and the already-claimed
-   names make that step additive.
+   index. The main ``dash0-opentelemetry`` package and the four supporting
+   pyproto packages are also published to public PyPI.
 3. **Versioning.** The distribution versions independently (semver). The
    vendored packages carry their upstream base version with ``.postN``
    increments for Dash0-side changes (e.g. ``1.44.0``, ``1.44.0.post1``).
@@ -146,29 +153,21 @@ Repository (an admin, before the first release):
    manifest commits; do not widen branch protection for the generic Actions
    token instead.
 6. Create the ``pypi`` environment with **required reviewers** and a
-   deployment policy restricted to the default branch (used only by the name
-   reservation below).
+   deployment policy restricted to tag refs matching ``v*`` (the
+   ``publish-pypi`` job runs on every tag push).
 
-.. _Name reservation:
-
-Name reservation on public PyPI (an org admin, **before the rename lands on
-the default branch** — the names are guessable from the public history the
-moment it merges):
+PyPI trusted publishing (an org admin, once, before the first release):
 
 1. Create the Dash0 **organization account** on PyPI with enforced 2FA.
-2. Check each of the five names is still unclaimed, then add a **pending
-   trusted publisher** per name, bound to ``reserve-pypi-names.yml`` and the
-   ``pypi`` environment of this repository. Pending publishers do not reserve
-   names — only the first upload does — so proceed immediately.
-3. Run the ``Reserve PyPI names`` workflow. It publishes ``0.0.0.devN`` stubs
-   whose README points at the real index. Re-runs are safe
-   (``skip-existing``).
-4. **Mandatory:** remove the five trusted publishers on PyPI in the same
-   session and verify in each project's Publishing settings that none remain.
-   A standing publisher binding is a publish capability to the public names
-   for anyone who can run the workflow. (Re-adding one takes two minutes if a
-   stub ever needs refreshing; increment ``N`` — PyPI permanently forbids
-   filename reuse.)
+2. For each of the five package names, add a **pending trusted publisher**
+   bound to ``release.yml``, the ``publish-pypi`` job, and the ``pypi``
+   environment of this repository. Pending publishers claim names on first
+   upload without pre-registering them.
+3. SHA-pin ``pypa/gh-action-pypi-publish`` in ``release.yml`` (the current
+   placeholder uses ``@release/v1``; replace with the SHA of the latest
+   release and a version comment before merging).
+4. Verify by pushing a pre-release tag (e.g. ``v0.3.0rc1``) and confirming
+   all five packages appear on PyPI under the Dash0 organization.
 5. When the PEP 755 namespace-grant process goes live on PyPI, apply for a
    restricted grant on the ``dash0`` prefix through the organization account.
 
@@ -247,7 +246,7 @@ Local build (dry run)
                 dash0-opentelemetry-exporter-otlp-pyproto-common \
                 dash0-opentelemetry-exporter-otlp-pyproto-http \
                 dash0-opentelemetry-exporter-otlp-pyproto-grpc \
-                dash0-opentelemetry-distro; do
+                dash0-opentelemetry; do
       uv build --package "$name" --out-dir dist \
         --build-constraints scripts/build-constraints.txt
     done

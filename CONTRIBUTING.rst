@@ -15,7 +15,7 @@ Prerequisites
 Project layout
 ==============
 
-- ``packages/dash0-opentelemetry-distro`` — the distribution: ``Dash0Distro``
+- ``packages/dash0-opentelemetry`` — the distribution: ``Dash0Distro``
   and ``Dash0Configurator`` plus resource detection and settings. **This is the
   Dash0-authored code.**
 - ``packages/opentelemetry-*`` — the pure-Python (pyproto) OTLP exporter
@@ -34,7 +34,7 @@ Setup
 
 .. code-block:: bash
 
-    uv sync --package dash0-opentelemetry-distro
+    uv sync --package dash0-opentelemetry
 
 This creates ``.venv`` with the distribution, the in-repo pyproto exporters,
 and the dev dependencies.
@@ -47,8 +47,8 @@ Distribution unit tests (fast, no Docker):
 
 .. code-block:: bash
 
-    uv run --package dash0-opentelemetry-distro \
-      python -m pytest packages/dash0-opentelemetry-distro/tests -v
+    uv run --package dash0-opentelemetry \
+      python -m pytest packages/dash0-opentelemetry/tests -v
 
 End-to-end example (requires Docker; builds the distro into a container, runs a
 Flask app under ``opentelemetry-instrument``, and asserts on the exported
@@ -70,8 +70,8 @@ pyproto packages are excluded via ``ruff.toml``):
 
 .. code-block:: bash
 
-    uvx ruff@latest check packages/dash0-opentelemetry-distro examples
-    uvx ruff@latest format --check packages/dash0-opentelemetry-distro examples
+    uvx ruff@latest check packages/dash0-opentelemetry examples
+    uvx ruff@latest format --check packages/dash0-opentelemetry examples
 
 Apply fixes with ``ruff check --fix`` and ``ruff format`` (drop ``--check``).
 

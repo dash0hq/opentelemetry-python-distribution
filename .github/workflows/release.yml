@@ -117,7 +117,7 @@ jobs:
                   f"releases must carry release-form versions"
               )
 
-          distro_version = versions["dash0-opentelemetry-distro"]
+          distro_version = versions["dash0-opentelemetry"]
           assert tag == f"v{distro_version}", (
               f"tag {tag} does not match the distro version: "
               f"expected v{distro_version}"
@@ -274,6 +274,38 @@ jobs:
           path: site/
       - uses: actions/deploy-pages@v5
         id: deploy
+
+  publish-pypi:
+    needs: [build]
+    # Publish to PyPI only on tag-triggered runs (not manual dispatches or
+    # UI-published events) and only when the build job actually produced
+    # artifacts (result == success, not skipped).
+    if: github.event_name == 'push' && needs.build.result == 'success'
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/dash0-opentelemetry/
+    permissions:
+      id-token: write
+    env:
+      TAG: ${{ github.ref_name }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Download release assets
+        run: |
+          set -euo pipefail
+          mkdir dist
+          gh release download "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern "*.whl" \
+            --pattern "*.tar.gz" \
+            --dir dist/
+          ls -l dist/
+      # SHA-pin this action before enabling the pypi environment for production.
+      # See https://github.com/pypa/gh-action-pypi-publish for the current SHA.
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
 
   index-dry-run:
     if: github.event_name == 'workflow_dispatch' && inputs.mode == 'dry-run'

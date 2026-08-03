@@ -56,27 +56,24 @@ The three decisions that used to gate publishing are resolved:
 Cutting a release
 =================
 
-1. Bump the versions being released: the distro's ``version.py`` always
-   (the tag is derived from it), plus any vendored package that changed
-   (``.postN``) together with the distro's ``==`` pins on it.
-2. Compile the changelog and regenerate ``uv.lock``. ``CHANGELOG.rst`` is
-   managed by `chloggen
-   <https://github.com/open-telemetry/opentelemetry-go-build-tools/tree/main/chloggen>`_:
-   fold the pending ``.chloggen/`` entries into a new dated section, then relock.
+1. Add a ``.chloggen/`` entry for any user-visible changes (``make chlog-new``).
+2. Trigger the **Prepare Release** workflow (``prepare-release.yml``) via
+   ``workflow_dispatch`` with the new distro version (e.g. ``0.3.0``).
+   The workflow:
 
-   .. code-block:: bash
+   - Bumps any vendored package whose source changed since the last release
+     tag to the next ``.postN`` version and cascades the ``==`` pins.
+   - Sets the distro version in ``version.py``.
+   - Folds pending ``.chloggen/`` entries into ``CHANGELOG.rst`` via
+     ``make chlog-update``.
+   - Relocks (``uv lock``).
+   - Commits directly to ``main`` with the message
+     ``docs: update changelog to prepare release v<version>``.
 
-       make chlog-update VERSION="<distro-version> - <YYYY-MM-DD>"
-       uv lock
-
-   ``make chlog-update`` inserts the rendered section below the
-   ``.. <!-- next version -->`` marker and deletes the entry files it consumed;
-   commit both the ``CHANGELOG.rst`` edit and the deletions. Pass ``VERSION``
-   exactly as the heading should read — this project uses ``<version> - <date>``
-   — and preview without writing using ``make chlog-preview``. Released sections
-   are generated: never hand-edit them. See ``docs/changelog-maintenance.rst``.
-3. Land those changes on ``main`` through a PR.
-4. Tag and push: ``git tag v<distro-version> && git push origin v<distro-version>``.
+3. The **Automation - Create Tag for Release** workflow detects that commit
+   message, creates the ``v<version>`` tag, and pushes it. The tag push
+   triggers **Release**, which builds, attests, uploads the GitHub release,
+   regenerates the index, and publishes to PyPI.
 
 **Never create or publish releases from the GitHub UI.** The pipeline
 assembles releases draft-first and publishes them itself; a release published
@@ -86,7 +83,8 @@ changes a package whose current version is already published fails
 (``scripts/check_version_bumped.py``) — the release pipeline would otherwise
 silently skip rebuilding it.
 
-The workflow then: validates the tag against the distro version and rejects
+The ``Release`` workflow: validates the tag (``vX.Y.Z`` with optional PEP 440
+pre-release or ``.postN`` suffix) against the distro version and rejects
 ``.dev`` versions anywhere; builds **only** artifacts whose filenames are not
 yet in ``scripts/index-manifest.json`` (published artifacts are immutable, and
 rebuilds are not byte-stable across toolchain upgrades); writes a
@@ -105,18 +103,11 @@ legitimately carry their stable versions.
 Runbooks
 ========
 
-**Rehearse without touching anything** — run the ``Release`` workflow manually
-with ``mode: dry-run``. It regenerates the index from the current releases and
-uploads it as a workflow artifact; nothing deploys and the manifest is not
-updated.
-
-**Rebuild the index without rebuilding artifacts** (Pages deploy failed, or
-yank/exclusion metadata changed) — run with ``mode: rebuild-index``.
-
-**A release run was cancelled by the concurrency queue** (GitHub keeps only
-one pending run per group; publishing 3+ releases in quick succession cancels
-the middle ones) — run with ``mode: rebuild-assets`` and the affected tag. The
-release must still be a draft or missing; published releases are immutable.
+**Rebuild a release whose run was cancelled by the concurrency queue**
+(GitHub keeps only one pending run per group; publishing 3+ releases in quick
+succession cancels the middle ones) — run the ``Release`` workflow manually
+via ``workflow_dispatch`` with the affected tag. The release must still be a
+draft or missing; published releases are immutable.
 
 **Withdraw a broken version** — never delete a release: its asset URLs are
 baked into every consumer lockfile that pins the version, and pip re-resolves
@@ -152,23 +143,36 @@ Repository (an admin, before the first release):
    ``main`` branch ruleset. This is the only credential that can push the
    manifest commits; do not widen branch protection for the generic Actions
    token instead.
-6. Create the ``pypi`` environment with **required reviewers** and a
-   deployment policy restricted to tag refs matching ``v*`` (the
-   ``publish-pypi`` job runs on every tag push).
+6. Create a **Personal Access Token** (classic or fine-grained, with
+   ``Contents: write`` on this repository) for a maintainer account and store
+   it as the ``REPOSITORY_FULL_ACCESS_GITHUB_TOKEN`` repository secret. The ``Automation - Create Tag
+   for Release`` workflow uses this token so that the tag push fires
+   ``Release`` — events triggered by the default ``GITHUB_TOKEN`` do not start
+   new workflow runs.
+7. Create **five** GitHub environments, one per published package, each with a
+   deployment policy restricted to tag refs matching ``v*``:
+
+   - ``pypi-dash0-opentelemetry``
+   - ``pypi-dash0-opentelemetry-pyproto``
+   - ``pypi-dash0-opentelemetry-exporter-otlp-pyproto-common``
+   - ``pypi-dash0-opentelemetry-exporter-otlp-pyproto-http``
+   - ``pypi-dash0-opentelemetry-exporter-otlp-pyproto-grpc``
 
 PyPI trusted publishing (an org admin, once, before the first release):
 
 1. Create the Dash0 **organization account** on PyPI with enforced 2FA.
 2. For each of the five package names, add a **pending trusted publisher**
-   bound to ``release.yml``, the ``publish-pypi`` job, and the ``pypi``
-   environment of this repository. Pending publishers claim names on first
-   upload without pre-registering them.
-3. SHA-pin ``pypa/gh-action-pypi-publish`` in ``release.yml`` (the current
-   placeholder uses ``@release/v1``; replace with the SHA of the latest
-   release and a version comment before merging).
-4. Verify by pushing a pre-release tag (e.g. ``v0.3.0rc1``) and confirming
+   bound to ``release.yml``, the ``publish-pypi`` job, and the corresponding
+   ``pypi-<package-name>`` environment of this repository. Pending publishers
+   claim names on first upload without pre-registering them. PyPI limits
+   pending publishers to three per ``repo + workflow + environment``
+   combination; because each package uses a distinct environment this
+   constraint does not apply, but PyPI also caps pending publishers per account
+   — register in batches if needed, using the ``workflow_dispatch`` ``packages``
+   input to publish each batch separately.
+3. Verify by pushing a pre-release tag (e.g. ``v0.3.0rc1``) and confirming
    all five packages appear on PyPI under the Dash0 organization.
-5. When the PEP 755 namespace-grant process goes live on PyPI, apply for a
+4. When the PEP 755 namespace-grant process goes live on PyPI, apply for a
    restricted grant on the ``dash0`` prefix through the organization account.
 
 While the repository is private

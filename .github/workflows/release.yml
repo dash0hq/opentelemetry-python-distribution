@@ -1,5 +1,6 @@
-# Release pipeline: build wheels/sdists as GitHub release assets and serve the
-# PEP 503 simple index from GitHub Pages (see RELEASING.rst).
+# Release pipeline: build wheels/sdists as GitHub release assets, serve the
+# PEP 503 simple index from GitHub Pages, and publish to PyPI.
+# See RELEASING.rst for the full process, runbooks, and administrative setup.
 #
 # Draft-first: assets upload to a draft release and the release is published
 # as the final build step, because the repo's immutable-releases setting
@@ -29,18 +30,17 @@ on:
     types: [published]
   workflow_dispatch:
     inputs:
-      mode:
-        description: Maintenance operation
-        type: choice
-        default: rebuild-index
-        options:
-          - rebuild-index
-          - dry-run
-          - rebuild-assets
-      release-tag:
+      tag:
+        description: "Release tag to build and publish (e.g. v0.3.0)"
+        required: true
+        default: ""
+      packages:
         description: >-
-          Tag to (re)build assets for (mode: rebuild-assets). The release must
-          still be a draft or missing; published releases are immutable.
+          Comma-separated packages to publish to PyPI (e.g.
+          "dash0-opentelemetry,dash0-opentelemetry-pyproto"). Leave empty to
+          publish every package that has new artifacts. Use this to work around
+          PyPI's limit of three pending trusted publishers per configuration by
+          publishing packages in batches across separate runs.
         required: false
         default: ""
 
@@ -49,7 +49,7 @@ permissions: {}
 # Queued, not cancelling: a cancelled run would skip building its release's
 # assets. Note GitHub keeps only the single newest pending run per group; if
 # 3+ releases land while one run is in progress, re-run the cancelled runs via
-# mode=rebuild-assets (see RELEASING.rst).
+# workflow_dispatch with the affected tag (see RELEASING.rst).
 concurrency:
   group: release-publish
   cancel-in-progress: false
@@ -58,21 +58,25 @@ jobs:
   build:
     if: >-
       github.event_name == 'push' ||
-      (github.event_name == 'workflow_dispatch' && inputs.mode == 'rebuild-assets')
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: write
       id-token: write
       attestations: write
     env:
-      TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.release-tag }}
+      TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.tag }}
       GH_TOKEN: ${{ github.token }}
     steps:
       - name: Require a release tag
         run: |
           set -euo pipefail
           if [ -z "$TAG" ]; then
-            echo "::error::the release-tag input is required for mode=rebuild-assets"
+            echo "::error::the tag input is required for workflow_dispatch"
+            exit 1
+          fi
+          if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(([ab]|rc)[0-9]+|\.post[0-9]+)?$ ]]; then
+            echo "::error::tag '$TAG' does not match vX.Y.Z (e.g. v1.2.3, v1.2.3rc1, v1.2.3.post1)"
             exit 1
           fi
       - uses: actions/checkout@v7
@@ -222,13 +226,10 @@ jobs:
 
   index:
     needs: [build]
-    # Runs after a successful build, on manually-published releases, and on
-    # mode=rebuild-index dispatches (where the build job is skipped).
+    # Runs after a successful build, or on manually-published releases.
     if: >-
       !cancelled() && needs.build.result != 'failure' &&
-      (needs.build.result == 'success' ||
-       github.event_name == 'release' ||
-       (github.event_name == 'workflow_dispatch' && inputs.mode == 'rebuild-index'))
+      (needs.build.result == 'success' || github.event_name == 'release')
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -277,10 +278,7 @@ jobs:
 
   publish-pypi:
     needs: [build]
-    # Publish to PyPI only on tag-triggered runs (not manual dispatches or
-    # UI-published events) and only when the build job actually produced
-    # artifacts (result == success, not skipped).
-    if: github.event_name == 'push' && needs.build.result == 'success'
+    if: needs.build.result == 'success'
     strategy:
       fail-fast: false
       matrix:
@@ -312,10 +310,18 @@ jobs:
     permissions:
       id-token: write
     env:
-      TAG: ${{ github.ref_name }}
+      TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.tag }}
       GH_TOKEN: ${{ github.token }}
     steps:
       - name: Download release assets
+        # On workflow_dispatch with a packages filter, skip packages not listed.
+        # Wrapping both sides with commas prevents prefix-match false positives
+        # (e.g. "dash0-opentelemetry" matching "dash0-opentelemetry-pyproto").
+        # On tag-push events inputs.packages is always empty, so all packages publish.
+        if: >-
+          github.event_name != 'workflow_dispatch' ||
+          inputs.packages == '' ||
+          contains(format(',{0},', inputs.packages), format(',{0},', matrix.package))
         run: |
           set -euo pipefail
           mkdir dist
@@ -325,30 +331,7 @@ jobs:
             --pattern "${{ matrix.file_prefix }}-*.tar.gz" \
             --dir dist/ 2>/dev/null || true
           ls -l dist/
-      # SHA-pin this action before enabling the pypi environments for production.
-      # See https://github.com/pypa/gh-action-pypi-publish for the current SHA.
       - if: hashFiles('dist/*.whl') != '' || hashFiles('dist/*.tar.gz') != ''
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1
         with:
           packages-dir: dist/
-
-  index-dry-run:
-    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'dry-run'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    env:
-      GH_TOKEN: ${{ github.token }}
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          ref: main
-      - name: Generate the index (no manifest update, no deploy)
-        run: |
-          set -euo pipefail
-          python3 scripts/build_simple_index.py --output-dir site \
-            --github-token "$GH_TOKEN"
-      - uses: actions/upload-artifact@v7
-        with:
-          name: index-site
-          path: site/

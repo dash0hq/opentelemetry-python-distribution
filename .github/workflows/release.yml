@@ -60,6 +60,11 @@ jobs:
       github.event_name == 'push' ||
       (github.event_name == 'workflow_dispatch' && inputs.mode == 'rebuild-assets')
     runs-on: ubuntu-latest
+    outputs:
+      # JSON array of the PyPI project names built this run; drives the
+      # per-package publish-pypi matrix below. Empty ("[]") when every
+      # filename is already indexed and nothing was built.
+      packages: ${{ steps.select.outputs.packages }}
     permissions:
       contents: write
       id-token: write
@@ -136,6 +141,9 @@ jobs:
           prerelease = bool(re.search(r"(?:a|b|rc)[0-9]+", distro_version))
           with open(os.environ["GITHUB_OUTPUT"], "a") as out:
               out.write(f"prerelease={str(prerelease).lower()}\n")
+              # The publish-pypi matrix iterates exactly the packages built
+              # this run, so already-published names are never re-published.
+              out.write(f"packages={json.dumps(to_build)}\n")
           print(f"building: {to_build or 'nothing (all filenames already indexed)'}")
           EOF
       - name: Build packages
@@ -278,32 +286,50 @@ jobs:
   publish-pypi:
     needs: [build]
     # Publish to PyPI only on tag-triggered runs (not manual dispatches or
-    # UI-published events) and only when the build job actually produced
-    # artifacts (result == success, not skipped).
-    if: github.event_name == 'push' && needs.build.result == 'success'
+    # UI-published events) and only when the build job produced artifacts.
+    if: >-
+      github.event_name == 'push' && needs.build.result == 'success' &&
+      needs.build.outputs.packages != '[]'
+    # One job per package built this run. Each package is published from its
+    # OWN GitHub environment whose name equals the package's PyPI project
+    # name. This is load-bearing, not cosmetic: a PyPI *pending* trusted
+    # publisher is unique on (owner, repo, workflow, environment), so a single
+    # shared environment could authorize only one of these names. A distinct
+    # environment per package gives each its own (…, release.yml, <name>)
+    # tuple, which is what lets this one workflow publish all of them. Each
+    # environment must exist with a matching pending/trusted publisher on PyPI
+    # (see RELEASING.rst).
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJSON(needs.build.outputs.packages) }}
     runs-on: ubuntu-latest
     environment:
-      name: pypi
-      url: https://pypi.org/project/dash0-opentelemetry/
+      name: ${{ matrix.package }}
+      url: https://pypi.org/project/${{ matrix.package }}/
     permissions:
       id-token: write
     env:
       TAG: ${{ github.ref_name }}
       GH_TOKEN: ${{ github.token }}
+      PACKAGE: ${{ matrix.package }}
     steps:
-      - name: Download release assets
+      - name: Download this package's release assets
         run: |
           set -euo pipefail
           mkdir dist
+          # Wheel/sdist filenames normalize runs of -_. to a single _, so the
+          # trailing hyphen before the version makes each prefix unambiguous:
+          # "dash0_opentelemetry-*" matches the distro but not
+          # "dash0_opentelemetry_pyproto-*".
+          dist_name="${PACKAGE//-/_}"
           gh release download "$TAG" \
             --repo "$GITHUB_REPOSITORY" \
-            --pattern "*.whl" \
-            --pattern "*.tar.gz" \
+            --pattern "${dist_name}-*.whl" \
+            --pattern "${dist_name}-*.tar.gz" \
             --dir dist/
           ls -l dist/
-      # SHA-pin this action before enabling the pypi environment for production.
-      # See https://github.com/pypa/gh-action-pypi-publish for the current SHA.
-      - uses: pypa/gh-action-pypi-publish@release/v1
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
         with:
           packages-dir: dist/
 

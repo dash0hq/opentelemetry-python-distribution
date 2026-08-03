@@ -55,10 +55,10 @@ Architecture
 
     packages/
       dash0-opentelemetry/                      the distribution (distro + configurator)
-      opentelemetry-pyproto/                    pure-Python protobuf message classes
-      opentelemetry-exporter-otlp-pyproto-common/   shared OTLP encoding
-      opentelemetry-exporter-otlp-pyproto-http/     pure-Python OTLP/HTTP exporter (default)
-      opentelemetry-exporter-otlp-pyproto-grpc/     pure-Python OTLP/gRPC exporter
+      dash0-opentelemetry-pyproto/                    pure-Python protobuf message classes
+      dash0-opentelemetry-exporter-otlp-pyproto-common/   shared OTLP encoding
+      dash0-opentelemetry-exporter-otlp-pyproto-http/     pure-Python OTLP/HTTP exporter (default)
+      dash0-opentelemetry-exporter-otlp-pyproto-grpc/     pure-Python OTLP/gRPC exporter
     examples/
       dash0-distro-flask/                       self-contained, Docker-based demo
 

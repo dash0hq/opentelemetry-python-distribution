@@ -1,0 +1,25 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "dash0-opentelemetry-exporter-otlp-pyproto-common"
+dynamic = ["version"]
+description = "OpenTelemetry OTLP encoding using pure-Python protobuf (no google.protobuf)"
+readme = "README.rst"
+license = "Apache-2.0"
+requires-python = ">=3.10"
+dependencies = [
+  "opentelemetry-api ~= 1.12",
+  "opentelemetry-sdk ~= 1.12",
+  "dash0-opentelemetry-pyproto == 1.44.0.post1",
+]
+
+[tool.hatch.version]
+path = "src/opentelemetry/exporter/otlp/_proto/common/version/__init__.py"
+
+[tool.hatch.build.targets.sdist]
+include = ["/src"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/opentelemetry"]

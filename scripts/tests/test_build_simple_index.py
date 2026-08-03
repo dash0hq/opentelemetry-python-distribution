@@ -201,9 +201,7 @@ def test_generated_site_shape(tmp_path):
     assert '<a href="dash0-opentelemetry-pyproto/">' in simple
     assert '<meta name="pypi:repository-version" content="1.0">' in simple
 
-    distro = (
-        tmp_path / "simple" / "dash0-opentelemetry" / "index.html"
-    ).read_text()
+    distro = (tmp_path / "simple" / "dash0-opentelemetry" / "index.html").read_text()
     assert f'href="{URL_PREFIX}/v0.1.0/{DISTRO_WHEEL}#sha256={sha256(b"distro")}"' in (
         distro
     )
@@ -297,9 +295,7 @@ def test_generated_site_escapes_hostile_filename_and_url(tmp_path):
         uploaded_at="2026-07-22T10:00:00Z",
     )
     bsi.generate_site([entry], tmp_path, REPO)
-    page = (
-        tmp_path / "simple" / "dash0-opentelemetry" / "index.html"
-    ).read_text()
+    page = (tmp_path / "simple" / "dash0-opentelemetry" / "index.html").read_text()
     assert "<script>" not in page
     assert "&lt;script&gt;" in page
     assert "&quot;&gt;" in page

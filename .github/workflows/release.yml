@@ -281,10 +281,34 @@ jobs:
     # UI-published events) and only when the build job actually produced
     # artifacts (result == success, not skipped).
     if: github.event_name == 'push' && needs.build.result == 'success'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - package: dash0-opentelemetry
+            file_prefix: dash0_opentelemetry
+            environment: pypi-dash0-opentelemetry
+            url: https://pypi.org/project/dash0-opentelemetry/
+          - package: dash0-opentelemetry-pyproto
+            file_prefix: dash0_opentelemetry_pyproto
+            environment: pypi-dash0-opentelemetry-pyproto
+            url: https://pypi.org/project/dash0-opentelemetry-pyproto/
+          - package: dash0-opentelemetry-exporter-otlp-pyproto-common
+            file_prefix: dash0_opentelemetry_exporter_otlp_pyproto_common
+            environment: pypi-dash0-opentelemetry-exporter-otlp-pyproto-common
+            url: https://pypi.org/project/dash0-opentelemetry-exporter-otlp-pyproto-common/
+          - package: dash0-opentelemetry-exporter-otlp-pyproto-http
+            file_prefix: dash0_opentelemetry_exporter_otlp_pyproto_http
+            environment: pypi-dash0-opentelemetry-exporter-otlp-pyproto-http
+            url: https://pypi.org/project/dash0-opentelemetry-exporter-otlp-pyproto-http/
+          - package: dash0-opentelemetry-exporter-otlp-pyproto-grpc
+            file_prefix: dash0_opentelemetry_exporter_otlp_pyproto_grpc
+            environment: pypi-dash0-opentelemetry-exporter-otlp-pyproto-grpc
+            url: https://pypi.org/project/dash0-opentelemetry-exporter-otlp-pyproto-grpc/
     runs-on: ubuntu-latest
     environment:
-      name: pypi
-      url: https://pypi.org/project/dash0-opentelemetry/
+      name: ${{ matrix.environment }}
+      url: ${{ matrix.url }}
     permissions:
       id-token: write
     env:
@@ -297,13 +321,14 @@ jobs:
           mkdir dist
           gh release download "$TAG" \
             --repo "$GITHUB_REPOSITORY" \
-            --pattern "*.whl" \
-            --pattern "*.tar.gz" \
-            --dir dist/
+            --pattern "${{ matrix.file_prefix }}-*.whl" \
+            --pattern "${{ matrix.file_prefix }}-*.tar.gz" \
+            --dir dist/ 2>/dev/null || true
           ls -l dist/
-      # SHA-pin this action before enabling the pypi environment for production.
+      # SHA-pin this action before enabling the pypi environments for production.
       # See https://github.com/pypa/gh-action-pypi-publish for the current SHA.
-      - uses: pypa/gh-action-pypi-publish@release/v1
+      - if: hashFiles('dist/*.whl') != '' || hashFiles('dist/*.tar.gz') != ''
+        uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist/
 

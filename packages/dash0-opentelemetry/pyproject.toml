@@ -34,8 +34,8 @@ dependencies = [
   # workspace from open-telemetry/opentelemetry-packaging under Dash0-owned
   # distribution names (import paths and entry points stay upstream-shaped).
   # Published on both the Dash0 package index and public PyPI.
-  "dash0-opentelemetry-exporter-otlp-pyproto-http == 1.44.0",
-  "dash0-opentelemetry-exporter-otlp-pyproto-grpc == 1.44.0",
+  "dash0-opentelemetry-exporter-otlp-pyproto-http == 1.44.0.post1",
+  "dash0-opentelemetry-exporter-otlp-pyproto-grpc == 1.44.0.post1",
 
   # --- Curated instrumentation set ---
   # The full upstream auto-instrumentation list (the bootstrap_gen module of

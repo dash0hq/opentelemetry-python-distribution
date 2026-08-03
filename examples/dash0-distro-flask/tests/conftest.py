@@ -49,11 +49,13 @@ def output_dir(request):
 
     makedirs(join(DEMO_DIR, "python-agent"), exist_ok=True)
 
-    run(
+    result = run(
         ["docker", "compose", "-f", COMPOSE_FILE, "up", "--detach"],
-        check=True,
         env=env,
     )
+    if result.returncode != 0:
+        run(["docker", "compose", "-f", COMPOSE_FILE, "logs"], env=env)
+        result.check_returncode()
     # Wait for the traffic generator to finish (it exits after sending requests).
     run(
         ["docker", "compose", "-f", COMPOSE_FILE, "wait", "traffic"],

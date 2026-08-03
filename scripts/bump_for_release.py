@@ -67,6 +67,19 @@ def in_manifest(name: str, version: str, manifest: dict) -> bool:
     return f"{name.replace('-', '_')}-{version}-py3-none-any.whl" in manifest
 
 
+# A release version is a plain PEP 440 string — X.Y.Z with an optional
+# pre-release (aN/bN/rcN) or post-release (.postN) suffix — and never carries a
+# leading "v" (that prefix belongs only on the git tag). Mirrors the version
+# shape create-tag-for-release.sh accepts.
+DISTRO_VERSION_RE = re.compile(
+    r"[0-9]+\.[0-9]+\.[0-9]+(?:(?:a|b|rc)[0-9]+|\.post[0-9]+)?"
+)
+
+
+def is_valid_distro_version(version: str) -> bool:
+    return DISTRO_VERSION_RE.fullmatch(version) is not None
+
+
 def git_changed_paths(base: str) -> set[str]:
     out = subprocess.run(
         ["git", "diff", "--name-only", f"{base}...HEAD"],
@@ -136,6 +149,16 @@ def main(argv=None):
         help="Git ref to diff against (default: last release tag)",
     )
     args = parser.parse_args(argv)
+
+    # Reject a malformed version before any file is written: a leading "v"
+    # (e.g. "v0.3.0") would otherwise corrupt version.py and produce the tag
+    # "vv0.3.0", stalling the release.
+    if not is_valid_distro_version(args.new_distro_version):
+        parser.error(
+            f"invalid distro version {args.new_distro_version!r}: expected a "
+            "plain release version such as 0.3.0, 0.3.0rc1, or 0.3.0.post1 "
+            "(no leading 'v' — that prefix belongs only on the git tag)"
+        )
 
     base = args.base or last_release_tag()
     manifest = json.loads(MANIFEST.read_text()) if MANIFEST.exists() else {}

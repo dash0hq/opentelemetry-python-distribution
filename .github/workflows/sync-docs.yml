@@ -1,0 +1,41 @@
+name: Synchronize docs to the Dash0 website
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: Only verify transformations + coverage; do not open a PR.
+        type: boolean
+        default: true
+  workflow_call:
+    inputs:
+      dry-run:
+        type: boolean
+        default: false
+  pull_request:
+    paths:
+      - 'docs/**'
+      - '.github/workflows/sync-docs/**'
+      - '.github/workflows/sync-docs.yml'
+
+jobs:
+  sync-docs:
+    name: Sync docs to Dash0 website
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sync docs to the Dash0 website
+        uses: dash0hq/sync-docs-action@3fbe55fed800da21ee24d6b6dba1a86435f61565  # v0.4.0
+        with:
+          dry-run: ${{ github.event_name == 'pull_request' || inputs.dry-run }}
+          target-repository: ${{ secrets.SYNC_DOCUMENTATION_TARGET_REPOSITORY }}
+          target-directory: ${{ secrets.SYNC_DOCUMENTATION_TARGET_DIRECTORY }}
+          target-github-token: ${{ secrets.DASH0_WEBSITE_SYNC_TOKEN }}
+          pr-branch: sync/opentelemetry-python-distribution-docs
+          pr-title: "docs: synchronize Python distribution documentation"
+          pr-body: |
+            Synchronizes the OpenTelemetry Python distribution documentation
+            from [dash0hq/opentelemetry-python-distribution](https://github.com/dash0hq/opentelemetry-python-distribution).
+          pr-reviewers: mmanciop

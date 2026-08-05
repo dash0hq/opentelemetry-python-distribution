@@ -32,14 +32,6 @@ The following variables are relevant to the distribution's behavior:
 | `OTEL_PYTHON_DISABLED_INSTRUMENTATIONS` | — | Comma-separated list of instrumentor entry-point names to skip (e.g. `flask,redis`). Honored by the auto-instrumentation loader. |
 | `OTEL_EXPERIMENTAL_RESOURCE_DETECTORS` | — | Comma-separated resource detector names. Reference the Dash0 detectors here when using declarative SDK configuration (`OTEL_CONFIG_FILE`). |
 
-## Mixed-protocol endpoint rewriting
-
-When signals use different protocols and the shared base URL targets the "wrong" conventional port (4317 for gRPC, 4318 for HTTP), the distribution automatically derives a corrected per-signal endpoint.
-
-For example, if `DASH0_OTEL_COLLECTOR_BASE_URL=http://collector:4318` and `OTEL_EXPORTER_OTLP_TRACES_PROTOCOL=grpc`, the distribution rewrites the traces endpoint to `http://collector:4317` rather than sending gRPC to the HTTP port.
-
-Custom ports and explicitly set per-signal endpoints are always left untouched.
-
 ## Disabling the distribution
 
 If you need to disable the distribution entirely without removing it:

@@ -56,7 +56,7 @@ coverage:
 
 nav:
   target: dash0/opentelemetry/distributions/python/nav.json
-  order: 20
+  order: 66
   id: opentelemetry-python-distribution
-  parentPath: OpenTelemetry
-  title: Distributions
+  parentPath: Dash0 Distributions
+  title: Python

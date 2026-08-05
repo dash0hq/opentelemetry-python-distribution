@@ -55,6 +55,9 @@ coverage:
   include:
     - "docs/*.md"
     - "docs/**/*.md"
+  ignore:
+    - "docs/brainstorms/2026-07-22-distro-publishing-requirements.md"
+    - "docs/plans/2026-07-22-001-feat-self-hosted-index-publishing-plan.md"
 
 nav:
   target: dash0/opentelemetry/distributions/python/nav.json

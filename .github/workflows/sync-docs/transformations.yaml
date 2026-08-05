@@ -53,6 +53,7 @@ files:
 coverage:
   include:
     - "docs/*.md"
+    - "docs/**/*.md"
 
 nav:
   target: dash0/opentelemetry/distributions/python/nav.json

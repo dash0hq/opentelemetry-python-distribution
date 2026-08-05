@@ -122,6 +122,6 @@ B3 format propagation is not included; it requires the separate `opentelemetry-p
 
 The following packages are deliberately excluded:
 
-- `opentelemetry-exporter-prometheus` — not needed; OTLP metrics export covers this use case.
-- `opentelemetry-propagator-ot-trace` — legacy propagator not required for Dash0.
-- `opentelemetry-instrumentation-aws-lambda` — Lambda deployments use a dedicated instrumentation layer.
+- `opentelemetry-exporter-prometheus`: not needed; OTLP metrics export covers this use case.
+- `opentelemetry-propagator-ot-trace`: legacy propagator not required for Dash0.
+- `opentelemetry-instrumentation-aws-lambda`: Lambda deployments use a dedicated instrumentation layer.

@@ -1,11 +1,12 @@
 # Dash0 OpenTelemetry Python Distribution
 
-The Dash0 distribution of OpenTelemetry for Python is a lightweight, opinionated layer on top of the upstream OpenTelemetry SDK that instruments Python applications with **no code changes** and exports telemetry using a **pure-Python protobuf implementation** — no `google.protobuf` or `grpcio` native dependencies required.
+The Dash0 distribution of OpenTelemetry for Python is a lightweight, opinionated layer on top of the upstream OpenTelemetry SDK that instruments Python applications with **no code changes** and exports telemetry using a **pure-Python protobuf implementation**.
+No `google.protobuf` or `grpcio` native dependencies are required.
 
 ## Why pure Python?
 
 Removing native dependencies is the core design goal.
-It makes the distribution safe to *inject* into an arbitrary process via `PYTHONPATH` — for example, from a Kubernetes operator or injector — without risking ABI or version conflicts with the target application.
+It makes the distribution safe to *inject* into an arbitrary process via `PYTHONPATH`, for example from a Kubernetes operator or injector, without risking ABI or version conflicts with the target application.
 If the distribution carried a native protobuf or gRPC dependency, injecting it into an application that already uses a different version of those libraries would break the application.
 The pure-Python implementation avoids that class of problem entirely.
 

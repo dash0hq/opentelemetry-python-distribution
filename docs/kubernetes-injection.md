@@ -14,7 +14,7 @@ When the Python interpreter starts, it finds and executes `sitecustomize.py`, wh
 ## Safety checks before instrumentation
 
 Before activating instrumentation, `sitecustomize.py` performs several guards.
-If any guard fails, the distribution deactivates itself gracefully — including from child processes — rather than breaking the application.
+If any guard fails, the distribution deactivates itself gracefully, including from child processes, rather than breaking the application.
 
 ### Python version check
 

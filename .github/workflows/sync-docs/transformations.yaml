@@ -9,6 +9,12 @@ common:
     content: |
       > **Note:** This page is auto-generated from the [opentelemetry-python-distribution](https://github.com/dash0hq/opentelemetry-python-distribution) repository.
 
+  - description: Rewrite relative cross-references between distribution docs to absolute website paths.
+    type: replace-regex
+    find: '\]\(([a-z][a-z0-9-]*)\)'
+    replace: '](/docs/dash0/opentelemetry/distributions/python/\1)'
+    required: false
+
 files:
   - source: docs/overview.md
     target: dash0/opentelemetry/distributions/python/overview.md
@@ -39,11 +45,6 @@ files:
     target: dash0/opentelemetry/distributions/python/kubernetes-injection.md
     title: Kubernetes Injection
     description: How the Dash0 Python distribution is injected into Kubernetes workloads via sitecustomize.py and PYTHONPATH, with safety guards and graceful self-deactivation.
-    transformations:
-      - description: Rewrite the cross-reference link to the absolute website path.
-        type: replace-regex
-        find: '\]\(resource-detection\)'
-        replace: '](/docs/dash0/opentelemetry/distributions/python/resource-detection)'
 
   - source: docs/exporters.md
     target: dash0/opentelemetry/distributions/python/exporters.md

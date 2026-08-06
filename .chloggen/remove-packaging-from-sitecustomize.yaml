@@ -1,0 +1,26 @@
+# One of 'breaking', 'deprecation', 'new_component', 'enhancement', 'bug_fix'.
+change_type: enhancement
+
+# A single word describing the area of concern (e.g. distro, pyproto, exporter,
+# resource-detectors, deps, ci, release, docs).
+component: distro
+
+# A brief description of the change. Surround your text with quotes ("") if it
+# needs to start with a backtick (`).
+note: Stop importing ``packaging`` in the injector bootstrap script
+
+# One or more tracking issues related to the change. At least one is required.
+issues: [48]
+
+# (Optional) One or more lines of additional information to render under the
+# primary note. These lines are padded with 2 spaces and inserted directly into
+# the document. Use pipe (|) for multiline entries.
+subtext: |
+  ``sitecustomize.py``'s dependency-conflict check now uses a small vendored,
+  dependency-free PEP 440/508 implementation instead of ``packaging``, so the
+  distribution's own code no longer relies on ``packaging`` being importable in
+  the injected process. ``packaging`` currently still ships transitively via
+  ``opentelemetry-instrumentation``; the vendored copy can be dropped once that
+  package no longer requires it.
+
+change_logs: [user]

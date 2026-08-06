@@ -10,8 +10,8 @@ re-pins instrumentations upstream and the dependency block was not re-synced.
 
 from importlib.metadata import requires, version
 
+from dash0.opentelemetry.injector._packaging.requirements import Requirement
 from opentelemetry.instrumentation import bootstrap_gen
-from packaging.requirements import Requirement
 
 _DISTRO = "dash0-opentelemetry"
 

@@ -35,6 +35,11 @@ Both standard cgroup path formats and Kubernetes slice naming conventions are ha
 
 If the detector cannot confirm it is inside a Kubernetes pod, or cannot extract the pod UID, it returns an empty resource without failing.
 
+**Other `k8s.*` attributes** — such as `k8s.namespace.name`, `k8s.node.name`, `k8s.deployment.name`, and similar — cannot be read from the cgroup filesystem and are not set by this detector.
+They require access to the Kubernetes API and should be added via the [OpenTelemetry Collector's `k8sattributesprocessor`](https://opentelemetry.io/docs/kubernetes/collector/components/#kubernetes-attributes-processor).
+The [Dash0 Operator](https://www.dash0.com/changelog/automatic-kubernetes-resource-detection) handles this automatically for workloads it manages.
+See the [OpenTelemetry Kubernetes attributes best practices](https://www.dash0.com/guides/opentelemetry-kubernetes-attributes-best-practices) guide for a full picture of how to enrich telemetry with Kubernetes metadata.
+
 ## Service name detector (`dash0_service_name`)
 
 Sets `service.name` when it has not been provided explicitly:
@@ -57,10 +62,21 @@ This detector also wraps the upstream `service` detector, so there is no need to
 
 ## Using detectors explicitly
 
-To reference detectors by name in a declarative config file or via the environment variable:
+**You normally do not need this.**
+In the default execution path (`opentelemetry-instrument`), the distro injects `telemetry.distro.*`, `k8s.pod.uid`, and the service name fallback into `OTEL_RESOURCE_ATTRIBUTES` and `OTEL_SERVICE_NAME` before the SDK initializes.
+The SDK's built-in `OTELResourceDetector` picks those up automatically.
+No explicit detector configuration is required.
+
+**When you do need it: `OTEL_CONFIG_FILE`.**
+The experimental declarative SDK configuration (`OTEL_CONFIG_FILE`) ignores `OTEL_RESOURCE_ATTRIBUTES` and `OTEL_SERVICE_NAME` by design.
+In that case, reference the detectors explicitly in the config file, or via the environment variable:
 
 ```bash
 export OTEL_EXPERIMENTAL_RESOURCE_DETECTORS=dash0_distribution,dash0_kubernetes,dash0_service_name
 ```
 
-Each detector is independent: you can include or omit any of them individually.
+You must list all three if you want all three — none of the Dash0 detectors are included by default in the declarative config path.
+
+**What `OTEL_EXPERIMENTAL_RESOURCE_DETECTORS` does to the default detectors.**
+The SDK always appends `service_instance` and `otel` (the `OTELResourceDetector`) to whatever you list.
+You do not need to add them yourself, and you cannot remove them by omitting them.

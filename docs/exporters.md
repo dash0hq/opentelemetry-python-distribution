@@ -2,7 +2,7 @@
 
 ## Why pure Python?
 
-The distribution ships its own OTLP exporters built on pure-Python protobuf message classes (`dash0-opentelemetry-pyproto`).
+The distribution ships its own OTLP exporters built on pure-Python protobuf message classes ([`dash0-opentelemetry-pyproto`](https://pypi.org/project/dash0-opentelemetry-pyproto/)).
 These exporters have no dependency on `google.protobuf` or `grpcio`, which are C extension packages that require binary compatibility with the target application.
 
 Injecting a package with native dependencies into an arbitrary process risks ABI conflicts (different versions of the shared library) or version conflicts (the application already uses a different version of `google.protobuf`).
@@ -13,7 +13,7 @@ The pure-Python exporters eliminate that class of problem.
 ### OTLP/HTTP (default)
 
 **Exporter name:** `otlp_proto_http`
-**Package:** `dash0-opentelemetry-exporter-otlp-pyproto-http`
+**Package:** [`dash0-opentelemetry-exporter-otlp-pyproto-http`](https://pypi.org/project/dash0-opentelemetry-exporter-otlp-pyproto-http/)
 
 Selected by default for all three signals (traces, metrics, logs).
 Sends protobuf-encoded OTLP over HTTP/1.1.
@@ -22,7 +22,7 @@ Compatible with any OTLP-capable collector, including the Dash0 ingress.
 ### OTLP/gRPC
 
 **Exporter name:** `otlp_proto_grpc`
-**Package:** `dash0-opentelemetry-exporter-otlp-pyproto-grpc`
+**Package:** [`dash0-opentelemetry-exporter-otlp-pyproto-grpc`](https://pypi.org/project/dash0-opentelemetry-exporter-otlp-pyproto-grpc/)
 
 Available as an alternative to OTLP/HTTP.
 Uses the same pure-Python protobuf implementation.
@@ -40,7 +40,7 @@ export OTEL_EXPORTER_OTLP_TRACES_PROTOCOL=grpc
 
 ## Drop-in replacement for upstream exporters
 
-The pyproto exporters occupy the same import namespaces and register under the same entry-point names (`otlp_proto_http`, `otlp_proto_grpc`) as the upstream `opentelemetry-exporter-otlp-proto-http` and `opentelemetry-exporter-otlp-proto-grpc` packages.
+The pyproto exporters occupy the same import namespaces and register under the same entry-point names (`otlp_proto_http`, `otlp_proto_grpc`) as the upstream [`opentelemetry-exporter-otlp-proto-http`](https://pypi.org/project/opentelemetry-exporter-otlp-proto-http/) and [`opentelemetry-exporter-otlp-proto-grpc`](https://pypi.org/project/opentelemetry-exporter-otlp-proto-grpc/) packages.
 
 Because the distribution depends on the pyproto packages rather than the upstream ones, the standard exporter names resolve to the pure-Python implementations automatically.
 No configuration change is required; existing `OTEL_EXPORTER_OTLP_*` settings continue to work.

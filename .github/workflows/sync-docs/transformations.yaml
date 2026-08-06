@@ -1,0 +1,62 @@
+common:
+  - description: Strip the leading H1 heading (the frontmatter title replaces it on the website).
+    type: replace-regex
+    find: '^# [^\n]*\n'
+    replace: ""
+
+  - description: Rewrite relative cross-references between distribution docs to absolute website paths.
+    type: replace-regex
+    find: '\]\(([a-z][a-z0-9-]*)\)'
+    replace: '](/docs/dash0/opentelemetry/distributions/python/\1)'
+    required: false
+
+files:
+  - source: docs/overview.md
+    target: dash0/opentelemetry/distributions/python/overview.md
+    title: Dash0 OpenTelemetry Python Distribution
+    description: Overview of the Dash0 OpenTelemetry distribution for Python — zero-code instrumentation with pure-Python OTLP export and no native dependencies.
+
+  - source: docs/getting-started.md
+    target: dash0/opentelemetry/distributions/python/getting-started.md
+    title: Getting Started
+    description: Install the Dash0 OpenTelemetry Python distribution and send your first traces, metrics, and logs in minutes.
+
+  - source: docs/configuration.md
+    target: dash0/opentelemetry/distributions/python/configuration.md
+    title: Configuration
+    description: All Dash0-specific and standard OpenTelemetry environment variables for the Python distribution.
+
+  - source: docs/auto-instrumentation.md
+    target: dash0/opentelemetry/distributions/python/auto-instrumentation.md
+    title: Auto-instrumentation
+    description: The full set of libraries and frameworks automatically instrumented by the Dash0 OpenTelemetry Python distribution.
+
+  - source: docs/resource-detection.md
+    target: dash0/opentelemetry/distributions/python/resource-detection.md
+    title: Resource Detection
+    description: Built-in resource detectors for distribution metadata, Kubernetes pod UID, and service name fallback.
+
+  - source: docs/kubernetes-injection.md
+    target: dash0/opentelemetry/distributions/python/kubernetes-injection.md
+    title: Kubernetes Injection
+    description: How the Dash0 Python distribution is injected into Kubernetes workloads via sitecustomize.py and PYTHONPATH, with safety guards and graceful self-deactivation.
+
+  - source: docs/exporters.md
+    target: dash0/opentelemetry/distributions/python/exporters.md
+    title: OTLP Exporters
+    description: Pure-Python OTLP/HTTP and OTLP/gRPC exporters with no native dependencies, intelligent endpoint rewriting, and drop-in compatibility with the upstream exporter names.
+
+coverage:
+  include:
+    - "docs/*.md"
+    - "docs/**/*.md"
+  ignore:
+    - "docs/brainstorms/2026-07-22-distro-publishing-requirements.md"
+    - "docs/plans/2026-07-22-001-feat-self-hosted-index-publishing-plan.md"
+
+nav:
+  target: dash0/opentelemetry/distributions/python/nav.json
+  order: 66
+  id: opentelemetry-python-distribution
+  parentPath: Dash0 Distributions
+  title: Python

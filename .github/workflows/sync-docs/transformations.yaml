@@ -4,11 +4,6 @@ common:
     find: '^# [^\n]*\n'
     replace: ""
 
-  - description: Mark pages as auto-generated from the source repository.
-    type: prepend
-    content: |
-      > **Note:** This page is auto-generated from the [opentelemetry-python-distribution](https://github.com/dash0hq/opentelemetry-python-distribution) repository.
-
   - description: Rewrite relative cross-references between distribution docs to absolute website paths.
     type: replace-regex
     find: '\]\(([a-z][a-z0-9-]*)\)'

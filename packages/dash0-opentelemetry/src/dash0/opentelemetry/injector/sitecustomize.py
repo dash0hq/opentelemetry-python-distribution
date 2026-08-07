@@ -173,8 +173,13 @@ def _check_dependency_version_conflict(req_string, version_conflicts):
         version_conflicts: Dictionary to accumulate version conflicts (modified in place)
     """
     import importlib.metadata
-    from packaging.requirements import Requirement
-    from packaging.version import Version
+    # _packaging is a vendored, dependency-free copy of the packaging subset we
+    # need. TO BE REMOVED: once opentelemetry-instrumentation ships the same
+    # local implementation (opentelemetry.instrumentation._packaging) in a
+    # release this distribution pins, import Requirement/Version from there and
+    # delete the vendored copy. See dash0/opentelemetry/injector/_packaging.
+    from dash0.opentelemetry.injector._packaging.requirements import Requirement
+    from dash0.opentelemetry.injector._packaging.version import Version
 
     _log_debug("_check_dependency_version_conflict({})".format(req_string))
     req = Requirement(req_string)
@@ -193,8 +198,10 @@ def _check_dependency_version_conflict(req_string, version_conflicts):
         installed_version = Version(installed_distribution.version)
         _log_debug("installed_version: {}".format(installed_version))
 
-        # Check if installed version satisfies the requirement
-        if req.specifier and installed_version not in req.specifier:
+        # Check if installed version satisfies the requirement. Use
+        # SpecifierSet.contains() rather than the `in` operator: the vendored
+        # _packaging specifiers deliberately do not implement __contains__.
+        if req.specifier and not req.specifier.contains(installed_version):
             _log_debug("adding version conflict for {}".format(req.name))
             version_conflicts[req.name] = {
                 "version_required": str(req.specifier),

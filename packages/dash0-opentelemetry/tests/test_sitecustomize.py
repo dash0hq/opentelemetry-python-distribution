@@ -12,11 +12,13 @@ import unittest
 from io import StringIO
 from unittest.mock import MagicMock, Mock, patch
 
-# Pre-load packaging into sys.modules: the tests execute sitecustomize.py with
-# sys.path patched to mock entries, so the script could not import packaging
-# from disk.
-from packaging.requirements import Requirement  # noqa: F401
-from packaging.version import Version  # noqa: F401
+# Pre-load the vendored packaging replacement into sys.modules: the tests
+# execute sitecustomize.py with sys.path patched to mock entries, so the script
+# could not import these modules from disk.
+from dash0.opentelemetry.injector._packaging.requirements import (  # noqa: F401
+    Requirement,
+)
+from dash0.opentelemetry.injector._packaging.version import Version  # noqa: F401
 
 TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
 SITECUSTOMIZE_PATH = os.path.join(

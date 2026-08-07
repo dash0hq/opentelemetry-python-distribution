@@ -13,7 +13,7 @@ common:
 files:
   - source: docs/overview.md
     target: dash0/opentelemetry/distributions/python/overview.md
-    title: Dash0 OpenTelemetry Python Distribution
+    title: About the Dash0 OpenTelemetry Python Distribution
     description: Overview of the Dash0 OpenTelemetry distribution for Python — zero-code instrumentation with pure-Python OTLP export and no native dependencies.
 
   - source: docs/getting-started.md

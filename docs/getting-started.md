@@ -46,14 +46,7 @@ docker compose up
 
 Exported telemetry is written to JSONL files in `output/` (traces, metrics, logs).
 
-To overlay Dash0 ingress instead of the local collector:
-
-```bash
-export DASH0_ENDPOINT=https://ingress.<region>.<cloud>.dash0.com
-export DASH0_AUTH_TOKEN=auth_xxxxxxxxxxxxxxxx
-export DASH0_DATASET=default
-docker compose -f docker-compose.yml -f docker-compose.dash0.yml up
-```
+For a step-by-step walkthrough that builds the same app from scratch, verifies the exported spans, and forwards them to Dash0 (with troubleshooting), see the [Flask example](flask-tutorial) tutorial.
 
 ## What happens at startup
 

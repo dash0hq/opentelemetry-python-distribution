@@ -276,6 +276,14 @@ jobs:
       - uses: actions/deploy-pages@v5
         id: deploy
 
+  sync-docs:
+    needs: [build]
+    if: needs.build.result == 'success'
+    uses: ./.github/workflows/sync-docs.yml
+    with:
+      dry-run: false
+    secrets: inherit
+
   publish-pypi:
     needs: [build]
     if: needs.build.result == 'success'

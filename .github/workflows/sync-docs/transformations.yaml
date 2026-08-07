@@ -21,6 +21,11 @@ files:
     title: Getting Started
     description: Install the Dash0 OpenTelemetry Python distribution and send your first traces, metrics, and logs in minutes.
 
+  - source: docs/flask-tutorial.md
+    target: dash0/opentelemetry/distributions/python/flask-tutorial.md
+    title: Flask Example
+    description: Build a Flask app with zero OpenTelemetry imports and instrument it end-to-end with the Dash0 OpenTelemetry Python distribution, then verify the traces, metrics, and logs and forward them to Dash0.
+
   - source: docs/configuration.md
     target: dash0/opentelemetry/distributions/python/configuration.md
     title: Configuration

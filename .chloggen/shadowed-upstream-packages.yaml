@@ -1,0 +1,31 @@
+# One of 'breaking', 'deprecation', 'new_component', 'enhancement', 'bug_fix'.
+change_type: bug_fix
+
+# A single word describing the area of concern (e.g. distro, pyproto, exporter,
+# resource-detectors, deps, ci, release, docs).
+component: distro
+
+# A brief description of the change. Surround your text with quotes ("") if it
+# needs to start with a backtick (`).
+note: Detect the upstream OTLP packages that the shipped pyproto packages shadow as double instrumentation
+
+# One or more tracking issues related to the change. At least one is required.
+issues: [67]
+
+# (Optional) One or more lines of additional information to render under the
+# primary note. These lines are padded with 2 spaces and inserted directly into
+# the document. Use pipe (|) for multiline entries.
+subtext: |
+  The double-instrumentation check matched on distribution name, but what
+  breaks a process is two distributions owning the same import path. The
+  pure-Python exporters ship as ``dash0-opentelemetry-exporter-otlp-pyproto-*``
+  and ``dash0-opentelemetry-pyproto`` while deliberately keeping the upstream
+  import paths and entry points, so an application with
+  ``opentelemetry-exporter-otlp-proto-grpc`` installed was not detected: the
+  names differ. The distribution then activated, leaving two providers of
+  ``opentelemetry.exporter.otlp.proto.grpc`` and two entry points named
+  ``otlp_proto_grpc`` in one process, with sys.path order deciding the winner.
+  The check now also looks for the upstream distribution each shipped package
+  stands in for, including the ``opentelemetry-exporter-otlp`` meta package.
+
+change_logs: [user]

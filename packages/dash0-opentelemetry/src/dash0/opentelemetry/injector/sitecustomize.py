@@ -117,7 +117,18 @@ def _shipped_opentelemetry_package_names(current_site):
     import importlib.metadata
     names = set()
     for dist in importlib.metadata.distributions(path=[current_site]):
-        name = dist.metadata["Name"]
+        try:
+            name = dist.metadata["Name"]
+        except Exception as e:
+            # importlib.metadata decodes METADATA as UTF-8, and a distribution
+            # whose file is not valid UTF-8 raises here; a Latin-1 author field
+            # written by older tooling is the usual cause. Skip that one
+            # distribution rather than letting it abort the whole scan.
+            _log_warn(
+                "cannot read the metadata of a distribution in the injected tree, so it "
+                "cannot be counted as shipped; skipping it: {}: {}".format(
+                    type(e).__name__, e))
+            continue
         if name is None:
             continue
         name = name.lower()
@@ -133,9 +144,24 @@ def _check_for_double_instrumentation(current_site):
     packages_we_ship = _shipped_opentelemetry_package_names(current_site)
     offending_packages = []
     for dist in importlib.metadata.distributions():
-        name = dist.metadata["Name"]
+        # The location is read before the metadata because it is path
+        # arithmetic that does not touch METADATA, so it is still available to
+        # describe a distribution whose name turns out not to be readable.
+        location = "an unknown location"
+        try:
+            location = str(dist._path)
+            name = dist.metadata["Name"]
+        except Exception as e:
+            # A package that has nothing to do with OpenTelemetry must not be
+            # able to deactivate auto-instrumentation for the whole process,
+            # which is what aborting this scan amounted to.
+            _log_warn(
+                "cannot read the metadata of the distribution installed in {}, so it "
+                "cannot be checked for double instrumentation; skipping it: {}: {}".format(
+                    location, type(e).__name__, e))
+            continue
         if name is not None and name.lower() in packages_we_ship:
-            offending_packages.append(str(dist._path))
+            offending_packages.append(location)
     if offending_packages:
         _self_deactivate(current_site)
         _print_cannot_auto_instrument_message(
@@ -153,7 +179,12 @@ def _read_all_dependencies():
     dependencies_file = os.path.join(dirname(__file__), "all-dependencies.txt")
     requirements_to_check = []
     try:
-        with open(dependencies_file, "r") as f:
+        # Decoded as UTF-8 explicitly rather than in whatever the locale says.
+        # This file ships inside the wheel, so its encoding is a property of the
+        # package and not of the process that happens to be reading it: a C
+        # locale with PEP 538 coercion disabled decodes as ASCII, which would
+        # make the same tree readable in one process and not in the next.
+        with open(dependencies_file, "r", encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
                 # Skip empty lines and comments
@@ -161,7 +192,11 @@ def _read_all_dependencies():
                     continue
                 requirements_to_check.append(line)
         return requirements_to_check
-    except (IOError, OSError):
+    except (IOError, OSError, UnicodeDecodeError):
+        # A manifest that cannot be decoded is as unusable as one that cannot be
+        # opened, and the caller already turns None into a deactivation that
+        # names this file. Without UnicodeDecodeError here it would propagate
+        # out of import_distro() instead.
         return None
 
 
@@ -182,7 +217,18 @@ def _check_dependency_version_conflict(req_string, version_conflicts):
     from dash0.opentelemetry.injector._packaging.version import Version
 
     _log_debug("_check_dependency_version_conflict({})".format(req_string))
-    req = Requirement(req_string)
+    # An exception escaping this module aborts no application, but it does print
+    # a traceback on every process start, so a parse failure must never
+    # propagate. Unparsable input makes a requirement unverifiable, not
+    # conflicting, so it is warned about and skipped.
+    try:
+        req = Requirement(req_string)
+    except Exception as e:
+        _log_warn(
+            "cannot parse requirement '{}' from all-dependencies.txt; skipping its "
+            "dependency-conflict check: {}: {}".format(
+                req_string, type(e).__name__, e))
+        return
 
     # Skip extras/markers for simplicity in conflict detection
     if req.marker and not req.marker.evaluate():
@@ -195,21 +241,46 @@ def _check_dependency_version_conflict(req_string, version_conflicts):
 
     try:
         installed_distribution = importlib.metadata.distribution(req.name)
-        installed_version = Version(installed_distribution.version)
-        _log_debug("installed_version: {}".format(installed_version))
-
-        # Check if installed version satisfies the requirement. Use
-        # SpecifierSet.contains() rather than the `in` operator: the vendored
-        # _packaging specifiers deliberately do not implement __contains__.
-        if req.specifier and not req.specifier.contains(installed_version):
-            _log_debug("adding version conflict for {}".format(req.name))
-            version_conflicts[req.name] = {
-                "version_required": str(req.specifier),
-                "version_found": str(installed_version),
-            }
     except importlib.metadata.PackageNotFoundError:
         _log_debug("adding version error for {}".format(req.name))
         version_conflicts[req.name] = {"error": "required package not found"}
+        return
+
+    # Read the version out once, before parsing it. distribution() above is lazy
+    # and does not touch METADATA, so an unreadable file surfaces here rather
+    # than above, and holding the value in a local is what lets the parse
+    # handler below quote it without going back to the attribute that failed.
+    try:
+        installed_version_string = installed_distribution.version
+    except Exception as e:
+        _log_warn(
+            "cannot read the installed version of package '{}'; skipping its "
+            "dependency-conflict check: {}: {}".format(
+                req.name, type(e).__name__, e))
+        return
+
+    # Distributions patched by Linux distributors can carry versions that do not
+    # parse as PEP 440, and metadata may lack a version entirely.
+    try:
+        installed_version = Version(installed_version_string)
+    except Exception as e:
+        _log_warn(
+            "cannot parse the installed version '{}' of package '{}'; skipping its "
+            "dependency-conflict check: {}: {}".format(
+                installed_version_string, req.name, type(e).__name__, e))
+        return
+
+    _log_debug("installed_version: {}".format(installed_version))
+
+    # Check if installed version satisfies the requirement. Use
+    # SpecifierSet.contains() rather than the `in` operator: the vendored
+    # _packaging specifiers deliberately do not implement __contains__.
+    if req.specifier and not req.specifier.contains(installed_version):
+        _log_debug("adding version conflict for {}".format(req.name))
+        version_conflicts[req.name] = {
+            "version_required": str(req.specifier),
+            "version_found": str(installed_version),
+        }
 
 
 def import_distro():

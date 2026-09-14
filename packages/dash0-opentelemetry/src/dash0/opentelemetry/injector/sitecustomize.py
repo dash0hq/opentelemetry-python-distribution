@@ -23,7 +23,7 @@
 # characters at parse time.
 
 from os import environ, pathsep
-from os.path import dirname, join
+from os.path import dirname, join, normpath
 # sys is imported as a module, unlike everything else here, because
 # _log_cannot_auto_instrument_warning probes it with hasattr: sys.argv is absent
 # under some embedded interpreters, where "from sys import argv" would raise at
@@ -158,8 +158,12 @@ def _self_deactivate(current_site):
 
     # Remove this site from PYTHONPATH so child processes do not attempt to load packages from us. PYTHONPATH entries
     # are separated by pathsep (":" on POSIX).
+    normalized_site = normpath(current_site)
     current_pythonpath = environ.get("PYTHONPATH", "")
-    pythonpath_entries = [entry for entry in current_pythonpath.split(pathsep) if entry != current_site]
+    pythonpath_entries = [
+        entry for entry in current_pythonpath.split(pathsep)
+        if normpath(entry) != normalized_site
+    ]
     new_pythonpath = pathsep.join(pythonpath_entries)
     _log_debug('setting PYTHONPATH in _self_deactivate: "{}"'.format(new_pythonpath))
     environ["PYTHONPATH"] = new_pythonpath
@@ -169,10 +173,10 @@ def _self_deactivate(current_site):
     _log_debug("clearing PYTHON_AUTO_INSTRUMENTATION_AGENT_PATH_PREFIX in _self_deactivate")
     environ["PYTHON_AUTO_INSTRUMENTATION_AGENT_PATH_PREFIX"] = ""
 
-    if current_site in path:
-        # Remove this site from the _current_ Python process, so our packages do not interfere with the application's
-        # dependencies.
-        path.remove(current_site)
+    # Remove this site from the _current_ Python process, so our packages do not interfere with the application's
+    # dependencies. Filtered rather than removed: path.remove() drops only the
+    # first occurrence, so a site listed twice would stay half-active.
+    path[:] = [entry for entry in path if normpath(entry) != normalized_site]
 
 
 def _shipped_opentelemetry_package_names(current_site):
@@ -314,7 +318,8 @@ def import_distro():
     # Maintenance note: After checking for double instrumentation scenarios, we add back the current site, via
     # path.append(current_site). The remove here together with the append also deliberately reorders sys.path to put
     # this site last, before evaluating conflicting dependency versions. See below for more details on that.
-    path.remove(current_site)
+    normalized_site = normpath(current_site)
+    path[:] = [entry for entry in path if normpath(entry) != normalized_site]
 
     if _check_for_double_instrumentation(current_site):
         return

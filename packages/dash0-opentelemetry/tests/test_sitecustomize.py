@@ -51,6 +51,16 @@ def mocked_opentelemetry_modules():
     }
 
 
+def auto_instrumentation_mock(modules):
+    """The auto_instrumentation object the script actually ends up with.
+
+    ``from opentelemetry.instrumentation import auto_instrumentation`` resolves
+    by attribute lookup on the already-present ``opentelemetry.instrumentation``
+    entry, so it is that mock's child that records the ``initialize`` call, not
+    the ``opentelemetry.instrumentation.auto_instrumentation`` entry."""
+    return modules["opentelemetry.instrumentation"].auto_instrumentation
+
+
 def make_dist(name, dist_path):
     """Build a mock importlib.metadata distribution."""
     dist = Mock()
@@ -591,6 +601,84 @@ class TestImportDistro(unittest.TestCase):
             '"level": "debug", "message": "importing and initializing the Python'
             " auto-instrumentation now",
             output,
+        )
+
+
+class TestInitializationFailure(unittest.TestCase):
+    """initialize() must be allowed to raise, so a failed SDK start-up is
+    reported and the injected site is taken back off sys.path."""
+
+    def setUp(self):
+        self.original_env = os.environ.copy()
+        self.original_sys_path = sys.path.copy()
+        for key in [
+            "OTEL_INJECTOR_LOG_LEVEL",
+            "OTEL_EXPORTER_OTLP_ENDPOINT",
+            "DASH0_OTEL_COLLECTOR_BASE_URL",
+        ]:
+            os.environ.pop(key, None)
+
+    def tearDown(self):
+        os.environ.clear()
+        os.environ.update(self.original_env)
+        sys.path = self.original_sys_path.copy()
+
+    def run_script_with_initialize(self, initialize_side_effect=None):
+        """Execute the script far enough to reach initialize(), returning the
+        stderr text and the initialize mock."""
+        mock_site = "/mock/site-packages"
+        os.environ["PYTHONPATH"] = mock_site
+        modules = mocked_opentelemetry_modules()
+        initialize = auto_instrumentation_mock(modules).initialize
+        if initialize_side_effect is not None:
+            initialize.side_effect = initialize_side_effect
+
+        stream = StringIO()
+        with patch("sys.stderr", stream):
+            with patch("sys.version_info", (3, 10, 0, "final", 0)):
+                with patch(
+                    "os.path.dirname", side_effect=create_dirname_side_effect(mock_site)
+                ):
+                    with patch("sys.path", [mock_site]):
+                        with patch(
+                            "builtins.open",
+                            unittest.mock.mock_open(read_data="packaging >=20.0\n"),
+                        ):
+                            with patch("importlib.metadata.distribution") as mock_dist:
+                                mock_dist.return_value = Mock(version="26.3")
+                                with patch.dict("sys.modules", modules):
+                                    module, spec = load_sitecustomize_module()
+                                    spec.loader.exec_module(module)
+        return stream.getvalue(), initialize
+
+    def test_initialize_is_asked_not_to_swallow_exceptions(self):
+        """Without swallow_exceptions=False, initialize() logs and returns on
+        failure, so the script's own error handling can never run."""
+        _, initialize = self.run_script_with_initialize()
+        initialize.assert_called_once_with(swallow_exceptions=False)
+
+    def test_initialization_failure_is_reported(self):
+        """A failure inside initialize() must name itself in the warning rather
+        than leaving the process quietly uninstrumented."""
+        output, _ = self.run_script_with_initialize(
+            initialize_side_effect=ValueError("collector endpoint is not a URL")
+        )
+        self.assertIn(
+            '"level": "warn", "message": "cannot auto-instrument Python process:'
+            " error when importing/initializing the Python OpenTelemetry"
+            " auto-instrumentation: ValueError: collector endpoint is not a URL",
+            output,
+        )
+
+    def test_initialization_failure_deactivates_for_child_processes(self):
+        """The site must come off PYTHONPATH and the injector prefix must be
+        cleared, or every child process repeats the same failed start-up."""
+        self.run_script_with_initialize(
+            initialize_side_effect=RuntimeError("instrumentor blew up")
+        )
+        self.assertEqual(os.environ.get("PYTHONPATH"), "")
+        self.assertEqual(
+            os.environ.get("PYTHON_AUTO_INSTRUMENTATION_AGENT_PATH_PREFIX"), ""
         )
 
 

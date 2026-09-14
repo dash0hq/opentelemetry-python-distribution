@@ -51,6 +51,24 @@ When running via injection, the `sitecustomize.py` also bridges the environment:
 
 This allows the operator to pass a single `DASH0_OTEL_COLLECTOR_BASE_URL` environment variable without needing to know which specific `OTEL_*` variables to set.
 
+## Diagnostic output
+
+`sitecustomize.py` writes its own diagnostics to stderr as one JSON object per line, under the logger name `dash0`.
+Warnings also carry `dash0.monitoring.telemetry_collection_issue`, because a guard that deactivates the distribution is a telemetry collection issue.
+
+`OTEL_INJECTOR_LOG_LEVEL` selects how much it writes.
+It takes a level name, matched case-insensitively and with surrounding whitespace ignored.
+
+| Value | Effect |
+|---|---|
+| unset, or empty | Warnings only. This is the default. |
+| `debug` | Every step the script takes, plus warnings. |
+| `info`, `warn`, `warning`, `error`, `critical` | Warnings only. |
+| anything else | Warnings only, plus one warning naming the value and listing the supported levels. |
+
+No value suppresses warnings.
+A warning is the only report an operator gets when a guard deactivates the distribution, so a level above `warning` is accepted and clamped to it rather than honored literally.
+
 ## Kubernetes pod UID detection
 
 When running inside a Kubernetes pod, the `dash0_kubernetes` resource detector automatically extracts the pod UID from the cgroup filesystem and adds it as `k8s.pod.uid` to every span, metric, and log record.

@@ -165,7 +165,10 @@ def _read_all_dependencies():
                     continue
                 requirements_to_check.append(line)
         return requirements_to_check
-    except (IOError, OSError):
+    except OSError:
+        # IOError is an alias of OSError since Python 3.3, and this only runs
+        # behind the version_info gate on 3.10+, so naming both caught nothing
+        # extra.
         return None
 
 

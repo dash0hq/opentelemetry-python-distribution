@@ -6,6 +6,7 @@ every test loads it from its packaged location and executes it under mocks.
 
 import importlib.metadata
 import importlib.util
+import json
 import os
 import sys
 import unittest
@@ -592,6 +593,148 @@ class TestImportDistro(unittest.TestCase):
             " auto-instrumentation now",
             output,
         )
+
+
+class TestDiagnosticRecords(unittest.TestCase):
+    """Every diagnostic is one line, one JSON object, written only to stderr.
+
+    The messages embed foreign text: a command line, an exception message, a
+    package version. None of it may be able to break the record."""
+
+    def setUp(self):
+        self.original_env = os.environ.copy()
+        self.original_sys_path = sys.path.copy()
+        for key in [
+            "OTEL_INJECTOR_LOG_LEVEL",
+            "OTEL_EXPORTER_OTLP_ENDPOINT",
+            "DASH0_OTEL_COLLECTOR_BASE_URL",
+        ]:
+            os.environ.pop(key, None)
+
+    def tearDown(self):
+        os.environ.clear()
+        os.environ.update(self.original_env)
+        sys.path = self.original_sys_path.copy()
+
+    def run_script_rejecting_python_version(self, argv=None, stream=None):
+        """Run the script through the version gate, which emits exactly one
+        warning, embedding " ".join(sys.argv) in it."""
+        mock_site = "/mock/site-packages"
+        stream = StringIO() if stream is None else stream
+        argv = ["python", "app.py"] if argv is None else argv
+
+        with patch("sys.stderr", stream):
+            with patch("sys.argv", argv):
+                with patch("sys.version_info", (3, 9, 0, "final", 0)):
+                    with patch("sys.version", "3.9.0"):
+                        with patch(
+                            "os.path.dirname",
+                            side_effect=create_dirname_side_effect(mock_site),
+                        ):
+                            with patch("sys.path", [mock_site]):
+                                module, spec = load_sitecustomize_module()
+                                spec.loader.exec_module(module)
+        return stream
+
+    def parsed_records(self, text):
+        """Every non-empty line must be a JSON object on its own."""
+        records = []
+        for line in text.splitlines():
+            if not line.strip():
+                continue
+            records.append(json.loads(line))
+        return records
+
+    def test_quotes_and_backslashes_in_the_message_stay_parseable(self):
+        """An everyday command line carries both: python -c 'print("hi")'."""
+        argv = ["python", "-c", 'print("hi")', "--path", "C:\\tmp"]
+        output = self.run_script_rejecting_python_version(argv=argv).getvalue()
+
+        records = self.parsed_records(output)
+        self.assertEqual(len(records), 1)
+        self.assertIn('python -c print("hi") --path C:\\tmp', records[0]["message"])
+
+    def test_a_multi_line_message_stays_one_record(self):
+        """Exception text routinely spans several lines, and a JSON-per-line
+        consumer would see one unparsable fragment followed by more."""
+        mock_site = "/mock/site-packages"
+        modules = mocked_opentelemetry_modules()
+        auto_instrumentation = modules["opentelemetry.instrumentation"]
+        auto_instrumentation.auto_instrumentation.initialize.side_effect = ValueError(
+            "first line\nsecond line\nthird line"
+        )
+
+        stream = StringIO()
+        with patch("sys.stderr", stream):
+            with patch("sys.version_info", (3, 10, 0, "final", 0)):
+                with patch(
+                    "os.path.dirname", side_effect=create_dirname_side_effect(mock_site)
+                ):
+                    with patch("sys.path", [mock_site]):
+                        with patch(
+                            "builtins.open",
+                            unittest.mock.mock_open(read_data="packaging >=20.0\n"),
+                        ):
+                            with patch("importlib.metadata.distribution") as mock_dist:
+                                mock_dist.return_value = Mock(version="26.3")
+                                with patch.dict("sys.modules", modules):
+                                    module, spec = load_sitecustomize_module()
+                                    spec.loader.exec_module(module)
+
+        output = stream.getvalue()
+        records = self.parsed_records(output)
+        self.assertEqual(len(records), 1)
+        self.assertIn("first line\nsecond line\nthird line", records[0]["message"])
+
+    def test_warnings_carry_the_telemetry_collection_issue_marker(self):
+        """A guard that deactivates the distribution is a collection issue."""
+        output = self.run_script_rejecting_python_version().getvalue()
+        record = self.parsed_records(output)[0]
+        self.assertEqual(record["level"], "warn")
+        self.assertEqual(record["logger_name"], "dash0")
+        self.assertTrue(record["dash0.monitoring.telemetry_collection_issue"])
+
+    def test_debug_records_do_not_carry_the_marker(self):
+        """Debug output describes normal progress, not a collection issue."""
+        os.environ["OTEL_INJECTOR_LOG_LEVEL"] = "debug"
+        output = self.run_script_rejecting_python_version().getvalue()
+        debug_records = [
+            r for r in self.parsed_records(output) if r["level"] == "debug"
+        ]
+        self.assertTrue(debug_records)
+        for record in debug_records:
+            self.assertNotIn("dash0.monitoring.telemetry_collection_issue", record)
+
+    def test_nothing_is_written_to_stdout_when_stderr_is_none(self):
+        """sys.stderr is None under pythonw and in daemonized processes, and
+        print(file=None) falls through to stdout, corrupting any program whose
+        stdout is its actual output."""
+        mock_site = "/mock/site-packages"
+        captured_stdout = StringIO()
+
+        with patch("sys.stderr", None):
+            with patch("sys.stdout", captured_stdout):
+                with patch("sys.version_info", (3, 9, 0, "final", 0)):
+                    with patch("sys.version", "3.9.0"):
+                        with patch(
+                            "os.path.dirname",
+                            side_effect=create_dirname_side_effect(mock_site),
+                        ):
+                            with patch("sys.path", [mock_site]):
+                                module, spec = load_sitecustomize_module()
+                                spec.loader.exec_module(module)
+
+        self.assertEqual(captured_stdout.getvalue(), "")
+
+    def test_a_closed_stderr_does_not_raise(self):
+        """A write to a closed descriptor would otherwise escape into
+        interpreter start-up."""
+        closed_stream = StringIO()
+        closed_stream.close()
+        try:
+            self.run_script_rejecting_python_version(stream=closed_stream)
+        except Exception as error:
+            self.fail(f"writing a diagnostic to a closed stderr raised {error!r}")
 
 
 if __name__ == "__main__":

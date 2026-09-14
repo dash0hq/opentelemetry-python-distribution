@@ -23,8 +23,12 @@
 # characters at parse time.
 
 from __future__ import print_function
-import os
-from os.path import dirname
+from os import environ, pathsep
+from os.path import dirname, join
+# sys is imported as a module, unlike everything else here, because
+# _log_cannot_auto_instrument_warning probes it with hasattr: sys.argv is absent
+# under some embedded interpreters, where "from sys import argv" would raise at
+# import time instead of letting the diagnostic degrade.
 import sys
 from sys import path, version, version_info, stderr
 
@@ -39,7 +43,7 @@ double_instrumentation_check_excluded_packages = [
     "opentelemetry-semantic-conventions",
 ]
 
-debug_enabled = os.environ.get("OTEL_INJECTOR_LOG_LEVEL") == "debug"
+debug_enabled = environ.get("OTEL_INJECTOR_LOG_LEVEL") == "debug"
 
 
 def _log_as_json_to_stderr(level, message):
@@ -61,10 +65,10 @@ def _log_debug(message):
 
 
 _log_debug("running sitecustomize.py")
-_log_debug("PYTHONPATH: {}".format(os.environ.get("PYTHONPATH")))
+_log_debug("PYTHONPATH: {}".format(environ.get("PYTHONPATH")))
 
 
-def _print_cannot_auto_instrument_message(reason):
+def _log_cannot_auto_instrument_warning(reason):
     if hasattr(sys, "argv"):
         # If sys.argv is available, add the full command line (" ".join(sys.argv)) to the log message, so users know
         # which Python process this is about.
@@ -90,17 +94,17 @@ def _self_deactivate(current_site):
     # self-deactivation via environment variables.
 
     # Remove this site from PYTHONPATH so child processes do not attempt to load packages from us. PYTHONPATH entries
-    # are separated by os.pathsep (":" on POSIX).
-    current_pythonpath = os.environ.get("PYTHONPATH", "")
-    pythonpath_entries = [entry for entry in current_pythonpath.split(os.pathsep) if entry != current_site]
-    new_pythonpath = os.pathsep.join(pythonpath_entries)
+    # are separated by pathsep (":" on POSIX).
+    current_pythonpath = environ.get("PYTHONPATH", "")
+    pythonpath_entries = [entry for entry in current_pythonpath.split(pathsep) if entry != current_site]
+    new_pythonpath = pathsep.join(pythonpath_entries)
     _log_debug('setting PYTHONPATH in _self_deactivate: "{}"'.format(new_pythonpath))
-    os.environ["PYTHONPATH"] = new_pythonpath
+    environ["PYTHONPATH"] = new_pythonpath
 
     # The OpenTelemetry injector will also run for child processes, and it would bring back the PYTHONPATH modification
     # which we have just removed. Instruct it to not do that by disabling Python auto-instrumentation.
     _log_debug("clearing PYTHON_AUTO_INSTRUMENTATION_AGENT_PATH_PREFIX in _self_deactivate")
-    os.environ["PYTHON_AUTO_INSTRUMENTATION_AGENT_PATH_PREFIX"] = ""
+    environ["PYTHON_AUTO_INSTRUMENTATION_AGENT_PATH_PREFIX"] = ""
 
     if current_site in path:
         # Remove this site from the _current_ Python process, so our packages do not interfere with the application's
@@ -135,10 +139,17 @@ def _check_for_double_instrumentation(current_site):
     for dist in importlib.metadata.distributions():
         name = dist.metadata["Name"]
         if name is not None and name.lower() in packages_we_ship:
-            offending_packages.append(str(dist._path))
+            # The operator reading the deactivation message has to find and
+            # remove this package, so name it with its version and its install
+            # directory rather than only a .dist-info path. locate_file("") is
+            # abstract on Distribution and therefore resolves for any finder,
+            # while _path is private and exists only on the path-based one, so
+            # any other finder raised AttributeError here.
+            offending_packages.append(
+                "{} {} ({})".format(name, dist.version, dist.locate_file("")))
     if offending_packages:
         _self_deactivate(current_site)
-        _print_cannot_auto_instrument_message(
+        _log_cannot_auto_instrument_warning(
             "The application has OpenTelemetry dependencies which indicate that it is already instrumented. The " +
             "following problematic dependencies have been found: {}. ".format(", ".join(offending_packages)) +
             "Skipping the Dash0 Python auto-instrumentation to avoid double instrumentation. Remove the mentioned "
@@ -150,7 +161,7 @@ def _check_for_double_instrumentation(current_site):
 
 def _read_all_dependencies():
     """Read all flattened dependencies from all-dependencies.txt. Returns list of requirement strings or None on error."""
-    dependencies_file = os.path.join(dirname(__file__), "all-dependencies.txt")
+    dependencies_file = join(dirname(__file__), "all-dependencies.txt")
     requirements_to_check = []
     try:
         with open(dependencies_file, "r") as f:
@@ -161,7 +172,10 @@ def _read_all_dependencies():
                     continue
                 requirements_to_check.append(line)
         return requirements_to_check
-    except (IOError, OSError):
+    except OSError:
+        # IOError is an alias of OSError since Python 3.3, and this only runs
+        # behind the version_info gate on 3.10+, so naming both caught nothing
+        # extra.
         return None
 
 
@@ -219,18 +233,18 @@ def import_distro():
     # We cannot use `sys.version_info.major` or other named attributes, as they only got introduced only in Python 3.1.
     if version_info[0] != required_python_major_version or version_info[1] < minimum_python_minor_version:
         _self_deactivate(current_site)
-        _print_cannot_auto_instrument_message("unsupported Python version: {}".format(version))
+        _log_cannot_auto_instrument_warning("unsupported Python version: {}".format(version))
         return
     _log_debug("found eligible Python version: {}".format(version_info))
 
     # The Dash0 Python distribution requires DASH0_OTEL_COLLECTOR_BASE_URL to activate and derives its OTLP endpoint
     # from it. The Dash0 operator sets OTEL_EXPORTER_OTLP_ENDPOINT; bridge it here so the distribution activates
     # without requiring operator-side changes.
-    if not os.environ.get("DASH0_OTEL_COLLECTOR_BASE_URL"):
-        otlp_endpoint = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")
+    if not environ.get("DASH0_OTEL_COLLECTOR_BASE_URL"):
+        otlp_endpoint = environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")
         if otlp_endpoint:
             _log_debug("bridging OTEL_EXPORTER_OTLP_ENDPOINT to DASH0_OTEL_COLLECTOR_BASE_URL: {}".format(otlp_endpoint))
-            os.environ["DASH0_OTEL_COLLECTOR_BASE_URL"] = otlp_endpoint
+            environ["DASH0_OTEL_COLLECTOR_BASE_URL"] = otlp_endpoint
 
     _log_debug("checking for double instrumentation")
 
@@ -262,7 +276,7 @@ def import_distro():
     requirements_to_check = _read_all_dependencies()
     if requirements_to_check is None:
         _self_deactivate(current_site)
-        _print_cannot_auto_instrument_message("cannot read all-dependencies.txt for dependency conflict checking")
+        _log_cannot_auto_instrument_warning("cannot read all-dependencies.txt for dependency conflict checking")
         return
 
     for req_string in requirements_to_check:
@@ -277,13 +291,13 @@ def import_distro():
             auto_instrumentation.initialize()
         except Exception as e:
             _self_deactivate(current_site)
-            _print_cannot_auto_instrument_message(
+            _log_cannot_auto_instrument_warning(
                 "error when importing/initializing the Python OpenTelemetry auto-instrumentation: {}: {}".format(
                     type(e).__name__, e))
     else:
         # Remove this site for good, we do not want to trigger dependency conflict issues.
         _self_deactivate(current_site)
-        _print_cannot_auto_instrument_message("dependency conflicts: {}".format(version_conflicts))
+        _log_cannot_auto_instrument_warning("dependency conflicts: {}".format(version_conflicts))
 
 
 import_distro()

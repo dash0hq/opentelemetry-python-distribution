@@ -1,0 +1,29 @@
+# One of 'breaking', 'deprecation', 'new_component', 'enhancement', 'bug_fix'.
+change_type: bug_fix
+
+# A single word describing the area of concern (e.g. distro, pyproto, exporter,
+# resource-detectors, deps, ci, release, docs).
+component: distro
+
+# A brief description of the change. Surround your text with quotes ("") if it
+# needs to start with a backtick (`).
+note: Report and deactivate when OpenTelemetry auto-instrumentation fails to initialize
+
+# One or more tracking issues related to the change. At least one is required.
+issues: [61]
+
+# (Optional) One or more lines of additional information to render under the
+# primary note. These lines are padded with 2 spaces and inserted directly into
+# the document. Use pipe (|) for multiline entries.
+subtext: |
+  The injector bootstrap script now calls
+  ``auto_instrumentation.initialize(swallow_exceptions=False)``. Previously a
+  failure of the distro, a configurator, or an instrumentor was logged by the
+  SDK and swallowed, so the script carried on as though instrumentation had
+  started: the injected site stayed on ``sys.path`` and ``PYTHONPATH`` while no
+  telemetry was produced, no ``cannot auto-instrument Python process`` warning
+  was emitted, and every child process repeated it. Such a failure is now
+  reported with its exception type and message, and the distribution
+  deactivates itself for the current process and its children.
+
+change_logs: [user]

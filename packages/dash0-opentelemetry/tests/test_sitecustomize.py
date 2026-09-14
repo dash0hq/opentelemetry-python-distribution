@@ -594,5 +594,138 @@ class TestImportDistro(unittest.TestCase):
         )
 
 
+class TestPackageNamesAreComparedCanonically(unittest.TestCase):
+    """distributions() reports the Name each package declared, verbatim, and
+    non-canonical spellings are ordinary in the wild. PEP 503 says runs of "-",
+    "_" and "." all collapse to a single "-" before two names are compared."""
+
+    def setUp(self):
+        self.original_env = os.environ.copy()
+        self.original_sys_path = sys.path.copy()
+        for key in [
+            "OTEL_INJECTOR_LOG_LEVEL",
+            "OTEL_EXPORTER_OTLP_ENDPOINT",
+            "DASH0_OTEL_COLLECTOR_BASE_URL",
+        ]:
+            os.environ.pop(key, None)
+
+    def tearDown(self):
+        os.environ.clear()
+        os.environ.update(self.original_env)
+        sys.path = self.original_sys_path.copy()
+
+    def run_script_with_distributions(self, shipped, app):
+        mock_site = "/mock/site-packages"
+        stream = StringIO()
+        with patch("sys.stderr", stream):
+            with patch("sys.version_info", (3, 10, 0, "final", 0)):
+                with patch(
+                    "os.path.dirname", side_effect=create_dirname_side_effect(mock_site)
+                ):
+                    with patch("sys.path", [mock_site]):
+                        with patch(
+                            "importlib.metadata.distributions",
+                            side_effect=create_distributions_side_effect(shipped, app),
+                        ):
+                            with patch(
+                                "builtins.open",
+                                unittest.mock.mock_open(read_data="packaging >=20.0\n"),
+                            ):
+                                with patch(
+                                    "importlib.metadata.distribution"
+                                ) as mock_dist:
+                                    mock_dist.return_value = Mock(version="26.3")
+                                    with patch.dict(
+                                        "sys.modules", mocked_opentelemetry_modules()
+                                    ):
+                                        module, spec = load_sitecustomize_module()
+                                        spec.loader.exec_module(module)
+        return stream.getvalue()
+
+    def test_non_canonical_application_name_is_still_detected(self):
+        """OpenTelemetry_SDK is PEP 503 equivalent to opentelemetry-sdk, so
+        activating on top of it is the double instrumentation the check exists
+        to prevent."""
+        shipped = [
+            make_dist(
+                "opentelemetry-sdk",
+                "/mock/site-packages/opentelemetry_sdk-1.44.0.dist-info",
+            )
+        ]
+        app = [
+            make_dist(
+                "OpenTelemetry_SDK",
+                "/app/site-packages/opentelemetry_sdk-1.0.0.dist-info",
+            )
+        ]
+        output = self.run_script_with_distributions(shipped, app)
+        self.assertIn("already instrumented", output)
+        self.assertIn("/app/site-packages/opentelemetry_sdk-1.0.0.dist-info", output)
+
+    def test_non_canonical_shipped_name_is_still_detected(self):
+        """The shipped side is read from the injected tree and is just as free
+        to declare a non-canonical Name."""
+        shipped = [
+            make_dist(
+                "OpenTelemetry.SDK",
+                "/mock/site-packages/opentelemetry_sdk-1.44.0.dist-info",
+            )
+        ]
+        app = [
+            make_dist(
+                "opentelemetry-sdk",
+                "/app/site-packages/opentelemetry_sdk-1.0.0.dist-info",
+            )
+        ]
+        output = self.run_script_with_distributions(shipped, app)
+        self.assertIn("already instrumented", output)
+
+    def test_non_canonical_api_layer_name_is_still_excluded(self):
+        """Applications legitimately depend on the API layer for manual
+        instrumentation, and must not be reported for declaring it as
+        opentelemetry_api."""
+        shipped = [
+            make_dist(
+                "opentelemetry-api",
+                "/mock/site-packages/opentelemetry_api-1.44.0.dist-info",
+            ),
+            make_dist(
+                "opentelemetry-sdk",
+                "/mock/site-packages/opentelemetry_sdk-1.44.0.dist-info",
+            ),
+        ]
+        app = [
+            make_dist(
+                "opentelemetry_api",
+                "/app/site-packages/opentelemetry_api-1.44.0.dist-info",
+            ),
+            make_dist(
+                "OpenTelemetry.Semantic_Conventions",
+                "/app/site-packages/opentelemetry_semantic_conventions-0.65b0.dist-info",
+            ),
+        ]
+        output = self.run_script_with_distributions(shipped, app)
+        self.assertNotIn("already instrumented", output)
+
+    def test_unrelated_packages_are_unaffected(self):
+        """Normalisation must not turn an unrelated distribution into a match."""
+        shipped = [
+            make_dist(
+                "opentelemetry-sdk",
+                "/mock/site-packages/opentelemetry_sdk-1.44.0.dist-info",
+            )
+        ]
+        app = [
+            make_dist("PyYAML", "/app/site-packages/PyYAML-6.0.dist-info"),
+            make_dist("ruamel.yaml", "/app/site-packages/ruamel.yaml-0.18.dist-info"),
+            make_dist(
+                "typing_extensions",
+                "/app/site-packages/typing_extensions-4.16.0.dist-info",
+            ),
+        ]
+        output = self.run_script_with_distributions(shipped, app)
+        self.assertNotIn("already instrumented", output)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -32,6 +32,9 @@ If another OpenTelemetry distribution or the upstream SDK is already active in t
 The script validates the application's installed packages against the distribution's pinned dependency manifest (`all-dependencies.txt`).
 If a version conflict is detected that would prevent the distribution from loading correctly, it deactivates itself and logs the conflict.
 
+Every requirement in the manifest is checked, so one deactivation names every conflicting package rather than only the first.
+Each is reported as `name (requires <specifier>, found <version>)`, or `name (required package not found)`, sorted by name.
+
 ## Graceful self-deactivation
 
 When any safety check fails, the distribution:

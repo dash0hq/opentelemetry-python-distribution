@@ -594,5 +594,98 @@ class TestImportDistro(unittest.TestCase):
         )
 
 
+class TestInjectedPathIsComparedNormalized(unittest.TestCase):
+    """The injected entry is whatever string the injector was configured with,
+    while current_site comes from dirname(__file__) and never carries a
+    trailing separator. The two must still be recognised as the same site."""
+
+    def setUp(self):
+        self.original_env = os.environ.copy()
+        self.original_sys_path = sys.path.copy()
+        for key in [
+            "OTEL_INJECTOR_LOG_LEVEL",
+            "OTEL_EXPORTER_OTLP_ENDPOINT",
+            "DASH0_OTEL_COLLECTOR_BASE_URL",
+        ]:
+            os.environ.pop(key, None)
+
+    def tearDown(self):
+        os.environ.clear()
+        os.environ.update(self.original_env)
+        sys.path = self.original_sys_path.copy()
+
+    def test_trailing_separator_does_not_break_activation(self):
+        """An exact-match path.remove() raised ValueError here, which escaped
+        import_distro() and left the process with a traceback instead of
+        instrumentation."""
+        mock_site = "/mock/site-packages"
+        modules = mocked_opentelemetry_modules()
+        initialize = modules["opentelemetry.instrumentation"].auto_instrumentation
+
+        stream = StringIO()
+        with patch("sys.stderr", stream):
+            with patch("sys.version_info", (3, 10, 0, "final", 0)):
+                with patch(
+                    "os.path.dirname", side_effect=create_dirname_side_effect(mock_site)
+                ):
+                    with patch("sys.path", [mock_site + os.sep]):
+                        with patch(
+                            "builtins.open",
+                            unittest.mock.mock_open(read_data="packaging >=20.0\n"),
+                        ):
+                            with patch("importlib.metadata.distribution") as mock_dist:
+                                mock_dist.return_value = Mock(version="26.3")
+                                with patch.dict("sys.modules", modules):
+                                    module, spec = load_sitecustomize_module()
+                                    spec.loader.exec_module(module)
+
+        self.assertNotIn("cannot auto-instrument", stream.getvalue())
+        self.assertTrue(initialize.initialize.called)
+
+    def test_trailing_separator_entry_is_removed_from_pythonpath(self):
+        """Left in place, child processes keep loading the injected tree after
+        this process decided not to."""
+        mock_site = "/mock/site-packages"
+        os.environ["PYTHONPATH"] = os.pathsep.join(
+            ["/other/path", mock_site + os.sep, "/another/path"]
+        )
+
+        with patch("sys.stderr", new_callable=StringIO):
+            with patch("sys.version_info", (2, 7, 0, "final", 0)):
+                with patch("sys.version", "2.7.0"):
+                    with patch(
+                        "os.path.dirname",
+                        side_effect=create_dirname_side_effect(mock_site),
+                    ):
+                        with patch("sys.path", [mock_site + os.sep]):
+                            module, spec = load_sitecustomize_module()
+                            spec.loader.exec_module(module)
+
+        self.assertEqual(
+            os.environ.get("PYTHONPATH"),
+            os.pathsep.join(["/other/path", "/another/path"]),
+        )
+
+    def test_every_occurrence_is_removed_from_sys_path(self):
+        """path.remove() drops only the first match, so a site listed twice
+        stayed half-active after deactivation."""
+        mock_site = "/mock/site-packages"
+        os.environ["PYTHONPATH"] = mock_site
+        path_entries = [mock_site + os.sep, "/app/site-packages", mock_site]
+
+        with patch("sys.stderr", new_callable=StringIO):
+            with patch("sys.version_info", (2, 7, 0, "final", 0)):
+                with patch("sys.version", "2.7.0"):
+                    with patch(
+                        "os.path.dirname",
+                        side_effect=create_dirname_side_effect(mock_site),
+                    ):
+                        with patch("sys.path", path_entries):
+                            module, spec = load_sitecustomize_module()
+                            spec.loader.exec_module(module)
+
+        self.assertEqual(path_entries, ["/app/site-packages"])
+
+
 if __name__ == "__main__":
     unittest.main()

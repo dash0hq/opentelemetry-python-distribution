@@ -212,6 +212,22 @@ def _check_dependency_version_conflict(req_string, version_conflicts):
         version_conflicts[req.name] = {"error": "required package not found"}
 
 
+def _render_version_conflicts(version_conflicts):
+    # The accumulated dict used to be interpolated with its repr, which put a
+    # Python literal into a log line an operator has to read, and put its single
+    # quotes inside the JSON message field. Sorted by name, so the same set of
+    # conflicts always reads the same way.
+    descriptions = []
+    for name in sorted(version_conflicts):
+        conflict = version_conflicts[name]
+        if "error" in conflict:
+            descriptions.append("{} ({})".format(name, conflict["error"]))
+        else:
+            descriptions.append("{} (requires {}, found {})".format(
+                name, conflict["version_required"], conflict["version_found"]))
+    return "; ".join(descriptions)
+
+
 def import_distro():
     _log_debug("checking Python version")
     current_site = dirname(__file__)
@@ -265,10 +281,14 @@ def import_distro():
         _print_cannot_auto_instrument_message("cannot read all-dependencies.txt for dependency conflict checking")
         return
 
+    # Every requirement is checked, not only up to the first conflict. An
+    # operator whose application conflicts with three of the injected packages
+    # otherwise fixes the one named, redeploys, waits for the process to start,
+    # and is told about the second, paying a deployment per round trip. This
+    # runs only on the failing path and costs one importlib.metadata lookup per
+    # entry, in a process that is about to deactivate anyway.
     for req_string in requirements_to_check:
         _check_dependency_version_conflict(req_string, version_conflicts)
-        if version_conflicts:
-            break
 
     if not version_conflicts:
         try:
@@ -283,7 +303,8 @@ def import_distro():
     else:
         # Remove this site for good, we do not want to trigger dependency conflict issues.
         _self_deactivate(current_site)
-        _print_cannot_auto_instrument_message("dependency conflicts: {}".format(version_conflicts))
+        _print_cannot_auto_instrument_message(
+            "dependency conflicts: {}".format(_render_version_conflicts(version_conflicts)))
 
 
 import_distro()

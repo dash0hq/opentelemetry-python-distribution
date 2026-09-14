@@ -1,0 +1,31 @@
+# One of 'breaking', 'deprecation', 'new_component', 'enhancement', 'bug_fix'.
+change_type: bug_fix
+
+# A single word describing the area of concern (e.g. distro, pyproto, exporter,
+# resource-detectors, deps, ci, release, docs).
+component: distro
+
+# A brief description of the change. Surround your text with quotes ("") if it
+# needs to start with a backtick (`).
+note: Report every dependency conflict at once, in readable form
+
+# One or more tracking issues related to the change. At least one is required.
+issues: [65]
+
+# (Optional) One or more lines of additional information to render under the
+# primary note. These lines are padded with 2 spaces and inserted directly into
+# the document. Use pipe (|) for multiline entries.
+subtext: |
+  The dependency-conflict check stopped at the first conflict it found, so an
+  operator whose application conflicted with three of the injected packages
+  fixed the one named, redeployed, waited for the process to start, and was
+  told about the second: one deployment per conflict. Every requirement in
+  ``all-dependencies.txt`` is now checked before the distribution deactivates.
+
+  The conflicts are also rendered rather than interpolated as a Python dict
+  repr. A deactivation now reads
+  ``dependency conflicts: alpha (requires >=2.0, found 1.0); beta (required
+  package not found)``, sorted by name so the same set always reads the same
+  way.
+
+change_logs: [user]

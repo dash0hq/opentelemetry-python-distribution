@@ -38,7 +38,7 @@ When any safety check fails, the distribution:
 
 1. Sets `DASH0_DISABLE=true` in the current process environment.
 2. Sets the same variable for child processes (so they also skip instrumentation).
-3. Logs the reason for deactivation at `WARNING` level.
+3. Logs the reason for deactivation at `WARNING` level, as a single line holding one JSON object, written only to stderr.
 4. Exits `sitecustomize.py` without activating instrumentation.
 
 The application continues running normally, unmodified.

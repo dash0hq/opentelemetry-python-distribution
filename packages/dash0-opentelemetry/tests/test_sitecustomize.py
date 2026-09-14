@@ -89,6 +89,25 @@ def create_dirname_side_effect(mock_site):
     return dirname_side_effect
 
 
+def create_sitecustomize_dirname_side_effect(mock_site):
+    """os.path.dirname side effect that reports mock_site for the script's own
+    __file__ every time it is asked, and delegates otherwise.
+
+    create_dirname_side_effect answers only the first call, which is enough for
+    tests whose script run reaches dirname(__file__) once. The last-resort
+    handler at the bottom of the script calls it a second time, to deactivate
+    after an exception escaped import_distro(), and that call has to resolve to
+    the same site as the first or the assertions watch the wrong path."""
+    from os.path import dirname as original_dirname
+
+    def dirname_side_effect(path):
+        if str(path).endswith("sitecustomize.py"):
+            return mock_site
+        return original_dirname(path)
+
+    return dirname_side_effect
+
+
 class TestImportDistro(unittest.TestCase):
     """Test suite for the import_distro function in sitecustomize.py."""
 
@@ -591,6 +610,105 @@ class TestImportDistro(unittest.TestCase):
             '"level": "debug", "message": "importing and initializing the Python'
             " auto-instrumentation now",
             output,
+        )
+
+
+class TestUnexpectedErrorIsContained(unittest.TestCase):
+    """An exception escaping import_distro() must not leave the injected site
+    active, and must not propagate out of interpreter start-up."""
+
+    def setUp(self):
+        self.original_env = os.environ.copy()
+        self.original_sys_path = sys.path.copy()
+        for key in [
+            "OTEL_INJECTOR_LOG_LEVEL",
+            "OTEL_EXPORTER_OTLP_ENDPOINT",
+            "DASH0_OTEL_COLLECTOR_BASE_URL",
+        ]:
+            os.environ.pop(key, None)
+
+    def tearDown(self):
+        os.environ.clear()
+        os.environ.update(self.original_env)
+        sys.path = self.original_sys_path.copy()
+
+    def run_script_with_site_missing_from_sys_path(self):
+        """Reproduce a real failure inside import_distro(): the injected entry
+        carries a trailing separator, so the exact-match path.remove() raises.
+
+        Returns the stderr text."""
+        mock_site = "/mock/site-packages"
+        os.environ["PYTHONPATH"] = mock_site
+
+        stream = StringIO()
+        with patch("sys.stderr", stream):
+            with patch("sys.version_info", (3, 10, 0, "final", 0)):
+                with patch(
+                    "os.path.dirname",
+                    side_effect=create_sitecustomize_dirname_side_effect(mock_site),
+                ):
+                    with patch("sys.path", [mock_site + os.sep]):
+                        module, spec = load_sitecustomize_module()
+                        spec.loader.exec_module(module)
+        return stream.getvalue()
+
+    def test_unexpected_error_does_not_propagate(self):
+        """site.execsitecustomize() reports an escaping exception as one line
+        that never names this distribution, so it must not escape."""
+        try:
+            self.run_script_with_site_missing_from_sys_path()
+        except Exception as error:
+            self.fail(f"the script let {error!r} escape interpreter start-up")
+
+    def test_unexpected_error_is_reported(self):
+        """The operator needs the exception type and message, since the script
+        is the only thing that knows this was the injector."""
+        output = self.run_script_with_site_missing_from_sys_path()
+        self.assertIn(
+            '"level": "warn", "message": "cannot auto-instrument Python process:'
+            " unexpected error while deciding whether to auto-instrument:"
+            " ValueError:",
+            output,
+        )
+
+    def test_unexpected_error_deactivates_for_child_processes(self):
+        """Without this, every child process that execs an interpreter retries
+        the same failure."""
+        self.run_script_with_site_missing_from_sys_path()
+        self.assertEqual(os.environ.get("PYTHONPATH"), "")
+        self.assertEqual(
+            os.environ.get("PYTHON_AUTO_INSTRUMENTATION_AGENT_PATH_PREFIX"), ""
+        )
+
+    def test_reporting_happens_before_deactivating(self):
+        """If _self_deactivate is the step that fails, the diagnostic must
+        already have been written."""
+        mock_site = "/mock/site-packages"
+        os.environ["PYTHONPATH"] = mock_site
+
+        stream = StringIO()
+        real_environ = os.environ
+
+        class EnvironFailingOnWrite(dict):
+            def __setitem__(self, key, value):
+                raise RuntimeError("the environment is not writable here")
+
+        failing_environ = EnvironFailingOnWrite(real_environ)
+
+        with patch("sys.stderr", stream):
+            with patch("sys.version_info", (3, 10, 0, "final", 0)):
+                with patch(
+                    "os.path.dirname",
+                    side_effect=create_sitecustomize_dirname_side_effect(mock_site),
+                ):
+                    with patch("sys.path", [mock_site + os.sep]):
+                        with patch("os.environ", failing_environ):
+                            module, spec = load_sitecustomize_module()
+                            spec.loader.exec_module(module)
+
+        self.assertIn(
+            "unexpected error while deciding whether to auto-instrument",
+            stream.getvalue(),
         )
 
 

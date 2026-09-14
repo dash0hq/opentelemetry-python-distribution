@@ -594,5 +594,166 @@ class TestImportDistro(unittest.TestCase):
         )
 
 
+def make_unreadable_dist(dist_path, error=None):
+    """A distribution whose METADATA cannot be decoded.
+
+    importlib.metadata decodes METADATA as UTF-8, and a Latin-1 author field
+    written by older tooling is the usual cause of this in the wild."""
+    if error is None:
+        error = UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte")
+    dist = Mock()
+    dist._path = dist_path
+    type(dist).metadata = property(lambda self: (_ for _ in ()).throw(error))
+    return dist
+
+
+class TestUnreadableInputIsSkipped(unittest.TestCase):
+    """A problem in one foreign package, or in one manifest line, makes that
+    one item unverifiable. It must not deactivate the whole process, and it
+    must not escape into interpreter start-up."""
+
+    def setUp(self):
+        self.original_env = os.environ.copy()
+        self.original_sys_path = sys.path.copy()
+        for key in [
+            "OTEL_INJECTOR_LOG_LEVEL",
+            "OTEL_EXPORTER_OTLP_ENDPOINT",
+            "DASH0_OTEL_COLLECTOR_BASE_URL",
+        ]:
+            os.environ.pop(key, None)
+
+    def tearDown(self):
+        os.environ.clear()
+        os.environ.update(self.original_env)
+        sys.path = self.original_sys_path.copy()
+
+    def run_script(
+        self,
+        shipped=None,
+        app=None,
+        manifest="packaging >=20.0\n",
+        installed_version="26.3",
+        open_error=None,
+    ):
+        mock_site = "/mock/site-packages"
+        modules = mocked_opentelemetry_modules()
+        initialize = modules["opentelemetry.instrumentation"].auto_instrumentation
+
+        if shipped is None:
+            shipped = [
+                make_dist(
+                    "opentelemetry-sdk",
+                    "/mock/site-packages/opentelemetry_sdk-1.44.0.dist-info",
+                )
+            ]
+        if app is None:
+            app = [make_dist("flask", "/app/site-packages/flask-2.0.0.dist-info")]
+
+        if open_error is None:
+            open_mock = unittest.mock.mock_open(read_data=manifest)
+        else:
+            open_mock = Mock(side_effect=open_error)
+
+        stream = StringIO()
+        with patch("sys.stderr", stream):
+            with patch("sys.version_info", (3, 10, 0, "final", 0)):
+                with patch(
+                    "os.path.dirname", side_effect=create_dirname_side_effect(mock_site)
+                ):
+                    with patch("sys.path", [mock_site]):
+                        with patch(
+                            "importlib.metadata.distributions",
+                            side_effect=create_distributions_side_effect(shipped, app),
+                        ):
+                            with patch("builtins.open", open_mock):
+                                with patch(
+                                    "importlib.metadata.distribution"
+                                ) as mock_dist:
+                                    mock_dist.return_value = Mock(
+                                        version=installed_version
+                                    )
+                                    with patch.dict("sys.modules", modules):
+                                        module, spec = load_sitecustomize_module()
+                                        spec.loader.exec_module(module)
+        return stream.getvalue(), initialize.initialize
+
+    def test_an_unreadable_application_package_does_not_deactivate(self):
+        """One package with non-UTF-8 METADATA used to abort the scan and take
+        auto-instrumentation down with it."""
+        app = [
+            make_unreadable_dist("/app/site-packages/legacy-1.0.dist-info"),
+            make_dist("flask", "/app/site-packages/flask-2.0.0.dist-info"),
+        ]
+        output, initialize = self.run_script(app=app)
+        self.assertNotIn("cannot auto-instrument", output)
+        self.assertTrue(initialize.called)
+
+    def test_an_unreadable_application_package_is_named_in_a_warning(self):
+        """The operator needs to know which package could not be checked."""
+        app = [make_unreadable_dist("/app/site-packages/legacy-1.0.dist-info")]
+        output, _ = self.run_script(app=app)
+        self.assertIn("/app/site-packages/legacy-1.0.dist-info", output)
+        self.assertIn("cannot be checked for double instrumentation", output)
+
+    def test_readable_packages_are_still_checked_after_an_unreadable_one(self):
+        """Skipping must not turn into stopping."""
+        app = [
+            make_unreadable_dist("/app/site-packages/legacy-1.0.dist-info"),
+            make_dist(
+                "opentelemetry-sdk",
+                "/app/site-packages/opentelemetry_sdk-1.0.0.dist-info",
+            ),
+        ]
+        output, _ = self.run_script(app=app)
+        self.assertIn("already instrumented", output)
+        self.assertIn("/app/site-packages/opentelemetry_sdk-1.0.0.dist-info", output)
+
+    def test_an_unreadable_shipped_package_does_not_deactivate(self):
+        """The injected tree is scanned the same way and deserves the same
+        treatment."""
+        shipped = [
+            make_unreadable_dist("/mock/site-packages/broken-1.0.dist-info"),
+            make_dist(
+                "opentelemetry-sdk",
+                "/mock/site-packages/opentelemetry_sdk-1.44.0.dist-info",
+            ),
+        ]
+        output, initialize = self.run_script(shipped=shipped)
+        self.assertNotIn("cannot auto-instrument", output)
+        self.assertTrue(initialize.called)
+
+    def test_an_undecodable_manifest_deactivates_with_its_own_message(self):
+        """UnicodeDecodeError was not caught, so it propagated instead of
+        becoming the intended 'cannot read all-dependencies.txt'."""
+        output, initialize = self.run_script(
+            open_error=UnicodeDecodeError(
+                "ascii", b"\xff", 0, 1, "ordinal not in range"
+            )
+        )
+        self.assertIn(
+            "cannot read all-dependencies.txt for dependency conflict checking", output
+        )
+        self.assertFalse(initialize.called)
+
+    def test_an_unparsable_requirement_is_skipped_not_raised(self):
+        """A line the parser rejects made Requirement() raise straight out of
+        import_distro()."""
+        output, initialize = self.run_script(
+            manifest='alpha >="2.0"\npackaging >=20.0\n'
+        )
+        self.assertIn("cannot parse requirement", output)
+        self.assertIn('alpha >="2.0"', output)
+        self.assertNotIn("cannot auto-instrument", output)
+        self.assertTrue(initialize.called)
+
+    def test_an_unparsable_installed_version_is_skipped(self):
+        """Distributions patched by Linux distributors can carry versions that
+        are not valid PEP 440."""
+        output, initialize = self.run_script(installed_version="not a version")
+        self.assertIn("cannot parse the installed version 'not a version'", output)
+        self.assertNotIn("cannot auto-instrument", output)
+        self.assertTrue(initialize.called)
+
+
 if __name__ == "__main__":
     unittest.main()

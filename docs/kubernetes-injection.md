@@ -27,6 +27,15 @@ The script itself is written in valid Python 2.7+ syntax (including a PEP-263 en
 
 If another OpenTelemetry distribution or the upstream SDK is already active in the process (detected by checking for overlapping OpenTelemetry packages), the script deactivates itself to avoid double-instrumenting the application.
 
+### Unreadable input
+
+A problem in one foreign package, or in one line of the manifest, makes that one item impossible to verify.
+It never deactivates the distribution on its own.
+
+A distribution whose `METADATA` cannot be decoded is skipped, with a warning naming its install directory, and the scan continues with the rest.
+A manifest line that is not a parseable requirement is skipped with a warning, as is a package whose installed version cannot be read or does not parse as PEP 440.
+Only a manifest that cannot be read or decoded at all deactivates the distribution, because without it no conflict check is possible.
+
 ### Dependency conflict check
 
 The script validates the application's installed packages against the distribution's pinned dependency manifest (`all-dependencies.txt`).

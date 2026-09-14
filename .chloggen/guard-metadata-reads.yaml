@@ -1,0 +1,36 @@
+# One of 'breaking', 'deprecation', 'new_component', 'enhancement', 'bug_fix'.
+change_type: bug_fix
+
+# A single word describing the area of concern (e.g. distro, pyproto, exporter,
+# resource-detectors, deps, ci, release, docs).
+component: distro
+
+# A brief description of the change. Surround your text with quotes ("") if it
+# needs to start with a backtick (`).
+note: Skip packages and requirements that cannot be read, instead of deactivating or crashing
+
+# One or more tracking issues related to the change. At least one is required.
+issues: [66]
+
+# (Optional) One or more lines of additional information to render under the
+# primary note. These lines are padded with 2 spaces and inserted directly into
+# the document. Use pipe (|) for multiline entries.
+subtext: |
+  Several reads of foreign data in ``sitecustomize.py`` were unguarded, so a
+  problem in an unrelated package could deactivate auto-instrumentation or
+  print a traceback at interpreter start-up.
+
+  ``importlib.metadata`` decodes ``METADATA`` as UTF-8, and one distribution
+  whose file is not valid UTF-8 (a Latin-1 author field written by older
+  tooling is the usual cause) aborted the entire double-instrumentation scan.
+  Such a distribution is now skipped, with a warning naming its install
+  directory. ``all-dependencies.txt`` is read as UTF-8 explicitly rather than
+  in the process locale, which otherwise made the same tree readable in one
+  process and not in the next, and an undecodable manifest now produces the
+  intended "cannot read all-dependencies.txt" deactivation instead of
+  propagating. A manifest line that is not a parseable requirement, a package
+  whose installed version cannot be read, and a version that does not parse as
+  PEP 440 are each warned about and skipped: an unverifiable requirement is not
+  a conflicting one.
+
+change_logs: [user]

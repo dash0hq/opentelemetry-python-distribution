@@ -39,6 +39,37 @@ double_instrumentation_check_excluded_packages = [
     "opentelemetry-semantic-conventions",
 ]
 
+# The pure-Python (pyproto) packages this distribution ships are published under
+# Dash0-owned distribution names while deliberately keeping the upstream import
+# paths and entry points. What breaks a process is two distributions owning the
+# same import path, not two sharing a distribution name, so matching the
+# application against the shipped names alone cannot see the case this check
+# exists for: an application with opentelemetry-exporter-otlp-proto-grpc
+# installed ends up with two distributions providing
+# opentelemetry.exporter.otlp.proto.grpc and two entry points named
+# otlp_proto_grpc, and which one wins depends on sys.path order.
+#
+# Keyed by the shipped distribution name, listing the upstream distributions it
+# stands in for. Keep this in step with the packages/ directory.
+upstream_packages_shadowed_by_shipped_packages = {
+    "dash0-opentelemetry-pyproto": [
+        "opentelemetry-proto",
+    ],
+    "dash0-opentelemetry-exporter-otlp-pyproto-common": [
+        "opentelemetry-exporter-otlp-proto-common",
+    ],
+    "dash0-opentelemetry-exporter-otlp-pyproto-grpc": [
+        "opentelemetry-exporter-otlp-proto-grpc",
+        # The meta package pulls in both transports, so finding it means the
+        # upstream exporters are installed alongside ours.
+        "opentelemetry-exporter-otlp",
+    ],
+    "dash0-opentelemetry-exporter-otlp-pyproto-http": [
+        "opentelemetry-exporter-otlp-proto-http",
+        "opentelemetry-exporter-otlp",
+    ],
+}
+
 debug_enabled = os.environ.get("OTEL_INJECTOR_LOG_LEVEL") == "debug"
 
 
@@ -125,6 +156,9 @@ def _shipped_opentelemetry_package_names(current_site):
             continue
         if name.startswith(("opentelemetry-", "dash0-")):
             names.add(name)
+            # Also look for the upstream distributions this one shadows, which
+            # own the same import paths under different distribution names.
+            names.update(upstream_packages_shadowed_by_shipped_packages.get(name, ()))
     return names
 
 

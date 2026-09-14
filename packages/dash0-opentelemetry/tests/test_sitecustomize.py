@@ -594,5 +594,134 @@ class TestImportDistro(unittest.TestCase):
         )
 
 
+WORKSPACE_ROOT = os.path.normpath(os.path.join(TESTS_DIR, "..", "..", ".."))
+
+
+class TestShadowedUpstreamPackagesAreDetected(unittest.TestCase):
+    """The pyproto packages ship under Dash0-owned distribution names while
+    keeping the upstream import paths, so the application's copy of the
+    upstream distribution has a different name and the same import path."""
+
+    def setUp(self):
+        self.original_env = os.environ.copy()
+        self.original_sys_path = sys.path.copy()
+        for key in [
+            "OTEL_INJECTOR_LOG_LEVEL",
+            "OTEL_EXPORTER_OTLP_ENDPOINT",
+            "DASH0_OTEL_COLLECTOR_BASE_URL",
+        ]:
+            os.environ.pop(key, None)
+
+    def tearDown(self):
+        os.environ.clear()
+        os.environ.update(self.original_env)
+        sys.path = self.original_sys_path.copy()
+
+    def shipped_pyproto_distributions(self):
+        return [
+            make_dist(
+                "dash0-opentelemetry-pyproto",
+                "/mock/site-packages/dash0_opentelemetry_pyproto.dist-info",
+            ),
+            make_dist(
+                "dash0-opentelemetry-exporter-otlp-pyproto-common",
+                "/mock/site-packages/dash0_otlp_pyproto_common.dist-info",
+            ),
+            make_dist(
+                "dash0-opentelemetry-exporter-otlp-pyproto-grpc",
+                "/mock/site-packages/dash0_otlp_pyproto_grpc.dist-info",
+            ),
+            make_dist(
+                "dash0-opentelemetry-exporter-otlp-pyproto-http",
+                "/mock/site-packages/dash0_otlp_pyproto_http.dist-info",
+            ),
+        ]
+
+    def run_script_with_application_package(self, application_package_name):
+        mock_site = "/mock/site-packages"
+        app_path = "/app/site-packages/{}-1.44.0.dist-info".format(
+            application_package_name.replace("-", "_")
+        )
+        app = [make_dist(application_package_name, app_path)]
+
+        stream = StringIO()
+        with patch("sys.stderr", stream):
+            with patch("sys.version_info", (3, 10, 0, "final", 0)):
+                with patch(
+                    "os.path.dirname", side_effect=create_dirname_side_effect(mock_site)
+                ):
+                    with patch("sys.path", [mock_site]):
+                        with patch(
+                            "importlib.metadata.distributions",
+                            side_effect=create_distributions_side_effect(
+                                self.shipped_pyproto_distributions(), app
+                            ),
+                        ):
+                            with patch(
+                                "builtins.open",
+                                unittest.mock.mock_open(read_data="packaging >=20.0\n"),
+                            ):
+                                with patch(
+                                    "importlib.metadata.distribution"
+                                ) as mock_dist:
+                                    mock_dist.return_value = Mock(version="26.3")
+                                    with patch.dict(
+                                        "sys.modules", mocked_opentelemetry_modules()
+                                    ):
+                                        module, spec = load_sitecustomize_module()
+                                        spec.loader.exec_module(module)
+        return stream.getvalue(), app_path
+
+    def test_upstream_exporters_shadowed_by_pyproto_are_detected(self):
+        """Each of these owns an import path one of the shipped packages also
+        owns, so both in one process is double instrumentation."""
+        shadowed = [
+            "opentelemetry-proto",
+            "opentelemetry-exporter-otlp-proto-common",
+            "opentelemetry-exporter-otlp-proto-grpc",
+            "opentelemetry-exporter-otlp-proto-http",
+            "opentelemetry-exporter-otlp",
+        ]
+        for package_name in shadowed:
+            with self.subTest(package=package_name):
+                output, app_path = self.run_script_with_application_package(
+                    package_name
+                )
+                self.assertIn("already instrumented", output)
+                self.assertIn(app_path, output)
+
+    def test_an_unrelated_package_is_still_not_reported(self):
+        """The mapping must not widen the check into unrelated distributions."""
+        output, _ = self.run_script_with_application_package("flask")
+        self.assertNotIn("already instrumented", output)
+
+    def test_every_shipped_pyproto_package_has_a_mapping(self):
+        """The workspace is the source of truth: a pyproto package added to
+        packages/ without an entry here would silently stop being detected."""
+        mock_site = "/mock/site-packages"
+        with patch("sys.stderr", new_callable=StringIO):
+            with patch("sys.version_info", (2, 7, 0, "final", 0)):
+                with patch("sys.version", "2.7.0"):
+                    with patch(
+                        "os.path.dirname",
+                        side_effect=create_dirname_side_effect(mock_site),
+                    ):
+                        with patch("sys.path", [mock_site]):
+                            module, spec = load_sitecustomize_module()
+                            spec.loader.exec_module(module)
+
+        mapping = module.upstream_packages_shadowed_by_shipped_packages
+        shipped_pyproto_packages = sorted(
+            entry
+            for entry in os.listdir(os.path.join(WORKSPACE_ROOT, "packages"))
+            if "pyproto" in entry
+        )
+        self.assertTrue(shipped_pyproto_packages)
+        for package_directory in shipped_pyproto_packages:
+            with self.subTest(package=package_directory):
+                self.assertIn(package_directory, mapping)
+                self.assertTrue(mapping[package_directory])
+
+
 if __name__ == "__main__":
     unittest.main()

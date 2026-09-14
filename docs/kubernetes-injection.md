@@ -27,6 +27,18 @@ The script itself is written in valid Python 2.7+ syntax (including a PEP-263 en
 
 If another OpenTelemetry distribution or the upstream SDK is already active in the process (detected by checking for overlapping OpenTelemetry packages), the script deactivates itself to avoid double-instrumenting the application.
 
+The check looks for import-path overlap, not just name overlap.
+The pure-Python (pyproto) exporters ship under Dash0-owned distribution names while keeping the upstream import paths and entry points, so an application holding the upstream distribution has a different name and the same import path:
+
+| Shipped distribution | Import path it owns | Upstream distribution it shadows |
+|---|---|---|
+| `dash0-opentelemetry-pyproto` | `opentelemetry.proto` | `opentelemetry-proto` |
+| `dash0-opentelemetry-exporter-otlp-pyproto-common` | `opentelemetry.exporter.otlp.proto.common` | `opentelemetry-exporter-otlp-proto-common` |
+| `dash0-opentelemetry-exporter-otlp-pyproto-grpc` | `opentelemetry.exporter.otlp.proto.grpc` | `opentelemetry-exporter-otlp-proto-grpc`, `opentelemetry-exporter-otlp` |
+| `dash0-opentelemetry-exporter-otlp-pyproto-http` | `opentelemetry.exporter.otlp.proto.http` | `opentelemetry-exporter-otlp-proto-http`, `opentelemetry-exporter-otlp` |
+
+Finding any of the upstream names in the application counts as double instrumentation, because two distributions would then provide the same modules and register the same exporter entry points.
+
 ### Dependency conflict check
 
 The script validates the application's installed packages against the distribution's pinned dependency manifest (`all-dependencies.txt`).

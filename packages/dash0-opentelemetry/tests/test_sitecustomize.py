@@ -10,6 +10,7 @@ import os
 import sys
 import unittest
 from io import StringIO
+from os.path import dirname as real_dirname
 from unittest.mock import MagicMock, Mock, patch
 
 # Pre-load the vendored packaging replacement into sys.modules: the tests
@@ -51,11 +52,17 @@ def mocked_opentelemetry_modules():
     }
 
 
-def make_dist(name, dist_path):
-    """Build a mock importlib.metadata distribution."""
+def make_dist(name, dist_path, version="1.0.0"):
+    """Build a mock importlib.metadata distribution.
+
+    locate_file("") reports the directory the distribution is installed in,
+    which is what the real Distribution API returns and what the script names
+    in its deactivation message. real_dirname is used rather than os.path
+    .dirname because several tests patch the latter."""
     dist = Mock()
     dist.metadata = {"Name": name}
-    dist._path = dist_path
+    dist.version = version
+    dist.locate_file = Mock(return_value=real_dirname(dist_path))
     return dist
 
 
@@ -419,11 +426,11 @@ class TestImportDistro(unittest.TestCase):
             " The application has OpenTelemetry dependencies which indicate that"
             " it is already instrumented. The following problematic dependencies"
             " have been found:"
-            " /app/site-packages/opentelemetry_sdk-1.0.0.dist-info. Skipping the"
+            " opentelemetry-sdk 1.0.0 (/app/site-packages). Skipping the"
             " Dash0 Python auto-instrumentation to avoid double instrumentation.",
             output,
         )
-        self.assertIn("/app/site-packages/opentelemetry_sdk-1.0.0.dist-info", output)
+        self.assertIn("opentelemetry-sdk 1.0.0 (/app/site-packages)", output)
         # Verify self-deactivation happened
         self.assertEqual(
             os.environ.get("PYTHON_AUTO_INSTRUMENTATION_AGENT_PATH_PREFIX"), ""
@@ -475,9 +482,9 @@ class TestImportDistro(unittest.TestCase):
             " have been found:",
             output,
         )
-        self.assertIn("/app/site-packages/opentelemetry_sdk-1.0.0.dist-info", output)
+        self.assertIn("opentelemetry-sdk 1.0.0 (/app/site-packages)", output)
         self.assertIn(
-            "/app/site-packages/opentelemetry_instrumentation-1.0.0.dist-info", output
+            "opentelemetry-instrumentation 1.0.0 (/app/site-packages)", output
         )
 
     @patch("sys.stderr", new_callable=StringIO)

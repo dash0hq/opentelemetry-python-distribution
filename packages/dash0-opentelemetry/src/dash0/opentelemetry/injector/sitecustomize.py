@@ -139,7 +139,14 @@ def _check_for_double_instrumentation(current_site):
     for dist in importlib.metadata.distributions():
         name = dist.metadata["Name"]
         if name is not None and name.lower() in packages_we_ship:
-            offending_packages.append(str(dist._path))
+            # The operator reading the deactivation message has to find and
+            # remove this package, so name it with its version and its install
+            # directory rather than only a .dist-info path. locate_file("") is
+            # abstract on Distribution and therefore resolves for any finder,
+            # while _path is private and exists only on the path-based one, so
+            # any other finder raised AttributeError here.
+            offending_packages.append(
+                "{} {} ({})".format(name, dist.version, dist.locate_file("")))
     if offending_packages:
         _self_deactivate(current_site)
         _log_cannot_auto_instrument_warning(

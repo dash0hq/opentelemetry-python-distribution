@@ -64,7 +64,7 @@ _log_debug("running sitecustomize.py")
 _log_debug("PYTHONPATH: {}".format(os.environ.get("PYTHONPATH")))
 
 
-def _print_cannot_auto_instrument_message(reason):
+def _log_cannot_auto_instrument_warning(reason):
     if hasattr(sys, "argv"):
         # If sys.argv is available, add the full command line (" ".join(sys.argv)) to the log message, so users know
         # which Python process this is about.
@@ -138,7 +138,7 @@ def _check_for_double_instrumentation(current_site):
             offending_packages.append(str(dist._path))
     if offending_packages:
         _self_deactivate(current_site)
-        _print_cannot_auto_instrument_message(
+        _log_cannot_auto_instrument_warning(
             "The application has OpenTelemetry dependencies which indicate that it is already instrumented. The " +
             "following problematic dependencies have been found: {}. ".format(", ".join(offending_packages)) +
             "Skipping the Dash0 Python auto-instrumentation to avoid double instrumentation. Remove the mentioned "
@@ -219,7 +219,7 @@ def import_distro():
     # We cannot use `sys.version_info.major` or other named attributes, as they only got introduced only in Python 3.1.
     if version_info[0] != required_python_major_version or version_info[1] < minimum_python_minor_version:
         _self_deactivate(current_site)
-        _print_cannot_auto_instrument_message("unsupported Python version: {}".format(version))
+        _log_cannot_auto_instrument_warning("unsupported Python version: {}".format(version))
         return
     _log_debug("found eligible Python version: {}".format(version_info))
 
@@ -262,7 +262,7 @@ def import_distro():
     requirements_to_check = _read_all_dependencies()
     if requirements_to_check is None:
         _self_deactivate(current_site)
-        _print_cannot_auto_instrument_message("cannot read all-dependencies.txt for dependency conflict checking")
+        _log_cannot_auto_instrument_warning("cannot read all-dependencies.txt for dependency conflict checking")
         return
 
     for req_string in requirements_to_check:
@@ -277,13 +277,13 @@ def import_distro():
             auto_instrumentation.initialize()
         except Exception as e:
             _self_deactivate(current_site)
-            _print_cannot_auto_instrument_message(
+            _log_cannot_auto_instrument_warning(
                 "error when importing/initializing the Python OpenTelemetry auto-instrumentation: {}: {}".format(
                     type(e).__name__, e))
     else:
         # Remove this site for good, we do not want to trigger dependency conflict issues.
         _self_deactivate(current_site)
-        _print_cannot_auto_instrument_message("dependency conflicts: {}".format(version_conflicts))
+        _log_cannot_auto_instrument_warning("dependency conflicts: {}".format(version_conflicts))
 
 
 import_distro()

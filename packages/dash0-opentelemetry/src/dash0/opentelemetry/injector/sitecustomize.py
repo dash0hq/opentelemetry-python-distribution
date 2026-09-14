@@ -39,7 +39,46 @@ double_instrumentation_check_excluded_packages = [
     "opentelemetry-semantic-conventions",
 ]
 
-debug_enabled = os.environ.get("OTEL_INJECTOR_LOG_LEVEL") == "debug"
+# The levels OTEL_INJECTOR_LOG_LEVEL accepts, mapped to the numbers the standard
+# logging module uses. Spelled out rather than read from logging: the injector
+# prepends this file to every Python process on the host, so importing logging
+# here would cost every one of them, and these are logging's documented
+# constants, fixed by its own API.
+log_level_by_name = {
+    "critical": 50,
+    "error": 40,
+    "warn": 30,
+    "warning": 30,
+    "info": 20,
+    "debug": 10,
+}
+
+# A warning is the only report an operator gets when a guard deactivates the
+# distribution, so no configured level may silence one. A level above WARNING is
+# accepted and clamped to it rather than honoured literally.
+default_log_level = log_level_by_name["warning"]
+
+
+def _resolve_log_level(value):
+    # Returns (level, unrecognized value). An unrecognized value is handed back
+    # to be reported rather than quietly meaning "off", which is what made this
+    # variable read as a boolean: only the exact lowercase string "debug" did
+    # anything, so DEBUG, info and warning all produced silence with nothing to
+    # explain it.
+    if value is None or not value.strip():
+        return default_log_level, None
+    level = log_level_by_name.get(value.strip().lower())
+    if level is None:
+        return default_log_level, value
+    return min(level, default_log_level), None
+
+
+injector_log_level, unrecognized_log_level = _resolve_log_level(
+    os.environ.get("OTEL_INJECTOR_LOG_LEVEL"))
+
+# Kept as its own name because it guards more than the level: it is what stops a
+# process that is not running in debug from building the diagnostics at all.
+debug_enabled = injector_log_level <= log_level_by_name["debug"]
 
 
 def _log_as_json_to_stderr(level, message):
@@ -59,6 +98,16 @@ def _log_debug(message):
     if debug_enabled:
         _log_as_json_to_stderr("debug", message)
 
+
+if unrecognized_log_level is not None:
+    # Reported rather than silently treated as "off". This is the variable an
+    # operator reaches for to make the distribution explain itself, so answering
+    # a typo with silence leaves them unable to tell a rejected value from a
+    # working one that had nothing to say.
+    _log_warn(
+        "OTEL_INJECTOR_LOG_LEVEL='{}' is not a level; using warning. "
+        "Supported levels: {}.".format(
+            unrecognized_log_level, ", ".join(sorted(log_level_by_name))))
 
 _log_debug("running sitecustomize.py")
 _log_debug("PYTHONPATH: {}".format(os.environ.get("PYTHONPATH")))

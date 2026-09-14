@@ -594,5 +594,94 @@ class TestImportDistro(unittest.TestCase):
         )
 
 
+class TestInjectorLogLevel(unittest.TestCase):
+    """OTEL_INJECTOR_LOG_LEVEL names a level, so every standard level name has
+    to be accepted, and a value that is not one must say so rather than read as
+    "off"."""
+
+    def setUp(self):
+        self.original_env = os.environ.copy()
+        self.original_sys_path = sys.path.copy()
+        for key in [
+            "OTEL_INJECTOR_LOG_LEVEL",
+            "OTEL_EXPORTER_OTLP_ENDPOINT",
+            "DASH0_OTEL_COLLECTOR_BASE_URL",
+        ]:
+            os.environ.pop(key, None)
+
+    def tearDown(self):
+        os.environ.clear()
+        os.environ.update(self.original_env)
+        sys.path = self.original_sys_path.copy()
+
+    def run_script_at_level(self, level):
+        """Run the script through the version gate, which emits one warning and
+        nothing else, so the stderr text shows exactly which levels survive."""
+        if level is not None:
+            os.environ["OTEL_INJECTOR_LOG_LEVEL"] = level
+        mock_site = "/mock/site-packages"
+
+        stream = StringIO()
+        with patch("sys.stderr", stream):
+            with patch("sys.version_info", (3, 9, 0, "final", 0)):
+                with patch("sys.version", "3.9.0"):
+                    with patch(
+                        "os.path.dirname",
+                        side_effect=create_dirname_side_effect(mock_site),
+                    ):
+                        with patch("sys.path", [mock_site]):
+                            module, spec = load_sitecustomize_module()
+                            spec.loader.exec_module(module)
+        return stream.getvalue()
+
+    def test_debug_is_accepted_case_insensitively(self):
+        """DEBUG and Debug are the same level as debug. Only the exact
+        lowercase spelling used to do anything."""
+        for spelling in ["debug", "DEBUG", "Debug", "  debug  "]:
+            with self.subTest(spelling=spelling):
+                os.environ.pop("OTEL_INJECTOR_LOG_LEVEL", None)
+                output = self.run_script_at_level(spelling)
+                self.assertIn('"level": "debug"', output)
+
+    def test_levels_above_debug_suppress_debug_records(self):
+        """info and warning are real levels, not synonyms for debug."""
+        for level in ["info", "warning", "warn", "error", "critical"]:
+            with self.subTest(level=level):
+                os.environ.pop("OTEL_INJECTOR_LOG_LEVEL", None)
+                output = self.run_script_at_level(level)
+                self.assertNotIn('"level": "debug"', output)
+
+    def test_no_level_can_silence_a_deactivation_warning(self):
+        """The warning is the only report an operator gets when a guard
+        deactivates the distribution, so critical must not suppress it."""
+        for level in [None, "debug", "info", "warning", "error", "critical"]:
+            with self.subTest(level=level):
+                os.environ.pop("OTEL_INJECTOR_LOG_LEVEL", None)
+                output = self.run_script_at_level(level)
+                self.assertIn(
+                    "cannot auto-instrument Python process:"
+                    " unsupported Python version: 3.9.0",
+                    output,
+                )
+
+    def test_unrecognized_level_is_reported_and_falls_back_to_warning(self):
+        """Silence would leave the operator unable to tell a rejected value
+        from a working one that had nothing to say."""
+        output = self.run_script_at_level("verbose")
+        self.assertIn("OTEL_INJECTOR_LOG_LEVEL='verbose' is not a level", output)
+        self.assertIn("Supported levels:", output)
+        self.assertIn("critical, debug, error, info, warn, warning", output)
+        self.assertNotIn('"level": "debug"', output)
+
+    def test_blank_level_is_treated_as_unset(self):
+        """An empty or whitespace value is not a typo worth reporting."""
+        for blank in ["", "   "]:
+            with self.subTest(blank=blank):
+                os.environ.pop("OTEL_INJECTOR_LOG_LEVEL", None)
+                output = self.run_script_at_level(blank)
+                self.assertNotIn("is not a level", output)
+                self.assertNotIn('"level": "debug"', output)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,30 @@
+# One of 'breaking', 'deprecation', 'new_component', 'enhancement', 'bug_fix'.
+change_type: bug_fix
+
+# A single word describing the area of concern (e.g. distro, pyproto, exporter,
+# resource-detectors, deps, ci, release, docs).
+component: distro
+
+# A brief description of the change. Surround your text with quotes ("") if it
+# needs to start with a backtick (`).
+note: Accept any standard level name in ``OTEL_INJECTOR_LOG_LEVEL``
+
+# One or more tracking issues related to the change. At least one is required.
+issues: [62]
+
+# (Optional) One or more lines of additional information to render under the
+# primary note. These lines are padded with 2 spaces and inserted directly into
+# the document. Use pipe (|) for multiline entries.
+subtext: |
+  ``OTEL_INJECTOR_LOG_LEVEL`` was compared against the exact lowercase string
+  ``debug``, so ``DEBUG``, ``Debug``, ``info`` and every other spelling behaved
+  exactly like leaving the variable unset: silence, with nothing to explain why.
+  The variable now resolves to a level, accepting ``critical``, ``error``,
+  ``warn``, ``warning``, ``info`` and ``debug`` case-insensitively and ignoring
+  surrounding whitespace. A value that is not a level falls back to ``warning``
+  and is reported once, naming the value and the supported levels, instead of
+  being silently treated as "off". No configured level can suppress the warning
+  a guard emits when it deactivates the distribution: a level above ``warning``
+  is clamped to it.
+
+change_logs: [user]

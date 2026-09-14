@@ -22,7 +22,6 @@
 # declaration above must stay on the first or second line: without it, Python 2.7 rejects the file's non-ASCII
 # characters at parse time.
 
-from __future__ import print_function
 import os
 from os.path import dirname
 import sys
@@ -42,13 +41,42 @@ double_instrumentation_check_excluded_packages = [
 debug_enabled = os.environ.get("OTEL_INJECTOR_LOG_LEVEL") == "debug"
 
 
+def _write_diagnostic_line(line):
+    # stderr is bound at module load, so a later replacement cannot silence the
+    # diagnostics. It can be None (daemons, pythonw) or already closed:
+    # print(file=None) falls through to sys.stdout, which corrupts any program
+    # whose stdout is its actual output (a CLI in a pipeline, a language server,
+    # anything speaking a protocol there), and a write to a closed descriptor
+    # raises, which would escape into interpreter start-up. A diagnostic that
+    # cannot be written must fail silently instead.
+    if stderr is None:
+        return
+    try:
+        stderr.write(line + "\n")
+        stderr.flush()
+    except Exception:
+        pass
+
+
 def _log_as_json_to_stderr(level, message):
-    log_body = '{{"level": "{}", "message": "{}", "logger_name": "dash0"'.format(level, message)
+    # Serialized with json.dumps rather than assembled with str.format. The
+    # message embeds foreign text: a command line (" ".join(sys.argv)), an
+    # exception message, a package version. A double quote or a backslash in it
+    # produced a line no JSON parser accepts, so a log pipeline that reads
+    # stderr as JSON dropped the record and lost the deactivation reason exactly
+    # when something had gone wrong. dumps also escapes newlines, which keeps
+    # one diagnostic to one line; exception text routinely spans several.
+    #
+    # json is imported here rather than at module scope because the injector
+    # prepends this file to every Python process on the host, and a process that
+    # emits no diagnostic should not pay for the import.
+    from json import dumps
+
+    log_body = {"level": level, "message": message, "logger_name": "dash0"}
     if level == "warn":
         # All warnings are Dash0 telemetry collection issues, hence adding the respective marker.
-        log_body += ', "dash0.monitoring.telemetry_collection_issue": true'
-    log_body += '}'
-    print(log_body, file=stderr)
+        log_body["dash0.monitoring.telemetry_collection_issue"] = True
+    _write_diagnostic_line(dumps(log_body))
 
 
 def _log_warn(message):

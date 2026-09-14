@@ -23,8 +23,12 @@
 # characters at parse time.
 
 from __future__ import print_function
-import os
-from os.path import dirname
+from os import environ, pathsep
+from os.path import dirname, join
+# sys is imported as a module, unlike everything else here, because
+# _log_cannot_auto_instrument_warning probes it with hasattr: sys.argv is absent
+# under some embedded interpreters, where "from sys import argv" would raise at
+# import time instead of letting the diagnostic degrade.
 import sys
 from sys import path, version, version_info, stderr
 
@@ -39,7 +43,7 @@ double_instrumentation_check_excluded_packages = [
     "opentelemetry-semantic-conventions",
 ]
 
-debug_enabled = os.environ.get("OTEL_INJECTOR_LOG_LEVEL") == "debug"
+debug_enabled = environ.get("OTEL_INJECTOR_LOG_LEVEL") == "debug"
 
 
 def _log_as_json_to_stderr(level, message):
@@ -61,7 +65,7 @@ def _log_debug(message):
 
 
 _log_debug("running sitecustomize.py")
-_log_debug("PYTHONPATH: {}".format(os.environ.get("PYTHONPATH")))
+_log_debug("PYTHONPATH: {}".format(environ.get("PYTHONPATH")))
 
 
 def _log_cannot_auto_instrument_warning(reason):
@@ -90,17 +94,17 @@ def _self_deactivate(current_site):
     # self-deactivation via environment variables.
 
     # Remove this site from PYTHONPATH so child processes do not attempt to load packages from us. PYTHONPATH entries
-    # are separated by os.pathsep (":" on POSIX).
-    current_pythonpath = os.environ.get("PYTHONPATH", "")
-    pythonpath_entries = [entry for entry in current_pythonpath.split(os.pathsep) if entry != current_site]
-    new_pythonpath = os.pathsep.join(pythonpath_entries)
+    # are separated by pathsep (":" on POSIX).
+    current_pythonpath = environ.get("PYTHONPATH", "")
+    pythonpath_entries = [entry for entry in current_pythonpath.split(pathsep) if entry != current_site]
+    new_pythonpath = pathsep.join(pythonpath_entries)
     _log_debug('setting PYTHONPATH in _self_deactivate: "{}"'.format(new_pythonpath))
-    os.environ["PYTHONPATH"] = new_pythonpath
+    environ["PYTHONPATH"] = new_pythonpath
 
     # The OpenTelemetry injector will also run for child processes, and it would bring back the PYTHONPATH modification
     # which we have just removed. Instruct it to not do that by disabling Python auto-instrumentation.
     _log_debug("clearing PYTHON_AUTO_INSTRUMENTATION_AGENT_PATH_PREFIX in _self_deactivate")
-    os.environ["PYTHON_AUTO_INSTRUMENTATION_AGENT_PATH_PREFIX"] = ""
+    environ["PYTHON_AUTO_INSTRUMENTATION_AGENT_PATH_PREFIX"] = ""
 
     if current_site in path:
         # Remove this site from the _current_ Python process, so our packages do not interfere with the application's
@@ -150,7 +154,7 @@ def _check_for_double_instrumentation(current_site):
 
 def _read_all_dependencies():
     """Read all flattened dependencies from all-dependencies.txt. Returns list of requirement strings or None on error."""
-    dependencies_file = os.path.join(dirname(__file__), "all-dependencies.txt")
+    dependencies_file = join(dirname(__file__), "all-dependencies.txt")
     requirements_to_check = []
     try:
         with open(dependencies_file, "r") as f:
@@ -226,11 +230,11 @@ def import_distro():
     # The Dash0 Python distribution requires DASH0_OTEL_COLLECTOR_BASE_URL to activate and derives its OTLP endpoint
     # from it. The Dash0 operator sets OTEL_EXPORTER_OTLP_ENDPOINT; bridge it here so the distribution activates
     # without requiring operator-side changes.
-    if not os.environ.get("DASH0_OTEL_COLLECTOR_BASE_URL"):
-        otlp_endpoint = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")
+    if not environ.get("DASH0_OTEL_COLLECTOR_BASE_URL"):
+        otlp_endpoint = environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")
         if otlp_endpoint:
             _log_debug("bridging OTEL_EXPORTER_OTLP_ENDPOINT to DASH0_OTEL_COLLECTOR_BASE_URL: {}".format(otlp_endpoint))
-            os.environ["DASH0_OTEL_COLLECTOR_BASE_URL"] = otlp_endpoint
+            environ["DASH0_OTEL_COLLECTOR_BASE_URL"] = otlp_endpoint
 
     _log_debug("checking for double instrumentation")
 

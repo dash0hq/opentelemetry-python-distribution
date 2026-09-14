@@ -286,4 +286,18 @@ def import_distro():
         _print_cannot_auto_instrument_message("dependency conflicts: {}".format(version_conflicts))
 
 
-import_distro()
+try:
+    import_distro()
+except Exception as unexpected_error:
+    # Report first: deactivation may fail for the same reason as the bootstrap.
+    # Neither a broken diagnostic stream nor failed cleanup may crash the application.
+    try:
+        _print_cannot_auto_instrument_message(
+            "unexpected error while deciding whether to auto-instrument: {}: {}".format(
+                type(unexpected_error).__name__, unexpected_error))
+    except Exception:
+        pass
+    try:
+        _self_deactivate(dirname(__file__))
+    except Exception:
+        pass

@@ -89,6 +89,59 @@ def create_dirname_side_effect(mock_site):
     return dirname_side_effect
 
 
+class TestUnexpectedBootstrapError(unittest.TestCase):
+    def run_bootstrap(self, stderr, site_path):
+        module, spec = load_sitecustomize_module()
+        current_site = os.path.dirname(SITECUSTOMIZE_PATH)
+        unrelated_site = "/application/site-packages"
+        site_path.extend([unrelated_site, current_site])
+        environment = {
+            "PYTHONPATH": os.pathsep.join([current_site, unrelated_site]),
+            "PYTHON_AUTO_INSTRUMENTATION_AGENT_PATH_PREFIX": "/injector",
+        }
+        with (
+            patch.dict(os.environ, environment, clear=True),
+            patch("sys.path", site_path),
+            patch("sys.stderr", stderr),
+            patch(
+                "importlib.metadata.distributions",
+                side_effect=RuntimeError("metadata unavailable"),
+            ),
+        ):
+            spec.loader.exec_module(module)
+            self.assertEqual(os.environ["PYTHONPATH"], unrelated_site)
+            self.assertEqual(
+                os.environ["PYTHON_AUTO_INSTRUMENTATION_AGENT_PATH_PREFIX"], ""
+            )
+        return current_site
+
+    def test_unexpected_check_error_reports_and_deactivates_for_children(self):
+        stderr = StringIO()
+        site_path = []
+        current_site = self.run_bootstrap(stderr, site_path)
+        self.assertIn("unexpected error", stderr.getvalue())
+        self.assertIn("RuntimeError: metadata unavailable", stderr.getvalue())
+        self.assertNotIn(current_site, site_path)
+        self.assertIn("/application/site-packages", site_path)
+
+    def test_reporting_failure_does_not_prevent_deactivation(self):
+        stderr = Mock()
+        stderr.write.side_effect = OSError("stderr closed")
+        site_path = []
+        current_site = self.run_bootstrap(stderr, site_path)
+        self.assertNotIn(current_site, site_path)
+        stderr.write.assert_called()
+
+    def test_deactivation_failure_still_reports_and_continues(self):
+        class UnremovablePath(list):
+            def remove(self, value):
+                raise RuntimeError("path removal failed")
+
+        stderr = StringIO()
+        self.run_bootstrap(stderr, UnremovablePath())
+        self.assertIn("RuntimeError: path removal failed", stderr.getvalue())
+
+
 class TestImportDistro(unittest.TestCase):
     """Test suite for the import_distro function in sitecustomize.py."""
 

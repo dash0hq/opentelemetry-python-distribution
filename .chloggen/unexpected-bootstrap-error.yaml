@@ -1,0 +1,4 @@
+change_type: bug_fix
+component: distro
+note: Report unexpected injector bootstrap errors and attempt self-deactivation so child processes do not repeat failed initialization.
+issues: [59]

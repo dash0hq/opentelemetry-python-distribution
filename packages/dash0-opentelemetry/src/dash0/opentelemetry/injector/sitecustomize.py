@@ -24,7 +24,7 @@
 
 from __future__ import print_function
 import os
-from os.path import dirname
+from os.path import dirname, normpath
 import sys
 from sys import path, version, version_info, stderr
 
@@ -91,8 +91,19 @@ def _self_deactivate(current_site):
 
     # Remove this site from PYTHONPATH so child processes do not attempt to load packages from us. PYTHONPATH entries
     # are separated by os.pathsep (":" on POSIX).
+    #
+    # Compared normalized, because current_site comes from dirname(__file__) and
+    # never carries a trailing separator, while the entry the injector actually
+    # put on PYTHONPATH is whatever string it was configured with. A textual
+    # comparison leaves "/agents/python/glibc/" in place when current_site is
+    # "/agents/python/glibc", so child processes keep loading the injected tree
+    # after this process decided not to.
+    normalized_site = normpath(current_site)
     current_pythonpath = os.environ.get("PYTHONPATH", "")
-    pythonpath_entries = [entry for entry in current_pythonpath.split(os.pathsep) if entry != current_site]
+    pythonpath_entries = [
+        entry for entry in current_pythonpath.split(os.pathsep)
+        if normpath(entry) != normalized_site
+    ]
     new_pythonpath = os.pathsep.join(pythonpath_entries)
     _log_debug('setting PYTHONPATH in _self_deactivate: "{}"'.format(new_pythonpath))
     os.environ["PYTHONPATH"] = new_pythonpath
@@ -102,10 +113,10 @@ def _self_deactivate(current_site):
     _log_debug("clearing PYTHON_AUTO_INSTRUMENTATION_AGENT_PATH_PREFIX in _self_deactivate")
     os.environ["PYTHON_AUTO_INSTRUMENTATION_AGENT_PATH_PREFIX"] = ""
 
-    if current_site in path:
-        # Remove this site from the _current_ Python process, so our packages do not interfere with the application's
-        # dependencies.
-        path.remove(current_site)
+    # Remove this site from the _current_ Python process, so our packages do not interfere with the application's
+    # dependencies. Filtered rather than removed: path.remove() drops only the
+    # first occurrence, so a site listed twice would stay half-active.
+    path[:] = [entry for entry in path if normpath(entry) != normalized_site]
 
 
 def _shipped_opentelemetry_package_names(current_site):
@@ -240,7 +251,14 @@ def import_distro():
     # Maintenance note: After checking for double instrumentation scenarios, we add back the current site, via
     # path.append(current_site). The remove here together with the append also deliberately reorders sys.path to put
     # this site last, before evaluating conflicting dependency versions. See below for more details on that.
-    path.remove(current_site)
+    # Compared normalized: the sys.path entry can differ textually from
+    # dirname(__file__) (a trailing separator in the injected PYTHONPATH value
+    # is the common case). An exact-match path.remove() raises ValueError there,
+    # which escapes import_distro() and prints a traceback on every process
+    # start, and leaving the site on sys.path would make the check below see
+    # this bundle's own packages and falsely self-deactivate.
+    normalized_site = normpath(current_site)
+    path[:] = [entry for entry in path if normpath(entry) != normalized_site]
 
     if _check_for_double_instrumentation(current_site):
         return

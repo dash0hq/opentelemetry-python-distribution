@@ -286,4 +286,26 @@ def import_distro():
         _print_cannot_auto_instrument_message("dependency conflicts: {}".format(version_conflicts))
 
 
-import_distro()
+# Every guard above exists to leave the process in a known state, and an
+# exception escaping import_distro() is the one path that leaves it in the state
+# they prevent: the site still on PYTHONPATH and the injector prefix still set,
+# so every child process that execs an interpreter retries the same failure,
+# while site.execsitecustomize() reports a single line that does not name this
+# distribution and carries no traceback unless PYTHONVERBOSE is set.
+try:
+    import_distro()
+except Exception as unexpected_error:
+    # Reporting comes first: if _self_deactivate is the step that fails, the
+    # operator still gets the diagnostic instead of a silent process.
+    try:
+        _print_cannot_auto_instrument_message(
+            "unexpected error while deciding whether to auto-instrument: {}: {}".format(
+                type(unexpected_error).__name__, unexpected_error))
+    except Exception:
+        pass
+    try:
+        # The reporting is itself guarded, because the step that failed can be
+        # the one that reports.
+        _self_deactivate(dirname(__file__))
+    except Exception:
+        pass

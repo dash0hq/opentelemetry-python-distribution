@@ -305,8 +305,7 @@ class TestImportDistro(unittest.TestCase):
         # Should report dependency conflicts
         self.assertIn(
             '"level": "warn", "message": "cannot auto-instrument Python process:'
-            " dependency conflicts: {'packaging': {'version_required': '>=20.0',"
-            " 'version_found': '19.0'}}",
+            " dependency conflicts: packaging (requires >=20.0, found 19.0)",
             output,
         )
 
@@ -592,6 +591,108 @@ class TestImportDistro(unittest.TestCase):
             " auto-instrumentation now",
             output,
         )
+
+
+class TestEveryDependencyConflictIsReported(unittest.TestCase):
+    """The operator has to fix all of them before the process will instrument,
+    so naming one per deployment costs a deployment per conflict."""
+
+    def setUp(self):
+        self.original_env = os.environ.copy()
+        self.original_sys_path = sys.path.copy()
+        for key in [
+            "OTEL_INJECTOR_LOG_LEVEL",
+            "OTEL_EXPORTER_OTLP_ENDPOINT",
+            "DASH0_OTEL_COLLECTOR_BASE_URL",
+        ]:
+            os.environ.pop(key, None)
+
+    def tearDown(self):
+        os.environ.clear()
+        os.environ.update(self.original_env)
+        sys.path = self.original_sys_path.copy()
+
+    def run_script_with_manifest(self, manifest, installed_versions):
+        """installed_versions maps a requirement name to the version installed,
+        or to None for a package that is not installed at all."""
+        mock_site = "/mock/site-packages"
+
+        def distribution_side_effect(name):
+            version = installed_versions.get(name)
+            if version is None:
+                raise importlib.metadata.PackageNotFoundError()
+            return Mock(version=version)
+
+        stream = StringIO()
+        with patch("sys.stderr", stream):
+            with patch("sys.version_info", (3, 10, 0, "final", 0)):
+                with patch(
+                    "os.path.dirname", side_effect=create_dirname_side_effect(mock_site)
+                ):
+                    with patch("sys.path", [mock_site]):
+                        with patch(
+                            "builtins.open",
+                            unittest.mock.mock_open(read_data=manifest),
+                        ):
+                            with patch(
+                                "importlib.metadata.distribution",
+                                side_effect=distribution_side_effect,
+                            ):
+                                module, spec = load_sitecustomize_module()
+                                spec.loader.exec_module(module)
+        return stream.getvalue()
+
+    def test_all_conflicting_packages_are_named(self):
+        output = self.run_script_with_manifest(
+            "alpha >=2.0\nbeta >=3.0\ngamma >=4.0\n",
+            {"alpha": "1.0", "beta": "2.0", "gamma": "3.0"},
+        )
+        self.assertIn("alpha (requires >=2.0, found 1.0)", output)
+        self.assertIn("beta (requires >=3.0, found 2.0)", output)
+        self.assertIn("gamma (requires >=4.0, found 3.0)", output)
+
+    def test_satisfied_requirements_are_not_named(self):
+        output = self.run_script_with_manifest(
+            "alpha >=2.0\nbeta >=3.0\n",
+            {"alpha": "2.5", "beta": "2.0"},
+        )
+        self.assertNotIn("alpha", output)
+        self.assertIn("beta (requires >=3.0, found 2.0)", output)
+
+    def test_a_missing_package_is_reported_alongside_a_conflict(self):
+        """A conflict earlier in the manifest used to stop the scan before the
+        missing package was ever looked up."""
+        output = self.run_script_with_manifest(
+            "alpha >=2.0\nbeta >=3.0\n",
+            {"alpha": "1.0", "beta": None},
+        )
+        self.assertIn("alpha (requires >=2.0, found 1.0)", output)
+        self.assertIn("beta (required package not found)", output)
+
+    def test_conflicts_are_rendered_in_a_stable_order(self):
+        """The same set of conflicts must always read the same way, whatever
+        order the manifest happens to list them in."""
+        forwards = self.run_script_with_manifest(
+            "alpha >=2.0\nbeta >=3.0\n", {"alpha": "1.0", "beta": "2.0"}
+        )
+        backwards = self.run_script_with_manifest(
+            "beta >=3.0\nalpha >=2.0\n", {"alpha": "1.0", "beta": "2.0"}
+        )
+        self.assertIn(
+            "alpha (requires >=2.0, found 1.0); beta (requires >=3.0, found 2.0)",
+            forwards,
+        )
+        self.assertIn(
+            "alpha (requires >=2.0, found 1.0); beta (requires >=3.0, found 2.0)",
+            backwards,
+        )
+
+    def test_the_message_is_not_a_python_dict_repr(self):
+        """The rendered text is what an operator reads, and a repr also put
+        single quotes inside the JSON message field."""
+        output = self.run_script_with_manifest("alpha >=2.0\n", {"alpha": "1.0"})
+        self.assertNotIn("'version_required'", output)
+        self.assertNotIn("'version_found'", output)
 
 
 if __name__ == "__main__":

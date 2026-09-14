@@ -32,6 +32,13 @@ If another OpenTelemetry distribution or the upstream SDK is already active in t
 The script validates the application's installed packages against the distribution's pinned dependency manifest (`all-dependencies.txt`).
 If a version conflict is detected that would prevent the distribution from loading correctly, it deactivates itself and logs the conflict.
 
+### Initialization failure
+
+The last guard runs after the others have passed.
+The script asks the OpenTelemetry auto-instrumentation not to swallow exceptions, so a failure in the distro, a configurator, or an instrumentor reaches the script instead of being logged and ignored.
+Without this, a failed start-up would leave the distribution on `sys.path` around an SDK that never initialized: no telemetry, no warning, and every child process repeating it.
+When initialization fails, the script logs the failing exception type and message and deactivates itself.
+
 ## Graceful self-deactivation
 
 When any safety check fails, the distribution:

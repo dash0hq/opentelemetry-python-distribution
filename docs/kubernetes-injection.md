@@ -36,7 +36,7 @@ If a version conflict is detected that would prevent the distribution from loadi
 
 When any safety check fails, the distribution:
 
-1. Sets `DASH0_DISABLE=true` in the current process environment.
+1. Removes its own directory from `sys.path` and from `PYTHONPATH`, comparing entries with `os.path.normpath` so a trailing separator on the injected entry still matches, and removing every occurrence rather than only the first.
 2. Sets the same variable for child processes (so they also skip instrumentation).
 3. Logs the reason for deactivation at `WARNING` level.
 4. Exits `sitecustomize.py` without activating instrumentation.

@@ -1,0 +1,30 @@
+# One of 'breaking', 'deprecation', 'new_component', 'enhancement', 'bug_fix'.
+change_type: bug_fix
+
+# A single word describing the area of concern (e.g. distro, pyproto, exporter,
+# resource-detectors, deps, ci, release, docs).
+component: distro
+
+# A brief description of the change. Surround your text with quotes ("") if it
+# needs to start with a backtick (`).
+note: Recognise the injected directory on ``sys.path`` and ``PYTHONPATH`` regardless of a trailing separator
+
+# One or more tracking issues related to the change. At least one is required.
+issues: [60]
+
+# (Optional) One or more lines of additional information to render under the
+# primary note. These lines are padded with 2 spaces and inserted directly into
+# the document. Use pipe (|) for multiline entries.
+subtext: |
+  ``sitecustomize.py`` compared the injected directory textually, while
+  ``dirname(__file__)`` never carries a trailing separator and the entry the
+  injector puts on ``PYTHONPATH`` is whatever string it was configured with.
+  When the two differed, the exact-match ``path.remove()`` raised ``ValueError``
+  and interpreter start-up printed a traceback instead of instrumenting, and
+  self-deactivation left the directory on ``PYTHONPATH`` so child processes kept
+  loading the injected tree. Both comparisons now normalise with
+  ``os.path.normpath``, and the entries are filtered rather than removed, so a
+  directory listed more than once is fully removed instead of staying
+  half-active.
+
+change_logs: [user]

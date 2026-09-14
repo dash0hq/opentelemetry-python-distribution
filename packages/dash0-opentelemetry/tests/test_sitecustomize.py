@@ -601,5 +601,119 @@ class TestImportDistro(unittest.TestCase):
         )
 
 
+class DistributionFromAnotherFinder:
+    """A distribution that does not come from the path-based finder.
+
+    importlib.metadata.Distribution defines locate_file() but not _path, which
+    belongs to the path-based implementation alone, so reading _path here raises
+    AttributeError the way it does for any other finder."""
+
+    def __init__(self, name, location, version="1.0.0"):
+        self.metadata = {"Name": name}
+        self.version = version
+        self._location = location
+
+    def locate_file(self, path):
+        return self._location
+
+
+class TestOffendingPackagesAreReportedViaThePublicApi(unittest.TestCase):
+    """The deactivation message has to be built from API a Distribution is
+    guaranteed to have, and has to say enough to act on."""
+
+    def setUp(self):
+        self.original_env = os.environ.copy()
+        self.original_sys_path = sys.path.copy()
+        for key in [
+            "OTEL_INJECTOR_LOG_LEVEL",
+            "OTEL_EXPORTER_OTLP_ENDPOINT",
+            "DASH0_OTEL_COLLECTOR_BASE_URL",
+        ]:
+            os.environ.pop(key, None)
+
+    def tearDown(self):
+        os.environ.clear()
+        os.environ.update(self.original_env)
+        sys.path = self.original_sys_path.copy()
+
+    def run_script_with_application_distribution(self, app_distribution):
+        mock_site = "/mock/site-packages"
+        shipped = [
+            make_dist(
+                "opentelemetry-sdk",
+                "/mock/site-packages/opentelemetry_sdk-1.44.0.dist-info",
+                version="1.44.0",
+            ),
+            make_dist(
+                "opentelemetry-instrumentation",
+                "/mock/site-packages/opentelemetry_instrumentation-0.65b0.dist-info",
+                version="0.65b0",
+            ),
+        ]
+
+        stream = StringIO()
+        with patch("sys.stderr", stream):
+            with patch("sys.version_info", (3, 10, 0, "final", 0)):
+                with patch(
+                    "os.path.dirname", side_effect=create_dirname_side_effect(mock_site)
+                ):
+                    with patch("sys.path", [mock_site]):
+                        with patch(
+                            "importlib.metadata.distributions",
+                            side_effect=create_distributions_side_effect(
+                                shipped, [app_distribution]
+                            ),
+                        ):
+                            module, spec = load_sitecustomize_module()
+                            spec.loader.exec_module(module)
+        return stream.getvalue()
+
+    def test_a_distribution_from_another_finder_is_still_reported(self):
+        """Reading the private _path raised AttributeError for any finder other
+        than the path-based one."""
+        output = self.run_script_with_application_distribution(
+            DistributionFromAnotherFinder(
+                "opentelemetry-sdk", "/app/site-packages", version="1.0.0"
+            )
+        )
+        self.assertIn("already instrumented", output)
+        self.assertIn("opentelemetry-sdk 1.0.0 (/app/site-packages)", output)
+
+    def test_the_report_names_the_package_and_its_version(self):
+        """A bare .dist-info path left the operator to work out which package
+        to remove."""
+        output = self.run_script_with_application_distribution(
+            make_dist(
+                "opentelemetry-instrumentation",
+                "/app/site-packages/opentelemetry_instrumentation-0.60b0.dist-info",
+                version="0.60b0",
+            )
+        )
+        self.assertIn(
+            "opentelemetry-instrumentation 0.60b0 (/app/site-packages)", output
+        )
+
+
+class TestDiagnosticHelperNaming(unittest.TestCase):
+    """The helper logs a warning, it does not print, and the repository's
+    convention is that a name describes precisely what the function does."""
+
+    def test_the_warning_helper_is_named_for_what_it_does(self):
+        mock_site = "/mock/site-packages"
+        with patch("sys.stderr", new_callable=StringIO):
+            with patch("sys.version_info", (2, 7, 0, "final", 0)):
+                with patch("sys.version", "2.7.0"):
+                    with patch(
+                        "os.path.dirname",
+                        side_effect=create_dirname_side_effect(mock_site),
+                    ):
+                        with patch("sys.path", [mock_site]):
+                            module, spec = load_sitecustomize_module()
+                            spec.loader.exec_module(module)
+
+        self.assertTrue(hasattr(module, "_log_cannot_auto_instrument_warning"))
+        self.assertFalse(hasattr(module, "_print_cannot_auto_instrument_message"))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -27,7 +27,7 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Sync docs to the Dash0 website
-        uses: dash0hq/sync-docs-action@3fbe55fed800da21ee24d6b6dba1a86435f61565  # v0.4.0
+        uses: dash0hq/sync-docs-action@1dc3817bec558ec22265a321177e58fb64a9324c  # v0.5.0
         with:
           dry-run: ${{ github.event_name == 'pull_request' || inputs.dry-run }}
           target-repository: ${{ secrets.SYNC_DOCUMENTATION_TARGET_REPOSITORY }}

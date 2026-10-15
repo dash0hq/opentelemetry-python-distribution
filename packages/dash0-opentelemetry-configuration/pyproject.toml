@@ -1,0 +1,29 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "dash0-opentelemetry-configuration"
+dynamic = ["version"]
+description = "OpenTelemetry Python declarative configuration (experimental), vendored for the Dash0 distribution"
+readme = "README.rst"
+license = "Apache-2.0"
+requires-python = ">=3.10"
+dependencies = [
+  "opentelemetry-api == 1.44.0",
+  "opentelemetry-sdk == 1.44.0",
+  "pyyaml >= 5.4",
+  "jsonschema >= 4.0",
+]
+
+[tool.hatch.version]
+path = "src/opentelemetry/_configuration/version/__init__.py"
+
+[tool.hatch.build.targets.sdist]
+include = ["/src"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/opentelemetry"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

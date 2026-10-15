@@ -311,6 +311,10 @@ jobs:
             file_prefix: dash0_opentelemetry_exporter_otlp_pyproto_grpc
             environment: pypi-dash0-opentelemetry-exporter-otlp-pyproto-grpc
             url: https://pypi.org/project/dash0-opentelemetry-exporter-otlp-pyproto-grpc/
+          - package: dash0-opentelemetry-configuration
+            file_prefix: dash0_opentelemetry_configuration
+            environment: pypi-dash0-opentelemetry-configuration
+            url: https://pypi.org/project/dash0-opentelemetry-configuration/
     runs-on: ubuntu-latest
     environment:
       name: ${{ matrix.environment }}

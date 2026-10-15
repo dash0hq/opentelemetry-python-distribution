@@ -18,6 +18,7 @@ extend-exclude = [
   "packages/dash0-opentelemetry-exporter-otlp-pyproto-common",
   "packages/dash0-opentelemetry-exporter-otlp-pyproto-http",
   "packages/dash0-opentelemetry-exporter-otlp-pyproto-grpc",
+  "packages/dash0-opentelemetry-configuration/src",
   "**/*_pb2*.py",
   "**/*_pypb2*.py",
 ]

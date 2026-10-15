@@ -1,16 +1,5 @@
 # Copyright The OpenTelemetry Authors
 # SPDX-License-Identifier: Apache-2.0
 
-from opentelemetry._configuration import (
-    ConfigurationError,
-    OpenTelemetryConfiguration,
-    configure_sdk,
-    load_config_file,
-)
-
-__all__ = [
-    "ConfigurationError",
-    "OpenTelemetryConfiguration",
-    "configure_sdk",
-    "load_config_file",
-]
+from opentelemetry._configuration import *  # noqa: F403
+from opentelemetry._configuration import __all__  # noqa: F401

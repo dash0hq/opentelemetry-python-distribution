@@ -32,6 +32,17 @@ If another OpenTelemetry distribution or the upstream SDK is already active in t
 The script validates the application's installed packages against the distribution's pinned dependency manifest (`all-dependencies.txt`).
 If a version conflict is detected that would prevent the distribution from loading correctly, it deactivates itself and logs the conflict.
 
+### Last-resort guard
+
+Every guard above exists to leave the process in a known state.
+An unexpected error escaping the guards themselves is the one path that leaves the process in the state they prevent: the distribution still on `PYTHONPATH`, and the injector still set to re-add it to child processes.
+
+The script therefore wraps its whole decision in a last-resort handler.
+An unexpected error is logged with its exception type and message, naming the distribution, and the script then deactivates itself.
+Both steps are guarded independently, and the reporting runs first, so a failure inside deactivation cannot silence the diagnostic.
+
+Without this handler the only report is the single line `site.execsitecustomize()` prints, which does not name the distribution and carries no traceback unless `PYTHONVERBOSE` is set.
+
 ## Graceful self-deactivation
 
 When any safety check fails, the distribution:

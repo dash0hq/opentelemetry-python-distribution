@@ -1,0 +1,31 @@
+# One of 'breaking', 'deprecation', 'new_component', 'enhancement', 'bug_fix'.
+change_type: bug_fix
+
+# A single word describing the area of concern (e.g. distro, pyproto, exporter,
+# resource-detectors, deps, ci, release, docs).
+component: distro
+
+# A brief description of the change. Surround your text with quotes ("") if it
+# needs to start with a backtick (`).
+note: Contain an unexpected error in the injector bootstrap script instead of letting it escape interpreter start-up
+
+# One or more tracking issues related to the change. At least one is required.
+issues: [59]
+
+# (Optional) One or more lines of additional information to render under the
+# primary note. These lines are padded with 2 spaces and inserted directly into
+# the document. Use pipe (|) for multiline entries.
+subtext: |
+  ``sitecustomize.py`` now wraps its whole decision in a last-resort handler.
+  An exception escaping ``import_distro()`` previously left the process in
+  exactly the state the guards exist to prevent: the injected site still on
+  ``PYTHONPATH`` and the injector prefix still set, so every child process
+  retried the same failure, while the only report was the single line
+  ``site.execsitecustomize()`` prints, which does not name the distribution and
+  carries no traceback unless ``PYTHONVERBOSE`` is set. Such an error is now
+  reported with its exception type and message and the distribution
+  deactivates itself. Reporting runs before deactivating, and both steps are
+  guarded independently, so a failure inside deactivation cannot silence the
+  diagnostic.
+
+change_logs: [user]

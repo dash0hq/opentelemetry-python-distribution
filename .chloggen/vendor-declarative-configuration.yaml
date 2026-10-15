@@ -1,0 +1,45 @@
+# One of 'breaking', 'deprecation', 'new_component', 'enhancement', 'bug_fix'.
+change_type: new_component
+
+# A single word describing the area of concern (e.g. distro, pyproto, exporter,
+# resource-detectors, deps, ci, release, docs).
+component: configuration
+
+# A brief description of the change. Surround your text with quotes ("") if it
+# needs to start with a backtick (`).
+note: Ship declarative configuration (OTEL_CONFIG_FILE) support in the distribution
+
+# One or more tracking issues related to the change. At least one is required.
+issues: [5]
+
+# (Optional) One or more lines of additional information to render under the
+# primary note. These lines are padded with 2 spaces and inserted directly into
+# the document. Use pipe (|) for multiline entries.
+subtext: |
+  ``OTEL_CONFIG_FILE`` used to fail out of the box, because the SDK defers to
+  ``opentelemetry.configuration`` and that package was not installed. The
+  distribution now depends on ``dash0-opentelemetry-configuration``, vendored
+  from https://github.com/dash0hq/opentelemetry-python under a Dash0-owned
+  distribution name with the import path and entry points kept upstream-shaped,
+  the same arrangement the pyproto exporter packages use.
+
+  Upstream's package validates against the configuration JSON Schema with
+  ``jsonschema``, which brings ``attrs``, ``referencing``, ``jsonschema-specifications``
+  and the compiled ``rpds-py`` along with it. All four would land in the tree
+  the injector adds to an application's ``sys.path``, and ``rpds-py`` would make
+  that tree stop being pure Python. The vendored package instead compiles the
+  schema to plain Python source at build time with ``fastjsonschema``, so the
+  checked-in validator imports nothing but ``decimal``. Regenerate it with
+  ``scripts/generate_configuration_validator.py``.
+
+  ``pyyaml`` is the one remaining runtime dependency and is declared with no
+  version specifier on purpose. It is common in applications and has no
+  dependencies of its own, so an unbounded requirement keeps the injector from
+  self-deactivating for every application that pins a different version.
+  ``UNPINNED_BY_DESIGN`` in ``scripts/check_pinned_dependencies.py`` records
+  that decision and fails the build if a specifier is ever added.
+
+  Resource detectors still run only when the configuration file names them
+  under ``detection/development``, so issue #6 is unaffected by this change.
+
+change_logs: [user]

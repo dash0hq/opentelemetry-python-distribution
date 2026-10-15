@@ -44,6 +44,7 @@ name = "dash0-opentelemetry"
 source = { editable = "packages/dash0-opentelemetry" }
 dependencies = [
     { name = "asgiref" },
+    { name = "dash0-opentelemetry-configuration" },
     { name = "dash0-opentelemetry-exporter-otlp-pyproto-grpc" },
     { name = "dash0-opentelemetry-exporter-otlp-pyproto-http" },
     { name = "opentelemetry-api" },
@@ -107,6 +108,7 @@ dependencies = [
     { name = "opentelemetry-util-http" },
     { name = "packaging" },
     { name = "psutil" },
+    { name = "pyyaml" },
     { name = "typing-extensions" },
     { name = "wrapt" },
 ]
@@ -119,6 +121,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "asgiref", specifier = "==3.12.1" },
+    { name = "dash0-opentelemetry-configuration", editable = "packages/dash0-opentelemetry-configuration" },
     { name = "dash0-opentelemetry-exporter-otlp-pyproto-grpc", editable = "packages/dash0-opentelemetry-exporter-otlp-pyproto-grpc" },
     { name = "dash0-opentelemetry-exporter-otlp-pyproto-http", editable = "packages/dash0-opentelemetry-exporter-otlp-pyproto-http" },
     { name = "opentelemetry-api", specifier = "==1.44.0" },
@@ -182,6 +185,7 @@ requires-dist = [
     { name = "opentelemetry-util-http", specifier = "==0.65b0" },
     { name = "packaging", specifier = "==26.3" },
     { name = "psutil", specifier = "==7.2.2" },
+    { name = "pyyaml" },
     { name = "typing-extensions", specifier = "==4.16.0" },
     { name = "wrapt", specifier = "==1.17.3" },
 ]
@@ -202,7 +206,7 @@ dependencies = [
 requires-dist = [
     { name = "opentelemetry-api", specifier = "==1.44.0" },
     { name = "opentelemetry-sdk", specifier = "==1.44.0" },
-    { name = "pyyaml", specifier = ">=5.4" },
+    { name = "pyyaml" },
 ]
 
 [[package]]

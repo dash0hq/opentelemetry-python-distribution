@@ -8,7 +8,13 @@ exact version (``== X.Y.Z``). Two exemptions:
   by the workspace checkout, not by PyPI resolution;
 * optional-dependency entries whose package is already pinned exactly in the
   base dependencies (e.g. an extra that re-references the SDK to pull in one of
-  its extras).
+  its extras);
+* the names in ``UNPINNED_BY_DESIGN``, which must be declared with no version
+  specifier at all. A specifier makes the injector's conflict check
+  (``sitecustomize.py``) self-deactivate the distro whenever the application
+  pins a different version, so for a package that is both common in
+  applications and dependency-free, an unbounded requirement is the safer
+  choice. Each entry records why.
 
 Additionally, the pyproject file must spell out the distro's *entire* installed
 tree: every package the distro pulls in transitively (per ``uv export`` over
@@ -28,6 +34,14 @@ import tomllib
 
 ROOT = Path(__file__).resolve().parent.parent
 DISTRO_PYPROJECT = ROOT / "packages" / "dash0-opentelemetry" / "pyproject.toml"
+
+UNPINNED_BY_DESIGN = {
+    "pyyaml": (
+        "read by dash0-opentelemetry-configuration to parse OTEL_CONFIG_FILE; "
+        "pyyaml has no dependencies of its own and every release since 3.x "
+        "provides safe_load, so any version the application already has works"
+    ),
+}
 
 # name, optional [extras], remainder (version specifier); the environment
 # marker (after ';') is split off before matching.
@@ -108,12 +122,21 @@ def main():
     violations = []
 
     pinned_in_base = {}
+    unpinned_by_design = set()
     for requirement in project.get("dependencies", []):
         name, specifier = _parse(requirement)
         if name is None:
             violations.append(f"dependencies: cannot parse {requirement!r}")
         elif name in workspace_members:
             continue
+        elif name in UNPINNED_BY_DESIGN:
+            unpinned_by_design.add(name)
+            if specifier:
+                violations.append(
+                    f"dependencies: {requirement!r} carries a version "
+                    f"specifier, but {name} is unpinned by design "
+                    f"({UNPINNED_BY_DESIGN[name]})"
+                )
         elif _is_exact_pin(specifier):
             pinned_in_base[name] = specifier.removeprefix("==").strip()
         else:
@@ -130,6 +153,7 @@ def main():
             elif (
                 name in workspace_members
                 or name in pinned_in_base
+                or name in UNPINNED_BY_DESIGN
                 or _is_exact_pin(specifier)
             ):
                 continue
@@ -140,6 +164,8 @@ def main():
                 )
 
     for name, version in sorted(_distro_closure().items()):
+        if name in unpinned_by_design:
+            continue
         if name not in pinned_in_base:
             violations.append(
                 f"closure: {name} == {version} is pulled in transitively but "

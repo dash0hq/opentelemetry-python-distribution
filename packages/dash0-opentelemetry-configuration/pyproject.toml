@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "dash0-opentelemetry-configuration"
 dynamic = ["version"]
-description = "OpenTelemetry Python declarative configuration (experimental), vendored for the Dash0 distribution"
+description = "Declarative configuration for the Dash0 OpenTelemetry distribution"
 readme = "README.rst"
 license = "Apache-2.0"
 requires-python = ">=3.10"

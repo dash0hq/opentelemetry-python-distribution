@@ -18,19 +18,23 @@ issues: [5]
 subtext: |
   ``OTEL_CONFIG_FILE`` used to fail out of the box, because the SDK defers to
   ``opentelemetry.configuration`` and that package was not installed. The
-  distribution now depends on ``dash0-opentelemetry-configuration``, vendored
-  from https://github.com/dash0hq/opentelemetry-python under a Dash0-owned
-  distribution name with the import path and entry points kept upstream-shaped,
-  the same arrangement the pyproto exporter packages use.
+  distribution now depends on ``dash0-opentelemetry-configuration``.
 
-  Upstream's package validates against the configuration JSON Schema with
-  ``jsonschema``, which brings ``attrs``, ``referencing``, ``jsonschema-specifications``
-  and the compiled ``rpds-py`` along with it. All four would land in the tree
-  the injector adds to an application's ``sys.path``, and ``rpds-py`` would make
-  that tree stop being pure Python. The vendored package instead compiles the
-  schema to plain Python source at build time with ``fastjsonschema``, so the
-  checked-in validator imports nothing but ``decimal``. Regenerate it with
-  ``scripts/generate_configuration_validator.py``.
+  The code is not maintained in this repository. It lives on the ``dash0``
+  branch of https://github.com/dash0hq/opentelemetry-python, which carries the
+  Dash0 patches as commits on top of an upstream commit so they can be rebased
+  when upstream moves. ``scripts/vendor_configuration.py`` is the only thing
+  that turns that branch into a package here, and a ``vendored-configuration``
+  job in CI fails if the checked-in tree is not what the script produces, so
+  the two cannot drift apart silently.
+
+  The patch on the fork replaces ``jsonschema`` validation with a validator
+  compiled from the schema by ``fastjsonschema`` at development time. That
+  keeps ``attrs``, ``referencing``, ``jsonschema-specifications`` and the
+  compiled ``rpds-py`` out of the tree the injector adds to an application's
+  ``sys.path``, which would otherwise stop being pure Python. The generated
+  validator imports ``decimal`` and nothing else, and the fork's test suite
+  checks it against ``jsonschema`` document by document.
 
   ``pyyaml`` is the one remaining runtime dependency and is declared with no
   version specifier on purpose. It is common in applications and has no

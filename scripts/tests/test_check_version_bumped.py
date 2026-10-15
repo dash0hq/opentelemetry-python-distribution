@@ -41,6 +41,7 @@ def test_workspace_discovery_matches_expected_packages():
         "dash0-opentelemetry-exporter-otlp-pyproto-common",
         "dash0-opentelemetry-exporter-otlp-pyproto-http",
         "dash0-opentelemetry-exporter-otlp-pyproto-grpc",
+        "dash0-opentelemetry-configuration",
     }
     for name, package_dir in cvb.workspace_packages().items():
         version = cvb.package_version(package_dir)

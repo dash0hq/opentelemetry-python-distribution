@@ -180,6 +180,7 @@ def test_expected_projects_derived_from_workspace():
             "dash0-opentelemetry-exporter-otlp-pyproto-common",
             "dash0-opentelemetry-exporter-otlp-pyproto-http",
             "dash0-opentelemetry-exporter-otlp-pyproto-grpc",
+            "dash0-opentelemetry-configuration",
         }
     )
 

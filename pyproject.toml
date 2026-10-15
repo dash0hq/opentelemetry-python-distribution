@@ -18,3 +18,4 @@ dash0-opentelemetry-pyproto = { workspace = true }
 dash0-opentelemetry-exporter-otlp-pyproto-common = { workspace = true }
 dash0-opentelemetry-exporter-otlp-pyproto-http = { workspace = true }
 dash0-opentelemetry-exporter-otlp-pyproto-grpc = { workspace = true }
+dash0-opentelemetry-configuration = { workspace = true }

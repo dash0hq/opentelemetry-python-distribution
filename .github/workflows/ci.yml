@@ -105,6 +105,18 @@ jobs:
           uv run --no-project --with pytest --python 3.13
           python -m pytest scripts/tests -v
 
+  vendored-configuration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      - name: Check the vendored configuration package matches the fork
+        run: >
+          uv run --no-project --python 3.13
+          python scripts/vendor_configuration.py --check
+
   build:
     runs-on: ubuntu-latest
     steps:

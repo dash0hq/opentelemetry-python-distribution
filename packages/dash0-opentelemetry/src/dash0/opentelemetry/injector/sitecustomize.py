@@ -22,7 +22,6 @@
 # declaration above must stay on the first or second line: without it, Python 2.7 rejects the file's non-ASCII
 # characters at parse time.
 
-from __future__ import print_function
 from os import environ, pathsep
 from os.path import dirname, join
 # sys is imported as a module, unlike everything else here, because
@@ -47,12 +46,28 @@ debug_enabled = environ.get("OTEL_INJECTOR_LOG_LEVEL") == "debug"
 
 
 def _log_as_json_to_stderr(level, message):
-    log_body = '{{"level": "{}", "message": "{}", "logger_name": "dash0"'.format(level, message)
+    from json import dumps
+
+    log_body = {"level": level, "message": message, "logger_name": "dash0"}
     if level == "warn":
         # All warnings are Dash0 telemetry collection issues, hence adding the respective marker.
-        log_body += ', "dash0.monitoring.telemetry_collection_issue": true'
-    log_body += '}'
-    print(log_body, file=stderr)
+        log_body["dash0.monitoring.telemetry_collection_issue"] = True
+    line = dumps(log_body)
+
+    # stderr is bound at module load, so a later replacement cannot silence the
+    # diagnostics. It can be None (daemons, pythonw) or already closed:
+    # print(file=None) falls through to sys.stdout, which corrupts any program
+    # whose stdout is its actual output (a CLI in a pipeline, a language server,
+    # anything speaking a protocol there), and a write to a closed descriptor
+    # raises, which would escape into interpreter start-up. A diagnostic that
+    # cannot be written must fail silently instead.
+    if stderr is None:
+        return
+    try:
+        stderr.write(line + "\n")
+        stderr.flush()
+    except Exception:
+        pass
 
 
 def _log_warn(message):

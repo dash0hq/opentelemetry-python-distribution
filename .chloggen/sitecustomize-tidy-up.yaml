@@ -1,0 +1,32 @@
+# One of 'breaking', 'deprecation', 'new_component', 'enhancement', 'bug_fix'.
+change_type: enhancement
+
+# A single word describing the area of concern (e.g. distro, pyproto, exporter,
+# resource-detectors, deps, ci, release, docs).
+component: distro
+
+# A brief description of the change. Surround your text with quotes ("") if it
+# needs to start with a backtick (`).
+note: Name the offending package and version when reporting double instrumentation
+
+# One or more tracking issues related to the change. At least one is required.
+issues: [68]
+
+# (Optional) One or more lines of additional information to render under the
+# primary note. These lines are padded with 2 spaces and inserted directly into
+# the document. Use pipe (|) for multiline entries.
+subtext: |
+  A double-instrumentation deactivation used to list a bare ``.dist-info``
+  path, leaving the operator to work out which package to remove. It now reads
+  ``opentelemetry-sdk 1.0.0 (/app/site-packages)``. The location comes from the
+  public ``Distribution.locate_file()`` rather than the private ``_path``,
+  which exists only on the path-based finder and raised ``AttributeError`` for
+  any other one.
+
+  Also tidies the script internally, with no behavior change: the helper that
+  logs the warning is named for what it does rather than for printing,
+  ``from x import y`` replaces the mixed ``import os`` usage per the project
+  convention, and the redundant ``IOError`` alias is dropped from an
+  ``except`` clause.
+
+change_logs: [user]

@@ -60,6 +60,13 @@ If a version conflict is detected that would prevent the distribution from loadi
 Every requirement in the manifest is checked, so one deactivation names every conflicting package rather than only the first.
 Each is reported as `name (requires <specifier>, found <version>)`, or `name (required package not found)`, sorted by name.
 
+### Initialization failure
+
+The last guard runs after the others have passed.
+The script asks the OpenTelemetry auto-instrumentation not to swallow exceptions, so a failure in the distro, a configurator, or an instrumentor reaches the script instead of being logged and ignored.
+Without this, a failed start-up would leave the distribution on `sys.path` around an SDK that never initialized: no telemetry, no warning, and every child process repeating it.
+When initialization fails, the script logs the failing exception type and message and deactivates itself.
+
 ### Last-resort guard
 
 Every guard above exists to leave the process in a known state.

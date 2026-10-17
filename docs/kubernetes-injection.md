@@ -43,6 +43,15 @@ The pure-Python (pyproto) exporters ship under Dash0-owned distribution names wh
 
 Finding any of the upstream names in the application counts as double instrumentation, because two distributions would then provide the same modules and register the same exporter entry points.
 
+### Unreadable input
+
+A problem in one foreign package, or in one line of the manifest, makes that one item impossible to verify.
+It never deactivates the distribution on its own.
+
+A distribution whose `METADATA` cannot be decoded is skipped, with a warning naming its install directory, and the scan continues with the rest.
+A manifest line that is not a parseable requirement is skipped with a warning, as is a package whose installed version cannot be read or does not parse as PEP 440.
+Only a manifest that cannot be read or decoded at all deactivates the distribution, because without it no conflict check is possible.
+
 ### Dependency conflict check
 
 The script validates the application's installed packages against the distribution's pinned dependency manifest (`all-dependencies.txt`).

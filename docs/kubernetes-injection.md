@@ -27,6 +27,10 @@ The script itself is written in valid Python 2.7+ syntax (including a PEP-263 en
 
 If another OpenTelemetry distribution or the upstream SDK is already active in the process (detected by checking for overlapping OpenTelemetry packages), the script deactivates itself to avoid double-instrumenting the application.
 
+Distribution names are compared in their PEP 503 canonical form: lowercased, with runs of `-`, `_` and `.` collapsed to a single `-`.
+Packages report the name they declared, verbatim, and non-canonical spellings are ordinary, so an application declaring `OpenTelemetry_SDK` is recognised as `opentelemetry-sdk`.
+The OpenTelemetry API layer is excluded from this check, because applications legitimately depend on it for manual instrumentation without being auto-instrumented.
+
 ### Dependency conflict check
 
 The script validates the application's installed packages against the distribution's pinned dependency manifest (`all-dependencies.txt`).

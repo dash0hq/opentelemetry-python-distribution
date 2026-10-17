@@ -37,6 +37,8 @@ minimum_python_minor_version = 10
 # Packages of the OpenTelemetry API layer. Applications legitimately depend on them for manual instrumentation
 # without being auto-instrumented, so finding them in the application does not indicate double instrumentation.
 # (Version conflicts with them are still caught by the dependency conflict check.)
+# Spelled in PEP 503 canonical form, because that is what every name is
+# normalized to before it is compared against this list.
 double_instrumentation_check_excluded_packages = [
     "opentelemetry-api",
     "opentelemetry-semantic-conventions",
@@ -179,6 +181,22 @@ def _self_deactivate(current_site):
     path[:] = [entry for entry in path if normpath(entry) != normalized_site]
 
 
+def _normalized_package_name(name):
+    # PEP 503: runs of "-", "_" and "." collapse to a single "-", lowercased.
+    # importlib.metadata normalizes the name a distribution is looked up *by*,
+    # but distributions() reports the Name each package declared, verbatim, and
+    # non-canonical spellings are ordinary in the wild (PyYAML,
+    # typing_extensions, ruamel.yaml). Lowercasing alone therefore does not make
+    # two spellings of the same distribution compare equal.
+    #
+    # re is imported here rather than at module scope: the injector prepends this
+    # file to every Python process on the host, and re is not loaded at that
+    # point on any supported interpreter. Both callers import importlib.metadata,
+    # which pulls in re itself, so by the time this runs the import is free.
+    from re import sub as re_sub
+    return re_sub(r"[-_.]+", "-", name).lower()
+
+
 def _shipped_opentelemetry_package_names(current_site):
     # The OpenTelemetry packages this distribution ships: the injected tree at current_site is exactly the pinned
     # dependency closure of dash0-opentelemetry (see its pyproject.toml), so enumerate the packages installed
@@ -191,7 +209,7 @@ def _shipped_opentelemetry_package_names(current_site):
         name = dist.metadata["Name"]
         if name is None:
             continue
-        name = name.lower()
+        name = _normalized_package_name(name)
         if name in double_instrumentation_check_excluded_packages:
             continue
         if name.startswith(("opentelemetry-", "dash0-")):
@@ -205,7 +223,7 @@ def _check_for_double_instrumentation(current_site):
     offending_packages = []
     for dist in importlib.metadata.distributions():
         name = dist.metadata["Name"]
-        if name is not None and name.lower() in packages_we_ship:
+        if name is not None and _normalized_package_name(name) in packages_we_ship:
             # The operator reading the deactivation message has to find and
             # remove this package, so name it with its version and its install
             # directory rather than only a .dist-info path. locate_file("") is

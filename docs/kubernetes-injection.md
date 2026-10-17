@@ -36,9 +36,9 @@ If a version conflict is detected that would prevent the distribution from loadi
 
 When any safety check fails, the distribution:
 
-1. Sets `DASH0_DISABLE=true` in the current process environment.
+1. Removes its own directory from `sys.path` and from `PYTHONPATH`, comparing entries with `os.path.normpath` so a trailing separator on the injected entry still matches, and removing every occurrence rather than only the first.
 2. Sets the same variable for child processes (so they also skip instrumentation).
-3. Logs the reason for deactivation at `WARNING` level.
+3. Logs the reason for deactivation at `WARNING` level, as a single line holding one JSON object, written only to stderr.
 4. Exits `sitecustomize.py` without activating instrumentation.
 
 The application continues running normally, unmodified.
@@ -50,6 +50,24 @@ When running via injection, the `sitecustomize.py` also bridges the environment:
 - If `OTEL_EXPORTER_OTLP_ENDPOINT` is not set but `DASH0_OTEL_COLLECTOR_BASE_URL` is set, the script copies the value to `OTEL_EXPORTER_OTLP_ENDPOINT` before the OpenTelemetry SDK initializes.
 
 This allows the operator to pass a single `DASH0_OTEL_COLLECTOR_BASE_URL` environment variable without needing to know which specific `OTEL_*` variables to set.
+
+## Diagnostic output
+
+`sitecustomize.py` writes its own diagnostics to stderr as one JSON object per line, under the logger name `dash0`.
+Warnings also carry `dash0.monitoring.telemetry_collection_issue`, because a guard that deactivates the distribution is a telemetry collection issue.
+
+`OTEL_INJECTOR_LOG_LEVEL` selects how much it writes.
+It takes a level name, matched case-insensitively and with surrounding whitespace ignored.
+
+| Value | Effect |
+|---|---|
+| unset, or empty | Warnings only. This is the default. |
+| `debug` | Every step the script takes, plus warnings. |
+| `info`, `warn`, `warning`, `error`, `critical` | Warnings only. |
+| anything else | Warnings only, plus one warning naming the value and listing the supported levels. |
+
+No value suppresses warnings.
+A warning is the only report an operator gets when a guard deactivates the distribution, so a level above `warning` is accepted and clamped to it rather than honored literally.
 
 ## Kubernetes pod UID detection
 

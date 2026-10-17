@@ -6,10 +6,12 @@ every test loads it from its packaged location and executes it under mocks.
 
 import importlib.metadata
 import importlib.util
+import json
 import os
 import sys
 import unittest
 from io import StringIO
+from os.path import dirname as real_dirname
 from unittest.mock import MagicMock, Mock, patch
 
 # Pre-load the vendored packaging replacement into sys.modules: the tests
@@ -51,11 +53,17 @@ def mocked_opentelemetry_modules():
     }
 
 
-def make_dist(name, dist_path):
-    """Build a mock importlib.metadata distribution."""
+def make_dist(name, dist_path, version="1.0.0"):
+    """Build a mock importlib.metadata distribution.
+
+    locate_file("") reports the directory the distribution is installed in,
+    which is what the real Distribution API returns and what the script names
+    in its deactivation message. real_dirname is used rather than os.path
+    .dirname because several tests patch the latter."""
     dist = Mock()
     dist.metadata = {"Name": name}
-    dist._path = dist_path
+    dist.version = version
+    dist.locate_file = Mock(return_value=real_dirname(dist_path))
     return dist
 
 
@@ -419,11 +427,11 @@ class TestImportDistro(unittest.TestCase):
             " The application has OpenTelemetry dependencies which indicate that"
             " it is already instrumented. The following problematic dependencies"
             " have been found:"
-            " /app/site-packages/opentelemetry_sdk-1.0.0.dist-info. Skipping the"
+            " opentelemetry-sdk 1.0.0 (/app/site-packages). Skipping the"
             " Dash0 Python auto-instrumentation to avoid double instrumentation.",
             output,
         )
-        self.assertIn("/app/site-packages/opentelemetry_sdk-1.0.0.dist-info", output)
+        self.assertIn("opentelemetry-sdk 1.0.0 (/app/site-packages)", output)
         # Verify self-deactivation happened
         self.assertEqual(
             os.environ.get("PYTHON_AUTO_INSTRUMENTATION_AGENT_PATH_PREFIX"), ""
@@ -475,9 +483,9 @@ class TestImportDistro(unittest.TestCase):
             " have been found:",
             output,
         )
-        self.assertIn("/app/site-packages/opentelemetry_sdk-1.0.0.dist-info", output)
+        self.assertIn("opentelemetry-sdk 1.0.0 (/app/site-packages)", output)
         self.assertIn(
-            "/app/site-packages/opentelemetry_instrumentation-1.0.0.dist-info", output
+            "opentelemetry-instrumentation 1.0.0 (/app/site-packages)", output
         )
 
     @patch("sys.stderr", new_callable=StringIO)
@@ -592,6 +600,444 @@ class TestImportDistro(unittest.TestCase):
             " auto-instrumentation now",
             output,
         )
+
+
+class DistributionFromAnotherFinder:
+    """A distribution that does not come from the path-based finder.
+
+    importlib.metadata.Distribution defines locate_file() but not _path, which
+    belongs to the path-based implementation alone, so reading _path here raises
+    AttributeError the way it does for any other finder."""
+
+    def __init__(self, name, location, version="1.0.0"):
+        self.metadata = {"Name": name}
+        self.version = version
+        self._location = location
+
+    def locate_file(self, path):
+        return self._location
+
+
+class TestOffendingPackagesAreReportedViaThePublicApi(unittest.TestCase):
+    """The deactivation message has to be built from API a Distribution is
+    guaranteed to have, and has to say enough to act on."""
+
+    def setUp(self):
+        self.original_env = os.environ.copy()
+        self.original_sys_path = sys.path.copy()
+        for key in [
+            "OTEL_INJECTOR_LOG_LEVEL",
+            "OTEL_EXPORTER_OTLP_ENDPOINT",
+            "DASH0_OTEL_COLLECTOR_BASE_URL",
+        ]:
+            os.environ.pop(key, None)
+
+    def tearDown(self):
+        os.environ.clear()
+        os.environ.update(self.original_env)
+        sys.path = self.original_sys_path.copy()
+
+    def run_script_with_application_distribution(self, app_distribution):
+        mock_site = "/mock/site-packages"
+        shipped = [
+            make_dist(
+                "opentelemetry-sdk",
+                "/mock/site-packages/opentelemetry_sdk-1.44.0.dist-info",
+                version="1.44.0",
+            ),
+            make_dist(
+                "opentelemetry-instrumentation",
+                "/mock/site-packages/opentelemetry_instrumentation-0.65b0.dist-info",
+                version="0.65b0",
+            ),
+        ]
+
+        stream = StringIO()
+        with patch("sys.stderr", stream):
+            with patch("sys.version_info", (3, 10, 0, "final", 0)):
+                with patch(
+                    "os.path.dirname", side_effect=create_dirname_side_effect(mock_site)
+                ):
+                    with patch("sys.path", [mock_site]):
+                        with patch(
+                            "importlib.metadata.distributions",
+                            side_effect=create_distributions_side_effect(
+                                shipped, [app_distribution]
+                            ),
+                        ):
+                            module, spec = load_sitecustomize_module()
+                            spec.loader.exec_module(module)
+        return stream.getvalue()
+
+    def test_a_distribution_from_another_finder_is_still_reported(self):
+        """Reading the private _path raised AttributeError for any finder other
+        than the path-based one."""
+        output = self.run_script_with_application_distribution(
+            DistributionFromAnotherFinder(
+                "opentelemetry-sdk", "/app/site-packages", version="1.0.0"
+            )
+        )
+        self.assertIn("already instrumented", output)
+        self.assertIn("opentelemetry-sdk 1.0.0 (/app/site-packages)", output)
+
+    def test_the_report_names_the_package_and_its_version(self):
+        """A bare .dist-info path left the operator to work out which package
+        to remove."""
+        output = self.run_script_with_application_distribution(
+            make_dist(
+                "opentelemetry-instrumentation",
+                "/app/site-packages/opentelemetry_instrumentation-0.60b0.dist-info",
+                version="0.60b0",
+            )
+        )
+        self.assertIn(
+            "opentelemetry-instrumentation 0.60b0 (/app/site-packages)", output
+        )
+
+
+class TestDiagnosticHelperNaming(unittest.TestCase):
+    """The helper logs a warning, it does not print, and the repository's
+    convention is that a name describes precisely what the function does."""
+
+    def test_the_warning_helper_is_named_for_what_it_does(self):
+        mock_site = "/mock/site-packages"
+        with patch("sys.stderr", new_callable=StringIO):
+            with patch("sys.version_info", (2, 7, 0, "final", 0)):
+                with patch("sys.version", "2.7.0"):
+                    with patch(
+                        "os.path.dirname",
+                        side_effect=create_dirname_side_effect(mock_site),
+                    ):
+                        with patch("sys.path", [mock_site]):
+                            module, spec = load_sitecustomize_module()
+                            spec.loader.exec_module(module)
+
+        self.assertTrue(hasattr(module, "_log_cannot_auto_instrument_warning"))
+        self.assertFalse(hasattr(module, "_print_cannot_auto_instrument_message"))
+
+
+class TestDiagnosticRecords(unittest.TestCase):
+    """Every diagnostic is one line, one JSON object, written only to stderr.
+
+    The messages embed foreign text: a command line, an exception message, a
+    package version. None of it may be able to break the record."""
+
+    def setUp(self):
+        self.original_env = os.environ.copy()
+        self.original_sys_path = sys.path.copy()
+        for key in [
+            "OTEL_INJECTOR_LOG_LEVEL",
+            "OTEL_EXPORTER_OTLP_ENDPOINT",
+            "DASH0_OTEL_COLLECTOR_BASE_URL",
+        ]:
+            os.environ.pop(key, None)
+
+    def tearDown(self):
+        os.environ.clear()
+        os.environ.update(self.original_env)
+        sys.path = self.original_sys_path.copy()
+
+    def run_script_rejecting_python_version(self, argv=None, stream=None):
+        """Run the script through the version gate, which emits exactly one
+        warning, embedding " ".join(sys.argv) in it."""
+        mock_site = "/mock/site-packages"
+        stream = StringIO() if stream is None else stream
+        argv = ["python", "app.py"] if argv is None else argv
+
+        with patch("sys.stderr", stream):
+            with patch("sys.argv", argv):
+                with patch("sys.version_info", (3, 9, 0, "final", 0)):
+                    with patch("sys.version", "3.9.0"):
+                        with patch(
+                            "os.path.dirname",
+                            side_effect=create_dirname_side_effect(mock_site),
+                        ):
+                            with patch("sys.path", [mock_site]):
+                                module, spec = load_sitecustomize_module()
+                                spec.loader.exec_module(module)
+        return stream
+
+    def parsed_records(self, text):
+        """Every non-empty line must be a JSON object on its own."""
+        records = []
+        for line in text.splitlines():
+            if not line.strip():
+                continue
+            records.append(json.loads(line))
+        return records
+
+    def test_quotes_and_backslashes_in_the_message_stay_parseable(self):
+        """An everyday command line carries both: python -c 'print("hi")'."""
+        argv = ["python", "-c", 'print("hi")', "--path", "C:\\tmp"]
+        output = self.run_script_rejecting_python_version(argv=argv).getvalue()
+
+        records = self.parsed_records(output)
+        self.assertEqual(len(records), 1)
+        self.assertIn('python -c print("hi") --path C:\\tmp', records[0]["message"])
+
+    def test_a_multi_line_message_stays_one_record(self):
+        """Exception text routinely spans several lines, and a JSON-per-line
+        consumer would see one unparsable fragment followed by more."""
+        mock_site = "/mock/site-packages"
+        modules = mocked_opentelemetry_modules()
+        auto_instrumentation = modules["opentelemetry.instrumentation"]
+        auto_instrumentation.auto_instrumentation.initialize.side_effect = ValueError(
+            "first line\nsecond line\nthird line"
+        )
+
+        stream = StringIO()
+        with patch("sys.stderr", stream):
+            with patch("sys.version_info", (3, 10, 0, "final", 0)):
+                with patch(
+                    "os.path.dirname", side_effect=create_dirname_side_effect(mock_site)
+                ):
+                    with patch("sys.path", [mock_site]):
+                        with patch(
+                            "builtins.open",
+                            unittest.mock.mock_open(read_data="packaging >=20.0\n"),
+                        ):
+                            with patch("importlib.metadata.distribution") as mock_dist:
+                                mock_dist.return_value = Mock(version="26.3")
+                                with patch.dict("sys.modules", modules):
+                                    module, spec = load_sitecustomize_module()
+                                    spec.loader.exec_module(module)
+
+        output = stream.getvalue()
+        records = self.parsed_records(output)
+        self.assertEqual(len(records), 1)
+        self.assertIn("first line\nsecond line\nthird line", records[0]["message"])
+
+    def test_warnings_carry_the_telemetry_collection_issue_marker(self):
+        """A guard that deactivates the distribution is a collection issue."""
+        output = self.run_script_rejecting_python_version().getvalue()
+        record = self.parsed_records(output)[0]
+        self.assertEqual(record["level"], "warn")
+        self.assertEqual(record["logger_name"], "dash0")
+        self.assertTrue(record["dash0.monitoring.telemetry_collection_issue"])
+
+    def test_debug_records_do_not_carry_the_marker(self):
+        """Debug output describes normal progress, not a collection issue."""
+        os.environ["OTEL_INJECTOR_LOG_LEVEL"] = "debug"
+        output = self.run_script_rejecting_python_version().getvalue()
+        debug_records = [
+            r for r in self.parsed_records(output) if r["level"] == "debug"
+        ]
+        self.assertTrue(debug_records)
+        for record in debug_records:
+            self.assertNotIn("dash0.monitoring.telemetry_collection_issue", record)
+
+    def test_nothing_is_written_to_stdout_when_stderr_is_none(self):
+        """sys.stderr is None under pythonw and in daemonized processes, and
+        print(file=None) falls through to stdout, corrupting any program whose
+        stdout is its actual output."""
+        mock_site = "/mock/site-packages"
+        captured_stdout = StringIO()
+
+        with patch("sys.stderr", None):
+            with patch("sys.stdout", captured_stdout):
+                with patch("sys.version_info", (3, 9, 0, "final", 0)):
+                    with patch("sys.version", "3.9.0"):
+                        with patch(
+                            "os.path.dirname",
+                            side_effect=create_dirname_side_effect(mock_site),
+                        ):
+                            with patch("sys.path", [mock_site]):
+                                module, spec = load_sitecustomize_module()
+                                spec.loader.exec_module(module)
+
+        self.assertEqual(captured_stdout.getvalue(), "")
+
+    def test_a_closed_stderr_does_not_raise(self):
+        """A write to a closed descriptor would otherwise escape into
+        interpreter start-up."""
+        closed_stream = StringIO()
+        closed_stream.close()
+        try:
+            self.run_script_rejecting_python_version(stream=closed_stream)
+        except Exception as error:
+            self.fail(f"writing a diagnostic to a closed stderr raised {error!r}")
+
+
+class TestInjectorLogLevel(unittest.TestCase):
+    """OTEL_INJECTOR_LOG_LEVEL names a level, so every standard level name has
+    to be accepted, and a value that is not one must say so rather than read as
+    "off"."""
+
+    def setUp(self):
+        self.original_env = os.environ.copy()
+        self.original_sys_path = sys.path.copy()
+        for key in [
+            "OTEL_INJECTOR_LOG_LEVEL",
+            "OTEL_EXPORTER_OTLP_ENDPOINT",
+            "DASH0_OTEL_COLLECTOR_BASE_URL",
+        ]:
+            os.environ.pop(key, None)
+
+    def tearDown(self):
+        os.environ.clear()
+        os.environ.update(self.original_env)
+        sys.path = self.original_sys_path.copy()
+
+    def run_script_at_level(self, level):
+        """Run the script through the version gate, which emits one warning and
+        nothing else, so the stderr text shows exactly which levels survive."""
+        if level is not None:
+            os.environ["OTEL_INJECTOR_LOG_LEVEL"] = level
+        mock_site = "/mock/site-packages"
+
+        stream = StringIO()
+        with patch("sys.stderr", stream):
+            with patch("sys.version_info", (3, 9, 0, "final", 0)):
+                with patch("sys.version", "3.9.0"):
+                    with patch(
+                        "os.path.dirname",
+                        side_effect=create_dirname_side_effect(mock_site),
+                    ):
+                        with patch("sys.path", [mock_site]):
+                            module, spec = load_sitecustomize_module()
+                            spec.loader.exec_module(module)
+        return stream.getvalue()
+
+    def test_debug_is_accepted_case_insensitively(self):
+        """DEBUG and Debug are the same level as debug. Only the exact
+        lowercase spelling used to do anything."""
+        for spelling in ["debug", "DEBUG", "Debug", "  debug  "]:
+            with self.subTest(spelling=spelling):
+                os.environ.pop("OTEL_INJECTOR_LOG_LEVEL", None)
+                output = self.run_script_at_level(spelling)
+                self.assertIn('"level": "debug"', output)
+
+    def test_levels_above_debug_suppress_debug_records(self):
+        """info and warning are real levels, not synonyms for debug."""
+        for level in ["info", "warning", "warn", "error", "critical"]:
+            with self.subTest(level=level):
+                os.environ.pop("OTEL_INJECTOR_LOG_LEVEL", None)
+                output = self.run_script_at_level(level)
+                self.assertNotIn('"level": "debug"', output)
+
+    def test_no_level_can_silence_a_deactivation_warning(self):
+        """The warning is the only report an operator gets when a guard
+        deactivates the distribution, so critical must not suppress it."""
+        for level in [None, "debug", "info", "warning", "error", "critical"]:
+            with self.subTest(level=level):
+                os.environ.pop("OTEL_INJECTOR_LOG_LEVEL", None)
+                output = self.run_script_at_level(level)
+                self.assertIn(
+                    "cannot auto-instrument Python process:"
+                    " unsupported Python version: 3.9.0",
+                    output,
+                )
+
+    def test_unrecognized_level_is_reported_and_falls_back_to_warning(self):
+        """Silence would leave the operator unable to tell a rejected value
+        from a working one that had nothing to say."""
+        output = self.run_script_at_level("verbose")
+        self.assertIn("OTEL_INJECTOR_LOG_LEVEL='verbose' is not a level", output)
+        self.assertIn("Supported levels:", output)
+        self.assertIn("critical, debug, error, info, warn, warning", output)
+        self.assertNotIn('"level": "debug"', output)
+
+    def test_blank_level_is_treated_as_unset(self):
+        """An empty or whitespace value is not a typo worth reporting."""
+        for blank in ["", "   "]:
+            with self.subTest(blank=blank):
+                os.environ.pop("OTEL_INJECTOR_LOG_LEVEL", None)
+                output = self.run_script_at_level(blank)
+                self.assertNotIn("is not a level", output)
+                self.assertNotIn('"level": "debug"', output)
+
+
+class TestInjectedPathIsComparedNormalized(unittest.TestCase):
+    """The injected entry is whatever string the injector was configured with,
+    while current_site comes from dirname(__file__) and never carries a
+    trailing separator. The two must still be recognised as the same site."""
+
+    def setUp(self):
+        self.original_env = os.environ.copy()
+        self.original_sys_path = sys.path.copy()
+        for key in [
+            "OTEL_INJECTOR_LOG_LEVEL",
+            "OTEL_EXPORTER_OTLP_ENDPOINT",
+            "DASH0_OTEL_COLLECTOR_BASE_URL",
+        ]:
+            os.environ.pop(key, None)
+
+    def tearDown(self):
+        os.environ.clear()
+        os.environ.update(self.original_env)
+        sys.path = self.original_sys_path.copy()
+
+    def test_trailing_separator_does_not_break_activation(self):
+        """An exact-match path.remove() raised ValueError here, which escaped
+        import_distro() and left the process with a traceback instead of
+        instrumentation."""
+        mock_site = "/mock/site-packages"
+        modules = mocked_opentelemetry_modules()
+        initialize = modules["opentelemetry.instrumentation"].auto_instrumentation
+
+        stream = StringIO()
+        with patch("sys.stderr", stream):
+            with patch("sys.version_info", (3, 10, 0, "final", 0)):
+                with patch(
+                    "os.path.dirname", side_effect=create_dirname_side_effect(mock_site)
+                ):
+                    with patch("sys.path", [mock_site + os.sep]):
+                        with patch(
+                            "builtins.open",
+                            unittest.mock.mock_open(read_data="packaging >=20.0\n"),
+                        ):
+                            with patch("importlib.metadata.distribution") as mock_dist:
+                                mock_dist.return_value = Mock(version="26.3")
+                                with patch.dict("sys.modules", modules):
+                                    module, spec = load_sitecustomize_module()
+                                    spec.loader.exec_module(module)
+
+        self.assertNotIn("cannot auto-instrument", stream.getvalue())
+        self.assertTrue(initialize.initialize.called)
+
+    def test_trailing_separator_entry_is_removed_from_pythonpath(self):
+        """Left in place, child processes keep loading the injected tree after
+        this process decided not to."""
+        mock_site = "/mock/site-packages"
+        os.environ["PYTHONPATH"] = os.pathsep.join(
+            ["/other/path", mock_site + os.sep, "/another/path"]
+        )
+
+        with patch("sys.stderr", new_callable=StringIO):
+            with patch("sys.version_info", (2, 7, 0, "final", 0)):
+                with patch("sys.version", "2.7.0"):
+                    with patch(
+                        "os.path.dirname",
+                        side_effect=create_dirname_side_effect(mock_site),
+                    ):
+                        with patch("sys.path", [mock_site + os.sep]):
+                            module, spec = load_sitecustomize_module()
+                            spec.loader.exec_module(module)
+
+        self.assertEqual(
+            os.environ.get("PYTHONPATH"),
+            os.pathsep.join(["/other/path", "/another/path"]),
+        )
+
+    def test_every_occurrence_is_removed_from_sys_path(self):
+        """path.remove() drops only the first match, so a site listed twice
+        stayed half-active after deactivation."""
+        mock_site = "/mock/site-packages"
+        os.environ["PYTHONPATH"] = mock_site
+        path_entries = [mock_site + os.sep, "/app/site-packages", mock_site]
+
+        with patch("sys.stderr", new_callable=StringIO):
+            with patch("sys.version_info", (2, 7, 0, "final", 0)):
+                with patch("sys.version", "2.7.0"):
+                    with patch(
+                        "os.path.dirname",
+                        side_effect=create_dirname_side_effect(mock_site),
+                    ):
+                        with patch("sys.path", path_entries):
+                            module, spec = load_sitecustomize_module()
+                            spec.loader.exec_module(module)
+
+        self.assertEqual(path_entries, ["/app/site-packages"])
 
 
 if __name__ == "__main__":

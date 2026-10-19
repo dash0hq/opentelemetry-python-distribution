@@ -38,6 +38,7 @@ ALLOWED_NON_OTEL_REQUIREMENTS = (
     "asgiref",
     "packaging",
     "psutil",
+    "pyyaml",
     "typing-extensions",
     "wrapt",
 )

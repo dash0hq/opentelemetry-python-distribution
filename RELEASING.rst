@@ -20,8 +20,8 @@ Each release publishes packages to **two channels**:
 
        https://dash0hq.github.io/opentelemetry-python-distribution/simple/
 
-   This index hosts all five workspace packages (including the vendored pyproto
-   exporters) and is the authoritative source for production consumers that
+   This index hosts all six workspace packages (including the vendored pyproto
+   exporters and the vendored declarative-configuration package) and is the authoritative source for production consumers that
    install with ``--require-hashes`` and ``--only-binary :all:``.
 
 ``.github/workflows/release.yml`` implements the pipeline; the index is
@@ -42,9 +42,10 @@ The three decisions that used to gate publishing are resolved:
    official packages, the distribution switches its dependencies over and the
    renamed copies are deprecated. The ``dash0-opentelemetry-*`` names are
    claimed on public PyPI via the first real release.
-2. **Scope.** All five workspace packages are published to the self-hosted
-   index. The main ``dash0-opentelemetry`` package and the four supporting
-   pyproto packages are also published to public PyPI.
+2. **Scope.** All six workspace packages are published to the self-hosted
+   index. The main ``dash0-opentelemetry`` package, the four supporting
+   pyproto packages and ``dash0-opentelemetry-configuration`` are also
+   published to public PyPI.
 3. **Versioning.** The distribution versions independently (semver). The
    vendored packages carry their upstream base version with ``.postN``
    increments for Dash0-side changes (e.g. ``1.44.0``, ``1.44.0.post1``).
@@ -149,21 +150,22 @@ Repository (an admin, before the first release):
    for Release`` workflow uses this token so that the tag push fires
    ``Release`` — events triggered by the default ``GITHUB_TOKEN`` do not start
    new workflow runs.
-7. Create **five** GitHub environments, one per published package, each with a
-   deployment policy restricted to tag refs matching ``v*``:
+7. Create **six** GitHub environments, one per published package, each with a
+   required reviewers protection rule naming the ``dash0hq/oss`` team:
 
    - ``pypi-dash0-opentelemetry``
    - ``pypi-dash0-opentelemetry-pyproto``
    - ``pypi-dash0-opentelemetry-exporter-otlp-pyproto-common``
    - ``pypi-dash0-opentelemetry-exporter-otlp-pyproto-http``
    - ``pypi-dash0-opentelemetry-exporter-otlp-pyproto-grpc``
+   - ``pypi-dash0-opentelemetry-configuration``
 
 PyPI trusted publishing (an org admin, once, before the first release):
 
 1. Create the Dash0 **organization account** on PyPI with enforced 2FA.
-2. For each of the five package names, add a **pending trusted publisher**
-   bound to ``release.yml``, the ``publish-pypi`` job, and the corresponding
-   ``pypi-<package-name>`` environment of this repository. Pending publishers
+2. For each of the six package names, add a **pending trusted publisher**
+   bound to ``release.yml`` and the corresponding ``pypi-<package-name>``
+   environment of this repository. Pending publishers
    claim names on first upload without pre-registering them. PyPI limits
    pending publishers to three per ``repo + workflow + environment``
    combination; because each package uses a distinct environment this
@@ -171,7 +173,7 @@ PyPI trusted publishing (an org admin, once, before the first release):
    — register in batches if needed, using the ``workflow_dispatch`` ``packages``
    input to publish each batch separately.
 3. Verify by pushing a pre-release tag (e.g. ``v0.3.0rc1``) and confirming
-   all five packages appear on PyPI under the Dash0 organization.
+   all six packages appear on PyPI under the Dash0 organization.
 4. When the PEP 755 namespace-grant process goes live on PyPI, apply for a
    restricted grant on the ``dash0`` prefix through the organization account.
 
@@ -216,7 +218,7 @@ repository to be public**; see the previous section until then)::
   defeats dependency confusion regardless of index priority; the defensive
   PyPI registration closes the squatting hole at lock-generation time.
 - ``--only-binary :all:`` closes the sdist build-dependency hole that
-  ``--require-hashes`` does not cover; all five packages ship universal
+  ``--require-hashes`` does not cover; all six packages ship universal
   wheels.
 - Renovate does not reliably pick up ``--extra-index-url`` from requirements
   files; configure the index explicitly (the ``/simple/`` suffix makes

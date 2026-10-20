@@ -3,7 +3,9 @@
 from pathlib import Path
 from sys import path as sys_path
 
-sys_path.insert(0, str(Path(__file__).resolve().parent.parent))
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+sys_path.insert(0, str(_REPO_ROOT / "scripts"))
+sys_path.insert(0, str(_REPO_ROOT / "packages" / "dash0-opentelemetry" / "src"))
 
 from dash0.opentelemetry.injector._packaging.requirements import (  # noqa: E402
     Requirement,

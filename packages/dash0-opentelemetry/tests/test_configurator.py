@@ -32,6 +32,8 @@ except ImportError:
 from opentelemetry import configuration as _configure_sdk_module
 from opentelemetry.configuration._resource import create_resource
 
+_POD_UID = "2edc9ee8-c9a2-4f3e-9f5e-1a2b3c4d5e6f"
+
 _MINIMAL_CONFIG = 'file_format: "1.0"\n'
 
 _CONFIG_WITH_SERVICE_NAME = """\
@@ -79,6 +81,16 @@ def test_detectors_injected_into_config_without_resource_section(tmp_path):
     assert attributes["telemetry.distro.name"] == "dash0-python"
     assert attributes["service.name"] == "server"
     assert attributes["service.instance.id"]
+
+
+def test_pod_uid_is_detected_under_declarative_configuration(monkeypatch, tmp_path):
+    monkeypatch.setattr(resource_module, "detect_kubernetes_pod_uid", lambda: _POD_UID)
+    config = load_config_file(str(_load(tmp_path, _MINIMAL_CONFIG)))
+
+    _add_dash0_resource_detectors(config, models)
+    attributes = create_resource(config.resource).attributes
+
+    assert attributes["k8s.pod.uid"] == _POD_UID
 
 
 def test_config_file_attributes_win_over_detected_ones(tmp_path):

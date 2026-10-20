@@ -99,7 +99,7 @@ class Dash0Configurator(_OTelSDKConfigurator):
             )
             return
 
-        if not self._configure_from_declarative_file():
+        if not self._configure_from_declarative_file(**kwargs):
             super()._configure(**kwargs)
 
         bootstrap_span_name = environ.get(DASH0_BOOTSTRAP_SPAN)
@@ -136,7 +136,7 @@ class Dash0Configurator(_OTelSDKConfigurator):
                     "dash0: not on main thread, SIGTERM/SIGINT flush not installed"
                 )
 
-    def _configure_from_declarative_file(self):
+    def _configure_from_declarative_file(self, **kwargs):
         """Apply declarative configuration with the Dash0 detector added.
 
         The base configurator handles ``OTEL_CONFIG_FILE`` too, but the
@@ -152,6 +152,11 @@ class Dash0Configurator(_OTelSDKConfigurator):
         ``False`` when the base configurator should run instead — either no
         config file is set, or the declarative machinery is not importable (the
         base class then reports its usual, more informative error).
+
+        ``kwargs`` are ignored, as they are by the base configurator on this
+        path, and reported the same way: the auto-instrumentation loader always
+        passes ``auto_instrumentation_version``, so without the warning the
+        resulting loss of ``telemetry.auto.version`` is silent.
         """
         config_file = environ.get(OTEL_CONFIG_FILE)
         if not config_file:
@@ -160,6 +165,12 @@ class Dash0Configurator(_OTelSDKConfigurator):
             load_config_file, configure_sdk, models = _load_declarative_machinery()
         except ImportError:
             return False
+        if kwargs:
+            _logger.warning(
+                "%s is set; ignoring configurator kwargs: %s",
+                OTEL_CONFIG_FILE,
+                sorted(kwargs),
+            )
         config = load_config_file(config_file)
         try:
             _add_dash0_resource_detectors(config, models)

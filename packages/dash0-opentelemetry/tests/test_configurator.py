@@ -5,6 +5,7 @@ SDK pulls in through the ``opentelemetry-sdk[file-configuration]`` extra, a dev
 dependency; they are skipped when it is not installed.
 """
 
+from importlib.metadata import entry_points
 from logging import WARNING
 
 import pytest
@@ -16,6 +17,7 @@ from dash0.opentelemetry._environment_variables import (
     OTEL_SERVICE_NAME,
 )
 from dash0.opentelemetry.configurator import (
+    _DASH0_RESOURCE_DETECTORS,
     Dash0Configurator,
     _add_dash0_resource_detectors,
     _load_declarative_machinery,
@@ -70,6 +72,26 @@ def _load(tmp_path, content):
     config_file = tmp_path / "otel-config.yaml"
     config_file.write_text(content, encoding="utf8")
     return config_file
+
+
+def test_injected_detector_names_match_the_registered_entry_points():
+    """Tie the hard-coded names to the entry points they are resolved through.
+
+    ``create_resource`` looks each name up in the
+    ``opentelemetry_resource_detector`` group and raises when one is missing,
+    so a name in ``_DASH0_RESOURCE_DETECTORS`` with no entry point breaks every
+    process that sets ``OTEL_CONFIG_FILE``. The other tests here go through
+    ``create_resource`` and so already fail in that case. The silent direction
+    is the reverse one: a detector registered in pyproject.toml but left out of
+    the tuple is never injected, and the rest of the suite stays green.
+    """
+    group = entry_points(group="opentelemetry_resource_detector")
+    registered = {point.name for point in group if point.name.startswith("dash0_")}
+
+    assert registered == set(_DASH0_RESOURCE_DETECTORS)
+    for name in _DASH0_RESOURCE_DETECTORS:
+        (point,) = (candidate for candidate in group if candidate.name == name)
+        point.load()
 
 
 def test_detectors_injected_into_config_without_resource_section(tmp_path):

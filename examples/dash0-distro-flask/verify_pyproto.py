@@ -28,16 +28,21 @@ AGENT_PACKAGES = (
 )
 # The non-opentelemetry-* packages the agent is allowed to pull in transitively,
 # as PEP 503-normalized names. Most are pure-Python support libraries of
-# opentelemetry-api/sdk/instrumentation; psutil (required by
-# opentelemetry-instrumentation-system-metrics) is the one exception - it carries
-# a compiled extension but is deliberately accepted so the curated set can ship
-# system metrics. Everything else - including grpcio and protobuf - is rejected.
+# opentelemetry-api/sdk/instrumentation; two ship compiled code and are
+# deliberately accepted. psutil (required by
+# opentelemetry-instrumentation-system-metrics) needs its extension, which is
+# what lets the curated set ship system metrics. pyyaml (required by
+# dash0-opentelemetry-configuration) bundles _yaml, a libyaml binding, but never
+# needs it: the configuration file loader only ever builds yaml.SafeLoader, and
+# pyyaml falls back to its pure-Python parser when _yaml fails to import.
+# Everything else - including grpcio and protobuf - is rejected.
 # Keep this list in sync when bumping the pinned opentelemetry versions in
 # dash0-opentelemetry's pyproject.toml.
 ALLOWED_NON_OTEL_REQUIREMENTS = (
     "asgiref",
     "packaging",
     "psutil",
+    "pyyaml",
     "typing-extensions",
     "wrapt",
 )

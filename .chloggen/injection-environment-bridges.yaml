@@ -1,0 +1,35 @@
+# One of 'breaking', 'deprecation', 'new_component', 'enhancement', 'bug_fix'.
+change_type: bug_fix
+
+# A single word describing the area of concern (e.g. distro, pyproto, exporter,
+# resource-detectors, deps, ci, release, docs).
+component: docs
+
+# A brief description of the change. Surround your text with quotes ("") if it
+# needs to start with a backtick (`).
+note: Describe both environment variable bridges, in the file each one is in, with the right direction
+
+# One or more tracking issues related to the change. At least one is required.
+issues: [70]
+
+# (Optional) One or more lines of additional information to render under the
+# primary note. These lines are padded with 2 spaces and inserted directly into
+# the document. Use pipe (|) for multiline entries.
+subtext: |
+  The injection page described a bridge that copies
+  ``DASH0_OTEL_COLLECTOR_BASE_URL`` into ``OTEL_EXPORTER_OTLP_ENDPOINT`` and
+  attributed it to ``sitecustomize.py``. That bridge is real, but it is in
+  ``distro.py``. The one in ``sitecustomize.py`` runs in the other direction:
+  it copies ``OTEL_EXPORTER_OTLP_ENDPOINT`` into
+  ``DASH0_OTEL_COLLECTOR_BASE_URL`` when the latter is unset.
+
+  The difference is not academic. Only the ``sitecustomize.py`` bridge runs
+  under injection before the distribution decides whether to activate, so a
+  reader of the old text would conclude that a deployment setting only
+  ``OTEL_EXPORTER_OTLP_ENDPOINT`` gets no telemetry, when that case is exactly
+  what the bridge exists to serve.
+
+  The page now describes both bridges, names the file each one is in, and the
+  heading says what the section is about rather than naming ``PYTHONPATH``.
+
+change_logs: [user]

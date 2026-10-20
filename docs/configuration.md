@@ -31,7 +31,7 @@ The following variables are relevant to the distribution's behavior:
 | `OTEL_RESOURCE_ATTRIBUTES` | — | Additional resource attributes. The distro reads this to detect whether `service.name` is already set, and appends its own detected attributes (`telemetry.distro.*`, `k8s.pod.uid`) to it. |
 | `OTEL_PYTHON_DISABLED_INSTRUMENTATIONS` | — | Comma-separated list of instrumentor entry-point names to skip (e.g. `flask,redis`). Honored by the auto-instrumentation loader. |
 | `OTEL_EXPERIMENTAL_RESOURCE_DETECTORS` | — | Comma-separated resource detector names, honored by the SDK's environment-based configuration. Declarative configuration (`OTEL_CONFIG_FILE`) never reads it. |
-| `OTEL_CONFIG_FILE` | — | Path to a declarative SDK configuration file, which takes over from every variable above that configures providers, exporters or the resource. The distro adds its own resource detectors to the parsed configuration so `telemetry.distro.*`, `k8s.pod.uid` and the service name fallback are not lost. |
+| `OTEL_CONFIG_FILE` | — | Path to a declarative SDK configuration file, which takes over from every variable above that configures providers, exporters or the resource. List the `dash0_*` detectors in the file to keep `telemetry.distro.*`, `k8s.pod.uid` and the `service.name` fallback. |
 
 ## Disabling the distribution
 

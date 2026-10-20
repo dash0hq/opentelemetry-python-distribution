@@ -67,23 +67,26 @@ In the default execution path (`opentelemetry-instrument`), the distro injects `
 The SDK's built-in `OTELResourceDetector` picks those up automatically.
 No explicit detector configuration is required.
 
-**Under `OTEL_CONFIG_FILE` you do not need this either.**
-The experimental declarative SDK configuration (`OTEL_CONFIG_FILE`) ignores `OTEL_RESOURCE_ATTRIBUTES` and `OTEL_SERVICE_NAME` by design, which would drop the distro's attributes.
-`Dash0Configurator` therefore adds all three detectors to the parsed configuration itself, so `telemetry.distro.*`, `k8s.pod.uid` and the service name fallback appear without any change to your config file.
-
-`OTEL_EXPERIMENTAL_RESOURCE_DETECTORS` has no effect in this path: declarative configuration runs only the detectors named under `resource.detection/development.detectors`, and never consults that variable.
-List a detector there to configure it explicitly:
+**When you do need it: `OTEL_CONFIG_FILE`.**
+The experimental declarative SDK configuration (`OTEL_CONFIG_FILE`) reads neither `OTEL_RESOURCE_ATTRIBUTES` nor `OTEL_SERVICE_NAME`, and it runs only the detectors your config file lists.
+The distro adds nothing to that file, so name the detectors yourself to keep `telemetry.distro.*`, `k8s.pod.uid` and the `service.name` fallback:
 
 ```yaml
 file_format: "1.0"
 resource:
   detection/development:
     detectors:
+      - dash0_distribution: {}
       - dash0_kubernetes: {}
+      - dash0_service_name: {}
 ```
 
-A detector you list yourself is not added a second time.
-Attributes you declare under `resource.attributes` still win over anything a detector reports.
+Each detector is independent, so list only the ones you want.
+Attributes you declare under `resource.attributes` take precedence over anything a detector reports.
+The Ruby and JavaScript distributions behave the same way, so one config file produces the same resource in all three languages.
+
+`OTEL_EXPERIMENTAL_RESOURCE_DETECTORS` has no effect here.
+Declarative configuration never reads it, so setting it alongside `OTEL_CONFIG_FILE` changes nothing.
 
 **What `OTEL_EXPERIMENTAL_RESOURCE_DETECTORS` does to the default detectors.**
 This applies to the `opentelemetry-instrument` path, not the `OTEL_CONFIG_FILE` one.

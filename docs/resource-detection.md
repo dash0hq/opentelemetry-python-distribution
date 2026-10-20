@@ -42,21 +42,47 @@ See the [OpenTelemetry Kubernetes attributes best practices](https://www.dash0.c
 
 ## Service name detector (`dash0_service_name`)
 
-Sets `service.name` when it has not been provided explicitly:
+Sets `service.name` and `service.version` when they have not been provided explicitly:
 
 | Attribute | Value |
 |---|---|
-| `service.name` | Derived from `OTEL_SERVICE_NAME`, `OTEL_RESOURCE_ATTRIBUTES`, or entrypoint basename |
+| `service.name` | Derived from `OTEL_SERVICE_NAME`, `OTEL_RESOURCE_ATTRIBUTES`, installed package metadata, `pyproject.toml`, or entrypoint basename |
+| `service.version` | The version of the installed distribution or the `pyproject.toml` that supplied the name |
 | `service.instance.id` | Stable per-process UUID |
 
 **Priority order for `service.name`:**
 
 1. `OTEL_SERVICE_NAME` environment variable.
 2. `service.name` key in `OTEL_RESOURCE_ATTRIBUTES`.
-3. Basename of the entrypoint script (e.g., `app.py` → `app`).
+3. `Name` from the installed distribution the process was started from.
+4. `[project].name` from the nearest `pyproject.toml`.
+5. Basename of the entrypoint script (e.g., `app.py` → `app`).
 
-The entrypoint fallback ensures that every process has a human-readable `service.name` even in injection scenarios where no explicit name has been configured.
-To disable this fallback, set `DASH0_AUTOMATIC_SERVICE_NAME=false`.
+Steps 3 and 4 also supply `service.version`, from `Version` and `[project].version`.
+Steps 1, 2 and 5 do not.
+No version is ever invented, because an absent version is more useful than a wrong one.
+
+**How the installed distribution is identified.**
+A process started by a console script is owned by the distribution that declared that script, which is the common shape of a `pip install .` deployment.
+A process started with `python -m package` is owned by the distribution that installed the top-level package, resolved through `importlib.metadata.packages_distributions`.
+A process started as a plain script, such as `python app.py`, is owned by no distribution and falls through to the next step.
+
+Reading installed metadata rather than source is what Java's Spring Boot starter does with `build-info.properties` and what the Node.js detector does with `package.json`.
+A deployed container often ships no `pyproject.toml`, and `.dist-info/METADATA` is derived from `pyproject.toml` at build time anyway.
+
+**How `pyproject.toml` is found.**
+The walk starts at the directory holding the entrypoint script, not the working directory, because `python path/to/app.py` can be run from anywhere.
+It stops at a `.git` directory or at the filesystem root, so a monorepo yields the project that owns the entrypoint rather than the one at the top of the checkout.
+This step needs `tomllib` and is therefore skipped on Python 3.10, which predates it.
+`tomli` is deliberately not taken as a dependency.
+
+A generic runner is identified as itself.
+Running `gunicorn myapp:app` reports `service.name=gunicorn`, because the console script belongs to `gunicorn`.
+That already was the behavior of the entrypoint basename, so it is not a change, but it now carries `gunicorn`'s version with it.
+Set `OTEL_SERVICE_NAME` for those deployments.
+
+The detection chain ensures that every process has a human-readable `service.name` even in injection scenarios where no explicit name has been configured.
+To disable all of it, set `DASH0_AUTOMATIC_SERVICE_NAME=false`.
 
 This detector also wraps the upstream `service` detector, so there is no need to list both `service` and `dash0_service_name` in `OTEL_EXPERIMENTAL_RESOURCE_DETECTORS`.
 

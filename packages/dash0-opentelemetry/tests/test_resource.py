@@ -40,6 +40,8 @@ def _clean_env(monkeypatch):
         monkeypatch.delenv(variable, raising=False)
     # No Kubernetes by default, so detection stays inert unless a test opts in.
     monkeypatch.setattr(resource_module, "running_in_kubernetes", lambda: False)
+    monkeypatch.setattr(resource_module, "distributions", list)
+    monkeypatch.setattr(resource_module, "packages_distributions", dict)
 
 
 def test_pod_uid_from_cgroup_v1(monkeypatch):

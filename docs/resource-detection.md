@@ -73,6 +73,10 @@ The distro adds nothing to that file, so name the detectors yourself to keep `te
 
 ```yaml
 file_format: "1.0"
+propagator:
+  composite:
+    - tracecontext: {}
+    - baggage: {}
 resource:
   detection/development:
     detectors:
@@ -80,6 +84,10 @@ resource:
       - dash0_kubernetes: {}
       - dash0_service_name: {}
 ```
+
+The `propagator` block is not optional.
+A configuration file without it gets an empty composite propagator, whose `extract` returns `None` rather than a root context.
+The instrumentation attaches that `None` as the current context, and every instrumented HTTP request then fails with `AttributeError: 'NoneType' object has no attribute 'get'`.
 
 Each detector is independent, so list only the ones you want.
 Attributes you declare under `resource.attributes` take precedence over anything a detector reports.

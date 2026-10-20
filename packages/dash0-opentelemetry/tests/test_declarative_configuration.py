@@ -43,6 +43,10 @@ _POD_UID = "2edc9ee8-c9a2-4f3e-9f5e-1a2b3c4d5e6f"
 
 _DOCUMENTED_EXAMPLE = """\
 file_format: "1.0"
+propagator:
+  composite:
+    - tracecontext: {}
+    - baggage: {}
 resource:
   detection/development:
     detectors:

@@ -1,0 +1,18 @@
+[project]
+name = "dash0-telemetry-demo"
+version = "1.0.0"
+requires-python = ">=3.10"
+dependencies = [
+  "flask==3.1.*",
+  "opentelemetry-api==1.44.0",
+]
+
+[project.scripts]
+storefront = "storefront:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = ["storefront"]

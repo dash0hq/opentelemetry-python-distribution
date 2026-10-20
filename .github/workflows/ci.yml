@@ -47,6 +47,11 @@ jobs:
           uv run --package dash0-opentelemetry
           --python ${{ matrix.python-version }}
           python -m pytest packages/dash0-opentelemetry/tests -v
+      - name: Run declarative-configuration unit tests
+        run: >
+          uv run --package dash0-opentelemetry
+          --python ${{ matrix.python-version }}
+          python -m pytest packages/dash0-opentelemetry-configuration/tests -v
 
   sitecustomize-python27:
     runs-on: ubuntu-latest

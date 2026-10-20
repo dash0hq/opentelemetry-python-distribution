@@ -61,7 +61,12 @@ def deployed() -> None:
     for manifest in sorted(MANIFESTS.glob("*.yaml")):
         kubectl("apply", "-f", str(manifest))
 
-    for deployment in ("collector", "app-environment", "app-declarative"):
+    for deployment in (
+        "collector",
+        "app-environment",
+        "app-declarative",
+        "app-installed",
+    ):
         kubectl(
             "-n",
             NAMESPACE,
@@ -83,8 +88,8 @@ def deployed() -> None:
     )
 
     wait_for(
-        "both applications to export spans",
-        lambda: len(read_exported("traces.jsonl")) >= 2,
+        "all three applications to export spans",
+        lambda: len(read_exported("traces.jsonl")) >= 3,
         timeout=180,
     )
 

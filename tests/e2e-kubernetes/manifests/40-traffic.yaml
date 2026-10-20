@@ -16,7 +16,7 @@ spec:
             - -c
             - |
               set -e
-              for target in app-environment app-declarative; do
+              for target in app-environment app-declarative app-installed; do
                 for i in 1 2 3 4 5; do
                   curl -sf "http://$target.dash0-e2e.svc.cluster.local:8080/order/book-$i" > /dev/null
                 done

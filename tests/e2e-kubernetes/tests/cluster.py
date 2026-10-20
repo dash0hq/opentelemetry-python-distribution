@@ -19,6 +19,7 @@ REPO_ROOT: Path = Path(__file__).resolve().parents[3]
 MANIFESTS: Path = Path(__file__).resolve().parents[1] / "manifests"
 
 APP_IMAGE: str = "dash0-e2e-app:test"
+INSTALLED_APP_IMAGE: str = "dash0-e2e-app-installed:test"
 INSTRUMENTATION_IMAGE: str = "dash0-e2e-instrumentation:test"
 
 
@@ -50,19 +51,29 @@ def create_cluster() -> None:
 
 
 def build_images() -> None:
-    """Build both images from this checkout."""
-    run(
-        [
-            "docker",
-            "build",
-            "-q",
-            "-t",
-            APP_IMAGE,
-            "-f",
-            str(MANIFESTS.parent / "app" / "Dockerfile"),
-            str(MANIFESTS.parent / "app"),
-        ]
-    )
+    """Build every image from this checkout.
+
+    The instrumentation image builds from the repository root, so the
+    distribution comes from the working copy rather than from an index. The two
+    application images build from their own directories and know nothing about
+    the distribution.
+    """
+    for image, directory in (
+        (APP_IMAGE, "app"),
+        (INSTALLED_APP_IMAGE, "app-installed"),
+    ):
+        run(
+            [
+                "docker",
+                "build",
+                "-q",
+                "-t",
+                image,
+                "-f",
+                str(MANIFESTS.parent / directory / "Dockerfile"),
+                str(MANIFESTS.parent / directory),
+            ]
+        )
     run(
         [
             "docker",
@@ -78,7 +89,7 @@ def build_images() -> None:
 
 
 def load_images() -> None:
-    for image in (APP_IMAGE, INSTRUMENTATION_IMAGE):
+    for image in (APP_IMAGE, INSTALLED_APP_IMAGE, INSTRUMENTATION_IMAGE):
         run([KIND, "load", "docker-image", "--name", CLUSTER, image])
 
 

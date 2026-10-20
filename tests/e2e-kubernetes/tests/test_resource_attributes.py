@@ -146,3 +146,24 @@ def test_both_paths_agree_on_service_instance_id_being_per_process(trace_records
 def test_metrics_and_logs_also_arrive(deployed):
     assert read_exported("metrics.jsonl"), "no metrics reached the collector"
     assert read_exported("logs.jsonl"), "no logs reached the collector"
+
+
+def test_an_installed_distribution_names_itself(trace_records):
+    """The same program, installed and started through its console script.
+
+    ``app-environment`` runs ``python /app/checkout.py`` and is named after the
+    file. ``app-installed`` runs the ``checkout`` console script of the
+    distribution ``checkout-service``, so it reports the distribution instead.
+    """
+    attributes = resource_for(trace_records, pod_uid("app=app-installed"))
+
+    assert attributes["service.name"] == "checkout-service"
+    assert attributes["service.version"] == "2.4.0"
+
+
+def test_a_plain_script_reports_no_service_version(trace_records):
+    """No distribution owns it, and a version is never invented."""
+    attributes = resource_for(trace_records, pod_uid("app=app-environment"))
+
+    assert attributes["service.name"] == "checkout"
+    assert "service.version" not in attributes

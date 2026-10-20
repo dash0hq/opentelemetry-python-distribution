@@ -54,7 +54,8 @@ Only a manifest that cannot be read or decoded at all deactivates the distributi
 
 ### Dependency conflict check
 
-The script validates the application's installed packages against the distribution's pinned dependency manifest (`all-dependencies.txt`).
+The script validates the application's installed packages against `all-dependencies.txt`, the dependency manifest shipped beside it.
+Each line states what the upstream packages in the injected tree declare they support, so an application carrying its own `wrapt` or `typing-extensions` only conflicts when that version is outside the range upstream itself allows.
 If a version conflict is detected that would prevent the distribution from loading correctly, it deactivates itself and logs the conflict.
 
 Every requirement in the manifest is checked, so one deactivation names every conflicting package rather than only the first.

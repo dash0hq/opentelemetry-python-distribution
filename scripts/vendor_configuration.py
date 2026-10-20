@@ -21,7 +21,12 @@ What it generates, all of which is therefore not to be edited by hand:
   ``opentelemetry.configuration`` by name, so the shims are what make
   ``OTEL_CONFIG_FILE`` work at all.
 * ``pyproject.toml``, whose ``opentelemetry-api`` and ``opentelemetry-sdk``
-  pins are copied from the distribution's own pins rather than written twice.
+  pins are copied from the fork's own package metadata. The vendored code uses
+  SDK internals that move between releases, so it is only correct against the
+  SDK the fork pins. When that disagrees with what this distribution pins, the
+  script stops rather than papering over it: rebase the ``dash0`` branch onto
+  the upstream tag matching the distribution's SDK, or move the distribution's
+  pin to match the fork.
 
 Two files inside the package are deliberately left alone. ``README.rst``
 describes the vendoring for a reader of this repository, and
@@ -109,18 +114,46 @@ def read_upstream() -> dict[str, str]:
     return fields
 
 
-def distro_pin(name: str) -> str:
-    """The exact version the distribution pins ``name`` to."""
-    project = loads(DISTRO_PYPROJECT.read_text())["project"]
+def exact_pin(pyproject: Path, name: str) -> str:
+    """The version ``pyproject`` pins ``name`` to with ``==``."""
+    project = loads(pyproject.read_text())["project"]
     for requirement in project["dependencies"]:
         match = search(rf"^{name}\s*==\s*(\S+)$", requirement.strip())
         if match is not None:
             return match.group(1)
-    raise SystemExit(f"{DISTRO_PYPROJECT} does not pin {name} exactly")
+    raise SystemExit(f"{pyproject} does not pin {name} exactly")
 
 
-def generate(source: Path, destination: Path) -> None:
+def agreed_pins(fork_pyproject: Path) -> dict[str, str]:
+    """The API and SDK versions, once the fork and the distribution agree.
+
+    The vendored code uses SDK internals that move between releases, so it is
+    only correct against the SDK its own package pins. Copying the
+    distribution's pin over the fork's would hide a disagreement until a
+    provider blew up at runtime, so a disagreement stops the vendoring instead:
+    rebase the ``dash0`` branch onto the upstream tag matching the SDK this
+    distribution pins, or move the distribution's pin to match the fork.
+    """
+    pins: dict[str, str] = {}
+    for name in ("opentelemetry-api", "opentelemetry-sdk"):
+        fork_version = exact_pin(fork_pyproject, name)
+        distro_version = exact_pin(DISTRO_PYPROJECT, name)
+        if fork_version != distro_version:
+            raise SystemExit(
+                f"the fork pins {name} == {fork_version} while "
+                f"{DISTRO_PYPROJECT.relative_to(REPO_ROOT)} pins "
+                f"{name} == {distro_version}; rebase the fork branch onto the "
+                f"upstream tag for {distro_version}, or change the "
+                f"distribution's pin"
+            )
+        pins[name] = fork_version
+    return pins
+
+
+def generate(source: Path, destination: Path, fork_pyproject: Path) -> None:
     """Write the whole generated part of the package into ``destination``."""
+    pins = agreed_pins(fork_pyproject)
+
     private = destination / "src" / "opentelemetry" / "_configuration"
     private.parent.mkdir(parents=True, exist_ok=True)
     copytree(source, private)
@@ -148,8 +181,8 @@ def generate(source: Path, destination: Path) -> None:
 
     (destination / "pyproject.toml").write_text(
         PYPROJECT_TEMPLATE.format(
-            api_version=distro_pin("opentelemetry-api"),
-            sdk_version=distro_pin("opentelemetry-sdk"),
+            api_version=pins["opentelemetry-api"],
+            sdk_version=pins["opentelemetry-sdk"],
         )
     )
 
@@ -187,8 +220,14 @@ def main() -> int:
             print(f"{fields['source']} does not exist at {commit}")
             return 1
 
+        fork_package = Path(fields["source"]).parts[0]
+        fork_pyproject = clone / fork_package / "pyproject.toml"
+        if not fork_pyproject.is_file():
+            print(f"{fork_package}/pyproject.toml does not exist at {commit}")
+            return 1
+
         staged = Path(scratch) / "staged"
-        generate(source, staged)
+        generate(source, staged, fork_pyproject)
 
         if arguments.check:
             differences = compare(staged, PACKAGE)

@@ -6,6 +6,8 @@ or the standalone ``opentelemetry-configuration`` package on SDK 1.44+); they
 are skipped when it is not installed.
 """
 
+from logging import WARNING
+
 import pytest
 from dash0.opentelemetry import resource as resource_module
 from dash0.opentelemetry._environment_variables import (
@@ -110,6 +112,22 @@ def test_detectors_already_listed_are_not_injected_twice(tmp_path):
 
 def test_configurator_skips_declarative_path_without_config_file():
     assert Dash0Configurator()._configure_from_declarative_file() is False
+
+
+def test_ignored_configurator_kwargs_are_reported(monkeypatch, tmp_path, caplog):
+    monkeypatch.setenv(OTEL_CONFIG_FILE, str(_load(tmp_path, _MINIMAL_CONFIG)))
+    monkeypatch.setattr(_configure_sdk_module, "configure_sdk", lambda config: None)
+
+    with caplog.at_level(WARNING):
+        assert (
+            Dash0Configurator()._configure_from_declarative_file(
+                auto_instrumentation_version="1.2.3"
+            )
+            is True
+        )
+
+    expected = "ignoring configurator kwargs: ['auto_instrumentation_version']"
+    assert expected in caplog.text
 
 
 def test_configurator_applies_declarative_config_with_detector(monkeypatch, tmp_path):

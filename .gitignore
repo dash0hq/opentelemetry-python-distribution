@@ -24,3 +24,5 @@ venv/
 .idea/
 .vscode/
 .DS_Store
+
+tests/e2e-kubernetes/uv.lock

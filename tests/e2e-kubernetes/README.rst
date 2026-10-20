@@ -30,6 +30,15 @@ which the distribution deactivates itself.
 the three ``dash0_*`` detectors. Running both against one collector is what lets
 the suite compare the two resources key by key.
 
+``app-installed`` runs the same program a third way. ``app-installed/`` carries
+a ``pyproject.toml`` declaring the distribution ``checkout-service`` 2.4.0 with
+a ``checkout`` console script, and the image installs it rather than copying a
+file. The deployment reports ``service.name=checkout-service`` and
+``service.version=2.4.0``, where ``app-environment`` running the identical
+program as a plain script reports ``service.name=checkout`` and no version.
+That pair is the proof for the package-metadata detection, and no unit test can
+make it, because it depends on how the process was really started.
+
 The propagator block is not optional
 ====================================
 
@@ -106,7 +115,10 @@ Layout
 Path                              Contents
 ================================  ============================================
 ``app/``                          The uninstrumented Flask application and its
-                                  image.
+                                  image, run as a plain script.
+``app-installed/``                The same application packaged as a
+                                  distribution and started through its console
+                                  script.
 ``instrumentation/Dockerfile``    Builds the injectable tree. Its build context
                                   is the repository root, so it installs the
                                   distribution from this checkout rather than

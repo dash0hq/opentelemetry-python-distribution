@@ -1,9 +1,8 @@
 """Declarative-configuration (OTEL_CONFIG_FILE) handling of Dash0Configurator.
 
-These tests need the declarative-configuration machinery (the
-``opentelemetry-sdk[file-configuration]`` extra on SDK 1.43, a dev dependency,
-or the standalone ``opentelemetry-configuration`` package on SDK 1.44+); they
-are skipped when it is not installed.
+These tests need the ``opentelemetry-configuration`` package, which the pinned
+SDK pulls in through the ``opentelemetry-sdk[file-configuration]`` extra, a dev
+dependency; they are skipped when it is not installed.
 """
 
 from logging import WARNING
@@ -30,12 +29,8 @@ except ImportError:
         allow_module_level=True,
     )
 
-try:
-    import opentelemetry.configuration as _configure_sdk_module
-    from opentelemetry.configuration._resource import create_resource
-except ImportError:
-    import opentelemetry.sdk._configuration._sdk as _configure_sdk_module
-    from opentelemetry.sdk._configuration._resource import create_resource
+from opentelemetry import configuration as _configure_sdk_module
+from opentelemetry.configuration._resource import create_resource
 
 _MINIMAL_CONFIG = 'file_format: "1.0"\n'
 
@@ -45,6 +40,14 @@ resource:
   attributes:
     - name: service.name
       value: from-file
+"""
+
+_CONFIG_WITH_DETECTOR = """\
+file_format: "1.0"
+resource:
+  detection/development:
+    detectors:
+      - dash0_kubernetes: {}
 """
 
 
@@ -89,14 +92,7 @@ def test_config_file_attributes_win_over_detected_ones(tmp_path):
 
 
 def test_detectors_already_listed_are_not_injected_twice(tmp_path):
-    config = load_config_file(str(_load(tmp_path, _MINIMAL_CONFIG)))
-    # Built programmatically rather than from YAML: on SDK 1.43 the loader
-    # rejects the spec's `detection/development` key (fixed in 1.44).
-    config.resource = models.Resource(
-        detection_development=models.ExperimentalResourceDetection(
-            detectors=[models.ExperimentalResourceDetector(dash0_kubernetes=None)]
-        )
-    )
+    config = load_config_file(str(_load(tmp_path, _CONFIG_WITH_DETECTOR)))
 
     _add_dash0_resource_detectors(config, models)
 

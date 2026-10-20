@@ -46,23 +46,18 @@ _DASH0_RESOURCE_DETECTORS = (
 def _load_declarative_machinery():
     """Return ``(load_config_file, configure_sdk, models)``.
 
-    SDK 1.44+ ships declarative configuration as the standalone
-    ``opentelemetry-configuration`` package; on SDK 1.43 it lives inside the
-    SDK, behind the ``file-configuration`` extra. Raises ``ImportError`` when
-    neither is available.
+    Declarative configuration lives in the standalone
+    ``opentelemetry-configuration`` package, which the SDK depends on only
+    through its ``file-configuration`` extra. Imported here rather than at
+    module level so a process that never sets ``OTEL_CONFIG_FILE`` does not pay
+    for it. Raises ``ImportError`` when the package is not installed.
     """
-    try:
-        from opentelemetry.configuration import (
-            configure_sdk,
-            load_config_file,
-            models,
-        )
-    except ImportError:
-        from opentelemetry.sdk._configuration import models
-        from opentelemetry.sdk._configuration._sdk import configure_sdk
-        from opentelemetry.sdk._configuration.file._loader import (
-            load_config_file,
-        )
+    from opentelemetry.configuration import (
+        configure_sdk,
+        load_config_file,
+        models,
+    )
+
     return load_config_file, configure_sdk, models
 
 

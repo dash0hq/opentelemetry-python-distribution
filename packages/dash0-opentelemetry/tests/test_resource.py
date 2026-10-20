@@ -1,4 +1,5 @@
 import os
+from importlib.util import find_spec
 
 import pytest
 from dash0.opentelemetry import resource as resource_module
@@ -13,12 +14,20 @@ from dash0.opentelemetry.resource import (
     Dash0ServiceNameResourceDetector,
     apply_detected_resource_attributes,
     detect_fallback_service_name,
+    detect_service_metadata,
+    distribution_of_running_program,
     pod_uid_from_cgroup_v1,
     pod_uid_from_cgroup_v2,
+    service_metadata_from_pyproject,
 )
 from dash0.opentelemetry.version import __version__
 
 _POD_UID = "2edc9ee8-c9a2-4f3e-9f5e-1a2b3c4d5e6f"
+
+_needs_tomllib = pytest.mark.skipif(
+    find_spec("tomllib") is None,
+    reason="reading pyproject.toml needs tomllib, which arrived in 3.11",
+)
 
 
 @pytest.fixture(autouse=True)
@@ -166,3 +175,155 @@ def test_service_name_detector_suppresses_fallback_for_resource_attributes(
     # the detector neither resurrects the value nor papers over it with the
     # entrypoint fallback.
     assert "service.name" not in attributes
+
+
+class _FakeEntryPoint:
+    def __init__(self, group, name):
+        self.group = group
+        self.name = name
+
+
+class _FakeDistribution:
+    def __init__(self, name, version, scripts=()):
+        self.metadata = {"Name": name, "Version": version}
+        self.entry_points = [
+            _FakeEntryPoint("console_scripts", script) for script in scripts
+        ]
+
+
+def test_a_console_script_names_the_distribution_that_declared_it(monkeypatch):
+    monkeypatch.setattr(resource_module.sys, "argv", ["/usr/local/bin/checkout"])
+    monkeypatch.setattr(
+        resource_module,
+        "distributions",
+        lambda: [_FakeDistribution("checkout-service", "2.4.0", ("checkout",))],
+    )
+
+    assert detect_service_metadata() == ("checkout-service", "2.4.0")
+
+
+def test_a_script_run_directly_claims_no_distribution(monkeypatch):
+    """A path ending in .py is not a console script, so the scan is skipped."""
+    monkeypatch.setattr(resource_module.sys, "argv", ["/opt/app/server.py"])
+    monkeypatch.setattr(
+        resource_module,
+        "distributions",
+        lambda: [_FakeDistribution("server", "1.0.0", ("server",))],
+    )
+    monkeypatch.setattr(resource_module, "packages_distributions", dict)
+
+    assert distribution_of_running_program() is None
+
+
+def test_python_dash_m_names_the_distribution_that_installed_the_package(monkeypatch):
+    monkeypatch.setattr(resource_module.sys, "argv", ["/opt/app/__main__.py"])
+    monkeypatch.setattr(
+        resource_module,
+        "packages_distributions",
+        lambda: {"checkout": ["checkout-service"]},
+    )
+    monkeypatch.setattr(
+        resource_module,
+        "distributions",
+        lambda: [_FakeDistribution("checkout_service", "3.1.0")],
+    )
+    main = type(resource_module.sys)("__main__")
+    main.__package__ = "checkout.cli"
+    monkeypatch.setitem(resource_module.sys.modules, "__main__", main)
+
+    assert detect_service_metadata() == ("checkout_service", "3.1.0")
+
+
+@_needs_tomllib
+def test_pyproject_supplies_the_name_when_nothing_is_installed(monkeypatch, tmp_path):
+    source = tmp_path / "src"
+    source.mkdir()
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "checkout-service"\nversion = "0.9.1"\n', encoding="utf8"
+    )
+    monkeypatch.setattr(resource_module.sys, "argv", [str(source / "app.py")])
+    monkeypatch.setattr(resource_module, "distributions", list)
+    monkeypatch.setattr(resource_module, "packages_distributions", dict)
+
+    assert service_metadata_from_pyproject() == ("checkout-service", "0.9.1")
+    assert detect_service_metadata() == ("checkout-service", "0.9.1")
+
+
+@_needs_tomllib
+def test_the_walk_up_stops_at_a_git_directory(monkeypatch, tmp_path):
+    """A monorepo must not hand the entrypoint the root project's name."""
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "the-monorepo"\n', encoding="utf8"
+    )
+    inner = tmp_path / "services" / "checkout"
+    inner.mkdir(parents=True)
+    (inner / ".git").mkdir()
+    monkeypatch.setattr(resource_module.sys, "argv", [str(inner / "app.py")])
+
+    assert service_metadata_from_pyproject() == (None, None)
+
+
+@_needs_tomllib
+def test_a_pyproject_without_a_project_table_is_ignored(monkeypatch, tmp_path):
+    (tmp_path / "pyproject.toml").write_text(
+        "[tool.ruff]\nline-length = 88\n", encoding="utf8"
+    )
+    monkeypatch.setattr(resource_module.sys, "argv", [str(tmp_path / "app.py")])
+    monkeypatch.setattr(resource_module, "distributions", list)
+    monkeypatch.setattr(resource_module, "packages_distributions", dict)
+
+    assert service_metadata_from_pyproject() == (None, None)
+    assert detect_service_metadata() == ("app", None)
+
+
+def test_a_version_is_never_invented(monkeypatch):
+    """Absent is better than wrong, so the entrypoint fallback carries none."""
+    monkeypatch.setattr(resource_module.sys, "argv", ["/opt/app/server.py"])
+    monkeypatch.setattr(resource_module, "distributions", list)
+    monkeypatch.setattr(resource_module, "packages_distributions", dict)
+
+    assert detect_service_metadata() == ("server", None)
+
+
+def test_apply_reports_the_detected_service_version(monkeypatch):
+    monkeypatch.setattr(resource_module.sys, "argv", ["/usr/local/bin/checkout"])
+    monkeypatch.setattr(
+        resource_module,
+        "distributions",
+        lambda: [_FakeDistribution("checkout-service", "2.4.0", ("checkout",))],
+    )
+
+    apply_detected_resource_attributes("9.9.9")
+
+    assert os.environ[OTEL_SERVICE_NAME] == "checkout-service"
+    assert "service.version=2.4.0" in os.environ[OTEL_RESOURCE_ATTRIBUTES]
+
+
+def test_an_explicit_service_name_suppresses_detection_entirely(monkeypatch):
+    monkeypatch.setattr(resource_module.sys, "argv", ["/usr/local/bin/checkout"])
+    monkeypatch.setattr(
+        resource_module,
+        "distributions",
+        lambda: [_FakeDistribution("checkout-service", "2.4.0", ("checkout",))],
+    )
+    monkeypatch.setenv(OTEL_SERVICE_NAME, "explicit")
+
+    apply_detected_resource_attributes("9.9.9")
+
+    assert os.environ[OTEL_SERVICE_NAME] == "explicit"
+    assert "service.version" not in os.environ[OTEL_RESOURCE_ATTRIBUTES]
+
+
+def test_the_declarative_detector_reports_name_and_version(monkeypatch):
+    monkeypatch.setattr(resource_module.sys, "argv", ["/usr/local/bin/checkout"])
+    monkeypatch.setattr(
+        resource_module,
+        "distributions",
+        lambda: [_FakeDistribution("checkout-service", "2.4.0", ("checkout",))],
+    )
+
+    attributes = Dash0ServiceNameResourceDetector().detect().attributes
+
+    assert attributes["service.name"] == "checkout-service"
+    assert attributes["service.version"] == "2.4.0"
+    assert attributes["service.instance.id"]

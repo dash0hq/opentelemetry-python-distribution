@@ -67,16 +67,25 @@ In the default execution path (`opentelemetry-instrument`), the distro injects `
 The SDK's built-in `OTELResourceDetector` picks those up automatically.
 No explicit detector configuration is required.
 
-**When you do need it: `OTEL_CONFIG_FILE`.**
-The experimental declarative SDK configuration (`OTEL_CONFIG_FILE`) ignores `OTEL_RESOURCE_ATTRIBUTES` and `OTEL_SERVICE_NAME` by design.
-In that case, reference the detectors explicitly in the config file, or via the environment variable:
+**Under `OTEL_CONFIG_FILE` you do not need this either.**
+The experimental declarative SDK configuration (`OTEL_CONFIG_FILE`) ignores `OTEL_RESOURCE_ATTRIBUTES` and `OTEL_SERVICE_NAME` by design, which would drop the distro's attributes.
+`Dash0Configurator` therefore adds all three detectors to the parsed configuration itself, so `telemetry.distro.*`, `k8s.pod.uid` and the service name fallback appear without any change to your config file.
 
-```bash
-export OTEL_EXPERIMENTAL_RESOURCE_DETECTORS=dash0_distribution,dash0_kubernetes,dash0_service_name
+`OTEL_EXPERIMENTAL_RESOURCE_DETECTORS` has no effect in this path: declarative configuration runs only the detectors named under `resource.detection/development.detectors`, and never consults that variable.
+List a detector there to configure it explicitly:
+
+```yaml
+file_format: "1.0"
+resource:
+  detection/development:
+    detectors:
+      - dash0_kubernetes: {}
 ```
 
-You must list all three if you want all three — none of the Dash0 detectors are included by default in the declarative config path.
+A detector you list yourself is not added a second time.
+Attributes you declare under `resource.attributes` still win over anything a detector reports.
 
 **What `OTEL_EXPERIMENTAL_RESOURCE_DETECTORS` does to the default detectors.**
+This applies to the `opentelemetry-instrument` path, not the `OTEL_CONFIG_FILE` one.
 The SDK always appends `service_instance` and `otel` (the `OTELResourceDetector`) to whatever you list.
 You do not need to add them yourself, and you cannot remove them by omitting them.

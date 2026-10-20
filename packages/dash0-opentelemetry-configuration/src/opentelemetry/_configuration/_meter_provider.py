@@ -26,12 +26,6 @@ from opentelemetry._configuration.models import (
     ExemplarFilter as ExemplarFilterConfig,
 )
 from opentelemetry._configuration.models import (
-    ExperimentalMeterConfig as MeterConfigConfig,
-)
-from opentelemetry._configuration.models import (
-    ExperimentalMeterConfigurator as MeterConfiguratorConfig,
-)
-from opentelemetry._configuration.models import (
     ExperimentalOtlpFileMetricExporter as ExperimentalOtlpFileMetricExporterConfig,
 )
 from opentelemetry._configuration.models import (
@@ -41,7 +35,6 @@ from opentelemetry._configuration.models import (
     ExporterDefaultHistogramAggregation,
     ExporterTemporalityPreference,
     InstrumentType,
-    OtlpHttpEncoding,
 )
 from opentelemetry._configuration.models import (
     MeterProvider as MeterProviderConfig,
@@ -83,10 +76,6 @@ from opentelemetry.sdk.metrics import (
     UpDownCounter,
     _Gauge,
 )
-from opentelemetry.sdk.metrics._internal import (
-    _MeterConfig,
-    _RuleBasedMeterConfigurator,
-)
 from opentelemetry.sdk.metrics.export import (
     AggregationTemporality,
     ConsoleMetricExporter,
@@ -105,7 +94,6 @@ from opentelemetry.sdk.metrics.view import (
     View,
 )
 from opentelemetry.sdk.resources import Resource
-from opentelemetry.sdk.util.instrumentation import _scope_name_matches_glob
 
 _logger = logging.getLogger(__name__)
 
@@ -162,7 +150,8 @@ def _map_temporality(
             ObservableGauge: AggregationTemporality.CUMULATIVE,
         }
     raise ConfigurationError(
-        f"Unsupported temporality preference '{pref}'. Supported values: cumulative, delta, low_memory."
+        f"Unsupported temporality preference '{pref}'. "
+        "Supported values: cumulative, delta, low_memory."
     )
 
 
@@ -175,9 +164,16 @@ def _map_histogram_aggregation(
     OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION.
     Default (None or explicit_bucket_histogram) → ExplicitBucketHistogramAggregation.
     """
-    if pref is None or pref == ExporterDefaultHistogramAggregation.explicit_bucket_histogram:
+    if (
+        pref is None
+        or pref
+        == ExporterDefaultHistogramAggregation.explicit_bucket_histogram
+    ):
         return {Histogram: ExplicitBucketHistogramAggregation()}
-    if pref == ExporterDefaultHistogramAggregation.base2_exponential_bucket_histogram:
+    if (
+        pref
+        == ExporterDefaultHistogramAggregation.base2_exponential_bucket_histogram
+    ):
         return {Histogram: ExponentialBucketHistogramAggregation()}
     raise ConfigurationError(
         f"Unsupported default histogram aggregation '{pref}'. "
@@ -203,11 +199,20 @@ def _create_aggregation(config: AggregationConfig) -> Aggregation:
     if config.base2_exponential_bucket_histogram is not None:
         kwargs = {}
         if config.base2_exponential_bucket_histogram.max_size is not None:
-            kwargs["max_size"] = config.base2_exponential_bucket_histogram.max_size
+            kwargs["max_size"] = (
+                config.base2_exponential_bucket_histogram.max_size
+            )
         if config.base2_exponential_bucket_histogram.max_scale is not None:
-            kwargs["max_scale"] = config.base2_exponential_bucket_histogram.max_scale
-        if config.base2_exponential_bucket_histogram.record_min_max is not None:
-            kwargs["record_min_max"] = config.base2_exponential_bucket_histogram.record_min_max
+            kwargs["max_scale"] = (
+                config.base2_exponential_bucket_histogram.max_scale
+            )
+        if (
+            config.base2_exponential_bucket_histogram.record_min_max
+            is not None
+        ):
+            kwargs["record_min_max"] = (
+                config.base2_exponential_bucket_histogram.record_min_max
+            )
         return ExponentialBucketHistogramAggregation(**kwargs)
     if config.last_value is not None:
         return LastValueAggregation()
@@ -229,13 +234,16 @@ def _create_view(config: ViewConfig) -> View:
     if selector.instrument_type is not None:
         instrument_type = _INSTRUMENT_TYPE_MAP.get(selector.instrument_type)
         if instrument_type is None:
-            raise ConfigurationError(f"Unknown instrument type: {selector.instrument_type!r}")
+            raise ConfigurationError(
+                f"Unknown instrument type: {selector.instrument_type!r}"
+            )
 
     attribute_keys: set[str] | None = None
     if stream.attribute_keys is not None:
         if stream.attribute_keys.excluded:
             _logger.warning(
-                "attribute_keys.excluded is not supported by the Python SDK View; the exclusion list will be ignored."
+                "attribute_keys.excluded is not supported by the Python SDK View; "
+                "the exclusion list will be ignored."
             )
         if stream.attribute_keys.included is not None:
             attribute_keys = set(stream.attribute_keys.included)
@@ -263,7 +271,9 @@ def _create_console_metric_exporter(
 ) -> MetricExporter:
     """Create a ConsoleMetricExporter from config."""
     preferred_temporality = _map_temporality(config.temporality_preference)
-    preferred_aggregation = _map_histogram_aggregation(config.default_histogram_aggregation)
+    preferred_aggregation = _map_histogram_aggregation(
+        config.default_histogram_aggregation
+    )
     return ConsoleMetricExporter(
         preferred_temporality=preferred_temporality,
         preferred_aggregation=preferred_aggregation,
@@ -274,64 +284,38 @@ def _create_otlp_http_metric_exporter(
     config: OtlpHttpMetricExporterConfig,
 ) -> MetricExporter:
     """Create an OTLP HTTP metric exporter from config."""
+    try:
+        # pylint: disable=import-outside-toplevel,no-name-in-module
+        from opentelemetry.exporter.otlp.proto.http import (  # type: ignore[import-untyped]  # noqa: PLC0415
+            Compression,
+        )
+        from opentelemetry.exporter.otlp.proto.http.metric_exporter import (  # type: ignore[import-untyped]  # noqa: PLC0415
+            OTLPMetricExporter,
+        )
+    except ImportError as exc:
+        raise MissingDependencyError(
+            package="opentelemetry-exporter-otlp-proto-http",
+            feature="otlp_http metric exporter",
+        ) from exc
+
+    compression = _map_compression(
+        config.compression, Compression, allow_deflate=True
+    )
     headers = _parse_headers(config.headers, config.headers_list)
     timeout = (config.timeout / 1000.0) if config.timeout is not None else None
     preferred_temporality = _map_temporality(config.temporality_preference)
-    preferred_aggregation = _map_histogram_aggregation(config.default_histogram_aggregation)
+    preferred_aggregation = _map_histogram_aggregation(
+        config.default_histogram_aggregation
+    )
 
-    match config.encoding:
-        case None | OtlpHttpEncoding.protobuf:
-            try:
-                # pylint: disable=import-outside-toplevel,no-name-in-module
-                from opentelemetry.exporter.otlp.proto.http import (  # noqa: PLC0415
-                    Compression,
-                )
-                from opentelemetry.exporter.otlp.proto.http.metric_exporter import (  # noqa: PLC0415
-                    OTLPMetricExporter,
-                )
-            except ImportError as exc:
-                raise MissingDependencyError(
-                    package="opentelemetry-exporter-otlp-proto-http",
-                    feature="otlp_http metric exporter",
-                ) from exc
-
-            compression = _map_compression(config.compression, Compression, allow_deflate=True)
-            return OTLPMetricExporter(
-                endpoint=config.endpoint,
-                headers=headers,
-                timeout=timeout,
-                compression=compression,
-                preferred_temporality=preferred_temporality,
-                preferred_aggregation=preferred_aggregation,
-            )
-        case OtlpHttpEncoding.json:
-            try:
-                # pylint: disable=import-outside-toplevel,no-name-in-module
-                from opentelemetry.exporter.otlp.common.http import (  # noqa: PLC0415
-                    Compression as JsonCompression,
-                )
-                from opentelemetry.exporter.otlp.json.http.metric_exporter import (  # noqa: PLC0415
-                    OTLPMetricExporter as JsonOTLPMetricExporter,
-                )
-            except ImportError as exc:
-                raise MissingDependencyError(
-                    package="opentelemetry-exporter-otlp-json-http",
-                    feature="otlp_http JSON metric exporter",
-                ) from exc
-
-            compression = _map_compression(config.compression, JsonCompression, allow_deflate=True)
-            return JsonOTLPMetricExporter(
-                endpoint=config.endpoint,
-                headers=headers,
-                timeout=timeout,
-                compression=compression,
-                preferred_temporality=preferred_temporality,
-                preferred_aggregation=preferred_aggregation,
-            )
-        case _:
-            raise ConfigurationError(
-                f"Unsupported OTLP HTTP encoding '{config.encoding}'. Supported values: protobuf, json."
-            )
+    return OTLPMetricExporter(  # type: ignore[return-value]
+        endpoint=config.endpoint,
+        headers=headers,
+        timeout=timeout,
+        compression=compression,  # type: ignore[arg-type]
+        preferred_temporality=preferred_temporality,
+        preferred_aggregation=preferred_aggregation,
+    )
 
 
 def _create_otlp_grpc_metric_exporter(
@@ -340,9 +324,9 @@ def _create_otlp_grpc_metric_exporter(
     """Create an OTLP gRPC metric exporter from config."""
     try:
         # pylint: disable=import-outside-toplevel,no-name-in-module
-        import grpc  # noqa: PLC0415  # type: ignore[import-untyped]
+        import grpc  # type: ignore[import-untyped]  # noqa: PLC0415
 
-        from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import (  # noqa: PLC0415  # type: ignore[import-untyped]
+        from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import (  # type: ignore[import-untyped]  # noqa: PLC0415
             OTLPMetricExporter,
         )
     except ImportError as exc:
@@ -355,7 +339,9 @@ def _create_otlp_grpc_metric_exporter(
     headers = _parse_headers(config.headers, config.headers_list)
     timeout = (config.timeout / 1000.0) if config.timeout is not None else None
     preferred_temporality = _map_temporality(config.temporality_preference)
-    preferred_aggregation = _map_histogram_aggregation(config.default_histogram_aggregation)
+    preferred_aggregation = _map_histogram_aggregation(
+        config.default_histogram_aggregation
+    )
 
     return OTLPMetricExporter(  # type: ignore[return-value]
         endpoint=config.endpoint,
@@ -373,7 +359,7 @@ def _create_otlp_file_development_metric_exporter(
     """Create an OTLP file (JSON Lines) metric exporter from config."""
     try:
         # pylint: disable=import-outside-toplevel,no-name-in-module
-        from opentelemetry.exporter.otlp.json.file.metric_exporter import (  # noqa: PLC0415  # type: ignore[import-untyped]
+        from opentelemetry.exporter.otlp.json.file.metric_exporter import (  # type: ignore[import-untyped]  # noqa: PLC0415
             FileMetricExporter,
         )
     except ImportError as exc:
@@ -384,7 +370,9 @@ def _create_otlp_file_development_metric_exporter(
 
     path = _parse_otlp_file_output_stream(config.output_stream)
     preferred_temporality = _map_temporality(config.temporality_preference)
-    preferred_aggregation = _map_histogram_aggregation(config.default_histogram_aggregation)
+    preferred_aggregation = _map_histogram_aggregation(
+        config.default_histogram_aggregation
+    )
     return (
         FileMetricExporter(
             path,
@@ -399,6 +387,14 @@ def _create_otlp_file_development_metric_exporter(
     )
 
 
+_METRIC_EXPORTER_REGISTRY: dict = {
+    "otlp_http": _create_otlp_http_metric_exporter,
+    "otlp_grpc": _create_otlp_grpc_metric_exporter,
+    "console": _create_console_metric_exporter,
+    "otlp_file_development": _create_otlp_file_development_metric_exporter,
+}
+
+
 def _create_push_metric_exporter(
     config: PushMetricExporterConfig,
 ) -> MetricExporter:
@@ -409,23 +405,19 @@ def _create_push_metric_exporter(
     by the @_additional_properties decorator are loaded via the
     ``opentelemetry_metrics_exporter`` entry point group.
     """
-    match config:
-        case PushMetricExporterConfig(otlp_http=exporter_config) if exporter_config is not None:
-            return _create_otlp_http_metric_exporter(exporter_config)
-        case PushMetricExporterConfig(otlp_grpc=exporter_config) if exporter_config is not None:
-            return _create_otlp_grpc_metric_exporter(exporter_config)
-        case PushMetricExporterConfig(console=exporter_config) if exporter_config is not None:
-            return _create_console_metric_exporter(exporter_config)
-        case PushMetricExporterConfig(otlp_file_development=exporter_config) if exporter_config is not None:
-            return _create_otlp_file_development_metric_exporter(exporter_config)
-        case PushMetricExporterConfig(additional_properties=additional_properties) if additional_properties:
-            name, plugin_config = next(iter(additional_properties.items()))
-            return load_entry_point("opentelemetry_metrics_exporter", name)(**(plugin_config or {}))
-        case _:
-            raise ConfigurationError(
-                "No exporter type specified in push metric exporter config. "
-                "Supported types: console, otlp_http, otlp_grpc, otlp_file_development."
-            )
+    for name, factory in _METRIC_EXPORTER_REGISTRY.items():
+        value = getattr(config, name, None)
+        if value is not None:
+            return factory(value)
+    if config.additional_properties:
+        name, plugin_config = next(iter(config.additional_properties.items()))
+        return load_entry_point("opentelemetry_metrics_exporter", name)(
+            **(plugin_config or {})
+        )
+    raise ConfigurationError(
+        "No exporter type specified in push metric exporter config. "
+        "Supported types: console, otlp_http, otlp_grpc, otlp_file_development."
+    )
 
 
 def _create_periodic_metric_reader(
@@ -436,8 +428,16 @@ def _create_periodic_metric_reader(
     Passes explicit interval/timeout defaults to suppress env var reading.
     """
     exporter = _create_push_metric_exporter(config.exporter)
-    interval = config.interval if config.interval is not None else _DEFAULT_EXPORT_INTERVAL_MILLIS
-    timeout = config.timeout if config.timeout is not None else _DEFAULT_EXPORT_TIMEOUT_MILLIS
+    interval = (
+        config.interval
+        if config.interval is not None
+        else _DEFAULT_EXPORT_INTERVAL_MILLIS
+    )
+    timeout = (
+        config.timeout
+        if config.timeout is not None
+        else _DEFAULT_EXPORT_TIMEOUT_MILLIS
+    )
     return PeriodicExportingMetricReader(
         exporter=exporter,
         export_interval_millis=float(interval),
@@ -456,7 +456,7 @@ def _create_prometheus_metric_reader(
     """
     try:
         # pylint: disable=import-outside-toplevel,no-name-in-module
-        from opentelemetry.exporter.prometheus import (  # noqa: PLC0415  # type: ignore[import-untyped]
+        from opentelemetry.exporter.prometheus import (  # type: ignore[import-untyped]  # noqa: PLC0415
             PrometheusMetricReader,
             start_http_server,
         )
@@ -467,14 +467,19 @@ def _create_prometheus_metric_reader(
         ) from exc
 
     disable_target_info = (
-        config.target_info_enabled_development is not None and not config.target_info_enabled_development
+        config.target_info_enabled_development is not None
+        and not config.target_info_enabled_development
     )
 
     if config.scope_info_enabled is not None:
-        _logger.warning("scope_info_enabled is not yet supported for Prometheus metric exporter and will be ignored.")
+        _logger.warning(
+            "scope_info_enabled is not yet supported for "
+            "Prometheus metric exporter and will be ignored."
+        )
     if config.resource_constant_labels is not None:
         _logger.warning(
-            "resource_constant_labels is not yet supported for Prometheus metric exporter and will be ignored."
+            "resource_constant_labels is not yet supported for "
+            "Prometheus metric exporter and will be ignored."
         )
 
     reader = PrometheusMetricReader(
@@ -504,9 +509,12 @@ def _create_pull_metric_exporter(
         return _create_prometheus_metric_reader(config.prometheus_development)
     if config.additional_properties:
         name, plugin_config = next(iter(config.additional_properties.items()))
-        return load_entry_point("opentelemetry_pull_metric_exporter", name)(**(plugin_config or {}))
+        return load_entry_point("opentelemetry_pull_metric_exporter", name)(
+            **(plugin_config or {})
+        )
     raise ConfigurationError(
-        "No exporter type specified in pull metric exporter config. Supported types: prometheus_development."
+        "No exporter type specified in pull metric exporter config. "
+        "Supported types: prometheus_development."
     )
 
 
@@ -520,10 +528,14 @@ def _create_pull_metric_reader(
     """
     if config.producers:
         _logger.warning(
-            "MetricProducer configuration is not yet supported for pull metric readers and will be ignored."
+            "MetricProducer configuration is not yet supported for "
+            "pull metric readers and will be ignored."
         )
     if config.cardinality_limits is not None:
-        _logger.warning("cardinality_limits is not yet supported for pull metric readers and will be ignored.")
+        _logger.warning(
+            "cardinality_limits is not yet supported for "
+            "pull metric readers and will be ignored."
+        )
     return _create_pull_metric_exporter(config.exporter)
 
 
@@ -533,7 +545,10 @@ def _create_metric_reader(config: MetricReaderConfig) -> MetricReader:
         return _create_periodic_metric_reader(config.periodic)
     if config.pull is not None:
         return _create_pull_metric_reader(config.pull)
-    raise ConfigurationError("No reader type specified in metric reader config. Supported types: periodic, pull.")
+    raise ConfigurationError(
+        "No reader type specified in metric reader config. "
+        "Supported types: periodic, pull."
+    )
 
 
 def _create_exemplar_filter(
@@ -547,40 +562,8 @@ def _create_exemplar_filter(
     if value == ExemplarFilterConfig.trace_based:
         return TraceBasedExemplarFilter()
     raise ConfigurationError(
-        f"Unknown exemplar filter value: {value!r}. Supported values: always_on, always_off, trace_based."
-    )
-
-
-def _to_meter_config(config: MeterConfigConfig | None) -> _MeterConfig:
-    """Map an experimental per-meter config to an SDK ``_MeterConfig``.
-
-    Only ``enabled`` is honored — it is the sole field the SDK
-    ``_MeterConfig`` exposes. An absent ``enabled`` leaves the meter enabled.
-    """
-    if config is None or config.enabled is None:
-        return _MeterConfig.default()
-    return _MeterConfig(is_enabled=config.enabled)
-
-
-def _create_meter_configurator(
-    config: MeterConfiguratorConfig,
-) -> _RuleBasedMeterConfigurator:
-    """Build a rule-based meter configurator from experimental config.
-
-    Each entry in ``meters`` maps an instrumentation-scope name glob to a
-    per-meter config; ``default_config`` applies to scopes matching no glob.
-    Rules are evaluated in order, so earlier entries take precedence.
-    """
-    rules = [
-        (
-            _scope_name_matches_glob(matcher.name),
-            _to_meter_config(matcher.config),
-        )
-        for matcher in (config.meters or [])
-    ]
-    return _RuleBasedMeterConfigurator(
-        rules=rules,
-        default_config=_to_meter_config(config.default_config),
+        f"Unknown exemplar filter value: {value!r}. "
+        "Supported values: always_on, always_off, trace_based."
     )
 
 
@@ -617,18 +600,11 @@ def create_meter_provider(
             for view_config in config.views:
                 views.append(_create_view(view_config))
 
-    meter_configurator = (
-        _create_meter_configurator(config.meter_configurator_development)
-        if config is not None and config.meter_configurator_development is not None
-        else None
-    )
-
     return MeterProvider(
         resource=resource,
         metric_readers=readers,
         exemplar_filter=exemplar_filter,  # type: ignore[arg-type]
         views=views,
-        _meter_configurator=meter_configurator,
     )
 
 

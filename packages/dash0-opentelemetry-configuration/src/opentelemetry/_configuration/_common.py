@@ -7,15 +7,13 @@ import dataclasses
 import inspect
 import logging
 from collections.abc import Callable
-from typing import Any, Protocol, TypeVar
+from typing import Any, Protocol
 from urllib.parse import urlparse
 
 from opentelemetry._configuration._exceptions import ConfigurationError
 from opentelemetry.util._importlib_metadata import entry_points
 
 _logger = logging.getLogger(__name__)
-
-_CompressionT = TypeVar("_CompressionT")
 
 
 def _additional_properties(cls):
@@ -72,7 +70,9 @@ def load_entry_point(group: str, name: str) -> type:
     except ConfigurationError:
         raise
     except Exception as exc:
-        raise ConfigurationError(f"Failed to load plugin '{name}' from group '{group}': {exc}") from exc
+        raise ConfigurationError(
+            f"Failed to load plugin '{name}' from group '{group}': {exc}"
+        ) from exc
 
 
 class _ComponentConfig(Protocol):
@@ -129,7 +129,9 @@ def _resolve_component(
             return factory(value)
     if config.additional_properties:
         name, plugin_config = next(iter(config.additional_properties.items()))
-        return load_entry_point(entry_point_group, name)(**(plugin_config or {}))
+        return load_entry_point(entry_point_group, name)(
+            **(plugin_config or {})
+        )
     raise ConfigurationError(f"No {component_type} type specified in config.")
 
 
@@ -167,34 +169,31 @@ def _parse_headers(
 
 def _map_compression(
     value: str | None,
-    compression_enum: type[_CompressionT],
+    compression_enum: type,
     *,
     allow_deflate: bool = False,
-) -> _CompressionT | None:
+) -> object | None:
     """Map a compression string to the given Compression enum value."""
     if value is None:
         return None
 
     value_lower = value.lower()
-    supports_deflate = hasattr(compression_enum, "Deflate") or hasattr(compression_enum, "DEFLATE")
+    supports_deflate = hasattr(compression_enum, "Deflate")
 
     if value_lower == "none":
         return None
     if value_lower == "gzip":
-        for member_name in ("Gzip", "GZIP"):
-            if member := getattr(compression_enum, member_name, None):
-                return member
+        return compression_enum.Gzip  # type: ignore[attr-defined]
     if value_lower == "deflate" and allow_deflate and supports_deflate:
-        for member_name in ("Deflate", "DEFLATE"):
-            if member := getattr(compression_enum, member_name, None):
-                return member
+        return compression_enum.Deflate  # type: ignore[attr-defined]
 
     supported_values = ["'gzip'", "'none'"]
     if allow_deflate and supports_deflate:
         supported_values.insert(1, "'deflate'")
 
     raise ConfigurationError(
-        f"Unsupported compression value '{value}'. Supported values: {', '.join(supported_values)}."
+        f"Unsupported compression value '{value}'. Supported values: "
+        f"{', '.join(supported_values)}."
     )
 
 
@@ -210,9 +209,14 @@ def _parse_otlp_file_output_stream(output_stream: str | None) -> str | None:
         parsed = urlparse(output_stream)
     except ValueError as exc:
         raise ConfigurationError(
-            f"Failed to parse output_stream '{output_stream}' for otlp_file_development exporter: {exc}"
+            f"Failed to parse output_stream '{output_stream}' for "
+            f"otlp_file_development exporter: {exc}"
         ) from exc
-    is_local_file_uri = parsed.scheme == "file" and parsed.netloc in ("", "localhost") and bool(parsed.path)
+    is_local_file_uri = (
+        parsed.scheme == "file"
+        and parsed.netloc in ("", "localhost")
+        and bool(parsed.path)
+    )
     has_extra_components = parsed.params or parsed.query or parsed.fragment
     if is_local_file_uri and not has_extra_components:
         path = parsed.path

@@ -13,8 +13,7 @@ variable, which the SDK's configurator picks up automatically. For
 programmatic use:
 
 >>> from opentelemetry._configuration import (
-...     load_config_file,
-...     configure_sdk,
+...     load_config_file, configure_sdk,
 ... )
 >>> config = load_config_file("otel-config.yaml")
 >>> configure_sdk(config)
@@ -22,8 +21,7 @@ programmatic use:
 Construct a configuration programmatically and apply it:
 
 >>> from opentelemetry._configuration import (
-...     OpenTelemetryConfiguration,
-...     configure_sdk,
+...     OpenTelemetryConfiguration, configure_sdk,
 ... )
 >>> configure_sdk(OpenTelemetryConfiguration(file_format="1.0-rc.1"))
 

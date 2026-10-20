@@ -17,10 +17,6 @@ from opentelemetry._configuration._exceptions import (
     MissingDependencyError,
 )
 from opentelemetry._configuration.models import (
-    AttributeLimits,
-    OtlpHttpEncoding,
-)
-from opentelemetry._configuration.models import (
     ExperimentalComposableRuleBasedSampler as RuleBasedSamplerConfig,
 )
 from opentelemetry._configuration.models import (
@@ -31,12 +27,6 @@ from opentelemetry._configuration.models import (
 )
 from opentelemetry._configuration.models import (
     ExperimentalOtlpFileExporter as ExperimentalOtlpFileExporterConfig,
-)
-from opentelemetry._configuration.models import (
-    ExperimentalTracerConfig as TracerConfigConfig,
-)
-from opentelemetry._configuration.models import (
-    ExperimentalTracerConfigurator as TracerConfiguratorConfig,
 )
 from opentelemetry._configuration.models import (
     IdGenerator as IdGeneratorConfig,
@@ -74,8 +64,6 @@ from opentelemetry.sdk.trace import (
     _DEFAULT_OTEL_SPAN_LINK_COUNT_LIMIT,
     SpanLimits,
     TracerProvider,
-    _RuleBasedTracerConfigurator,
-    _TracerConfig,
 )
 from opentelemetry.sdk.trace._sampling_experimental import (
     ComposableSampler,
@@ -110,7 +98,6 @@ from opentelemetry.sdk.trace.sampling import (
     Sampler,
     TraceIdRatioBased,
 )
-from opentelemetry.sdk.util.instrumentation import _scope_name_matches_glob
 from opentelemetry.trace import SpanKind as TraceSpanKind
 
 _logger = logging.getLogger(__name__)
@@ -123,58 +110,32 @@ def _create_otlp_http_span_exporter(
     config: OtlpHttpExporterConfig,
 ) -> SpanExporter:
     """Create an OTLP HTTP span exporter from config."""
+    try:
+        # pylint: disable=import-outside-toplevel,no-name-in-module
+        from opentelemetry.exporter.otlp.proto.http import (  # type: ignore[import-untyped]  # noqa: PLC0415
+            Compression,
+        )
+        from opentelemetry.exporter.otlp.proto.http.trace_exporter import (  # type: ignore[import-untyped]  # noqa: PLC0415
+            OTLPSpanExporter,
+        )
+    except ImportError as exc:
+        raise MissingDependencyError(
+            package="opentelemetry-exporter-otlp-proto-http",
+            feature="otlp_http span exporter",
+        ) from exc
+
+    compression = _map_compression(
+        config.compression, Compression, allow_deflate=True
+    )
     headers = _parse_headers(config.headers, config.headers_list)
     timeout = (config.timeout / 1000.0) if config.timeout is not None else None
 
-    match config.encoding:
-        case None | OtlpHttpEncoding.protobuf:
-            try:
-                # pylint: disable=import-outside-toplevel,no-name-in-module
-                from opentelemetry.exporter.otlp.proto.http import (  # noqa: PLC0415
-                    Compression,
-                )
-                from opentelemetry.exporter.otlp.proto.http.trace_exporter import (  # noqa: PLC0415
-                    OTLPSpanExporter,
-                )
-            except ImportError as exc:
-                raise MissingDependencyError(
-                    package="opentelemetry-exporter-otlp-proto-http",
-                    feature="otlp_http span exporter",
-                ) from exc
-
-            compression = _map_compression(config.compression, Compression, allow_deflate=True)
-            return OTLPSpanExporter(
-                endpoint=config.endpoint,
-                headers=headers,
-                timeout=timeout,
-                compression=compression,
-            )
-        case OtlpHttpEncoding.json:
-            try:
-                # pylint: disable=import-outside-toplevel,no-name-in-module
-                from opentelemetry.exporter.otlp.common.http import (  # noqa: PLC0415
-                    Compression as JsonCompression,
-                )
-                from opentelemetry.exporter.otlp.json.http.trace_exporter import (  # noqa: PLC0415
-                    OTLPSpanExporter as JsonOTLPSpanExporter,
-                )
-            except ImportError as exc:
-                raise MissingDependencyError(
-                    package="opentelemetry-exporter-otlp-json-http",
-                    feature="otlp_http JSON span exporter",
-                ) from exc
-
-            compression = _map_compression(config.compression, JsonCompression, allow_deflate=True)
-            return JsonOTLPSpanExporter(
-                endpoint=config.endpoint,
-                headers=headers,
-                timeout=timeout,
-                compression=compression,
-            )
-        case _:
-            raise ConfigurationError(
-                f"Unsupported OTLP HTTP encoding '{config.encoding}'. Supported values: protobuf, json."
-            )
+    return OTLPSpanExporter(  # type: ignore[return-value]
+        endpoint=config.endpoint,
+        headers=headers,
+        timeout=timeout,
+        compression=compression,  # type: ignore[arg-type]
+    )
 
 
 def _create_otlp_grpc_span_exporter(
@@ -183,9 +144,9 @@ def _create_otlp_grpc_span_exporter(
     """Create an OTLP gRPC span exporter from config."""
     try:
         # pylint: disable=import-outside-toplevel,no-name-in-module
-        import grpc  # noqa: PLC0415  # type: ignore[import-untyped]
+        import grpc  # type: ignore[import-untyped]  # noqa: PLC0415
 
-        from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (  # noqa: PLC0415  # type: ignore[import-untyped]
+        from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (  # type: ignore[import-untyped]  # noqa: PLC0415
             OTLPSpanExporter,
         )
     except ImportError as exc:
@@ -212,7 +173,7 @@ def _create_otlp_file_development_span_exporter(
     """Create an OTLP file (JSON Lines) span exporter from config."""
     try:
         # pylint: disable=import-outside-toplevel,no-name-in-module
-        from opentelemetry.exporter.otlp.json.file.trace_exporter import (  # noqa: PLC0415  # type: ignore[import-untyped]
+        from opentelemetry.exporter.otlp.json.file.trace_exporter import (  # type: ignore[import-untyped]  # noqa: PLC0415
             FileSpanExporter,
         )
     except ImportError as exc:
@@ -225,6 +186,14 @@ def _create_otlp_file_development_span_exporter(
     return FileSpanExporter(path) if path is not None else FileSpanExporter()
 
 
+_SPAN_EXPORTER_REGISTRY: dict = {
+    "otlp_http": _create_otlp_http_span_exporter,
+    "otlp_grpc": _create_otlp_grpc_span_exporter,
+    "console": lambda _: ConsoleSpanExporter(),
+    "otlp_file_development": _create_otlp_file_development_span_exporter,
+}
+
+
 def _create_span_exporter(config: SpanExporterConfig) -> SpanExporter:
     """Create a span exporter from config.
 
@@ -233,23 +202,19 @@ def _create_span_exporter(config: SpanExporterConfig) -> SpanExporter:
     by the @_additional_properties decorator are loaded via the
     ``opentelemetry_traces_exporter`` entry point group.
     """
-    match config:
-        case SpanExporterConfig(otlp_http=exporter_config) if exporter_config is not None:
-            return _create_otlp_http_span_exporter(exporter_config)
-        case SpanExporterConfig(otlp_grpc=exporter_config) if exporter_config is not None:
-            return _create_otlp_grpc_span_exporter(exporter_config)
-        case SpanExporterConfig(console=exporter_config) if exporter_config is not None:
-            return ConsoleSpanExporter()
-        case SpanExporterConfig(otlp_file_development=exporter_config) if exporter_config is not None:
-            return _create_otlp_file_development_span_exporter(exporter_config)
-        case SpanExporterConfig(additional_properties=additional_properties) if additional_properties:
-            name, plugin_config = next(iter(additional_properties.items()))
-            return load_entry_point("opentelemetry_traces_exporter", name)(**(plugin_config or {}))
-        case _:
-            raise ConfigurationError(
-                "No exporter type specified in span exporter config. "
-                "Supported types: otlp_http, otlp_grpc, console, otlp_file_development."
-            )
+    for name, factory in _SPAN_EXPORTER_REGISTRY.items():
+        value = getattr(config, name, None)
+        if value is not None:
+            return factory(value)
+    if config.additional_properties:
+        name, plugin_config = next(iter(config.additional_properties.items()))
+        return load_entry_point("opentelemetry_traces_exporter", name)(
+            **(plugin_config or {})
+        )
+    raise ConfigurationError(
+        "No exporter type specified in span exporter config. "
+        "Supported types: otlp_http, otlp_grpc, console, otlp_file_development."
+    )
 
 
 def _create_span_processor(
@@ -266,8 +231,13 @@ def _create_span_processor(
             export_timeout_millis=config.batch.export_timeout,
         )
     if config.simple is not None:
-        return SimpleSpanProcessor(_create_span_exporter(config.simple.exporter))
-    raise ConfigurationError("No processor type specified in span processor config. Supported types: batch, simple.")
+        return SimpleSpanProcessor(
+            _create_span_exporter(config.simple.exporter)
+        )
+    raise ConfigurationError(
+        "No processor type specified in span processor config. "
+        "Supported types: batch, simple."
+    )
 
 
 def _create_experimental_composable_sampler(
@@ -279,12 +249,20 @@ def _create_experimental_composable_sampler(
     if config.always_off is not None:
         return composable_always_off()
     if config.parent_threshold is not None:
-        return composable_parent_threshold(_create_experimental_composable_sampler(config.parent_threshold.root))
+        return composable_parent_threshold(
+            _create_experimental_composable_sampler(
+                config.parent_threshold.root
+            )
+        )
     if config.probability is not None:
         ratio = config.probability.ratio
-        return composable_traceid_ratio_based(ratio if ratio is not None else 1.0)
+        return composable_traceid_ratio_based(
+            ratio if ratio is not None else 1.0
+        )
     if config.rule_based is not None:
-        return composable_rule_based(_create_rule_based_sampler_rules(config.rule_based))
+        return composable_rule_based(
+            _create_rule_based_sampler_rules(config.rule_based)
+        )
     raise ConfigurationError(
         f"Unknown or unsupported experimental composable sampler type in config: {config!r}. "
         "Supported types: always_on, always_off, parent_threshold, probability, rule_based."
@@ -326,10 +304,17 @@ def _create_rule_based_sampler_rule_predicate(
         )
     if config.span_kinds is not None:
         predicates.append(
-            SpanKindPredicate([TraceSpanKind[span_kind.value.upper()] for span_kind in config.span_kinds])
+            SpanKindPredicate(
+                [
+                    TraceSpanKind[span_kind.value.upper()]
+                    for span_kind in config.span_kinds
+                ]
+            )
         )
     if config.parent is not None:
-        predicates.append(ParentPredicate([parent.value for parent in config.parent]))
+        predicates.append(
+            ParentPredicate([parent.value for parent in config.parent])
+        )
     if not predicates:
         return AlwaysMatchPredicate()
     if len(predicates) == 1:
@@ -353,7 +338,11 @@ def _create_sampler(config: SamplerConfig) -> Sampler:
         ratio = config.trace_id_ratio_based.ratio
         return TraceIdRatioBased(ratio if ratio is not None else 1.0)
     if config.composite_development is not None:
-        return composite_sampler(_create_experimental_composable_sampler(config.composite_development))
+        return composite_sampler(
+            _create_experimental_composable_sampler(
+                config.composite_development
+            )
+        )
     if config.parent_based is not None:
         return _create_parent_based_sampler(config.parent_based)
     if config.additional_properties:
@@ -377,52 +366,61 @@ def _create_id_generator(config: IdGeneratorConfig) -> IdGenerator:
         return RandomIdGenerator()
     if config.additional_properties:
         name, plugin_config = next(iter(config.additional_properties.items()))
-        return load_entry_point("opentelemetry_id_generator", name)(**(plugin_config or {}))
-    raise ConfigurationError("No id_generator type specified in config. Supported built-in types: random.")
+        return load_entry_point("opentelemetry_id_generator", name)(
+            **(plugin_config or {})
+        )
+    raise ConfigurationError(
+        "No id_generator type specified in config. "
+        "Supported built-in types: random."
+    )
 
 
 def _create_parent_based_sampler(config: ParentBasedSamplerConfig) -> Sampler:
     """Create a ParentBased sampler from config, applying SDK defaults for absent delegates."""
-    root = _create_sampler(config.root) if config.root is not None else ALWAYS_ON
+    root = (
+        _create_sampler(config.root) if config.root is not None else ALWAYS_ON
+    )
     kwargs: dict = {"root": root}
     if config.remote_parent_sampled is not None:
-        kwargs["remote_parent_sampled"] = _create_sampler(config.remote_parent_sampled)
+        kwargs["remote_parent_sampled"] = _create_sampler(
+            config.remote_parent_sampled
+        )
     if config.remote_parent_not_sampled is not None:
-        kwargs["remote_parent_not_sampled"] = _create_sampler(config.remote_parent_not_sampled)
+        kwargs["remote_parent_not_sampled"] = _create_sampler(
+            config.remote_parent_not_sampled
+        )
     if config.local_parent_sampled is not None:
-        kwargs["local_parent_sampled"] = _create_sampler(config.local_parent_sampled)
+        kwargs["local_parent_sampled"] = _create_sampler(
+            config.local_parent_sampled
+        )
     if config.local_parent_not_sampled is not None:
-        kwargs["local_parent_not_sampled"] = _create_sampler(config.local_parent_not_sampled)
+        kwargs["local_parent_not_sampled"] = _create_sampler(
+            config.local_parent_not_sampled
+        )
     return ParentBased(**kwargs)
 
 
-def _create_span_limits(
-    config: SpanLimitsConfig,
-    global_limits: AttributeLimits | None = None,
-) -> SpanLimits:
+def _create_span_limits(config: SpanLimitsConfig) -> SpanLimits:
     """Create SpanLimits from config.
 
-    Absent fields fall back to global_limits (if provided), then to OTel spec
-    defaults (128 for counts, unlimited for lengths).
+    Absent fields use the OTel spec defaults (128 for counts, unlimited for lengths).
     Explicit values suppress env-var reading — matching Java SDK behavior.
     """
-    attribute_count_limit = config.attribute_count_limit
-    if attribute_count_limit is None and global_limits is not None:
-        attribute_count_limit = global_limits.attribute_count_limit
-
-    attribute_value_length_limit = config.attribute_value_length_limit
-    if attribute_value_length_limit is None and global_limits is not None:
-        attribute_value_length_limit = global_limits.attribute_value_length_limit
-
     return SpanLimits(
         max_span_attributes=(
-            attribute_count_limit if attribute_count_limit is not None else _DEFAULT_OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT
+            config.attribute_count_limit
+            if config.attribute_count_limit is not None
+            else _DEFAULT_OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT
         ),
         max_events=(
-            config.event_count_limit if config.event_count_limit is not None else _DEFAULT_OTEL_SPAN_EVENT_COUNT_LIMIT
+            config.event_count_limit
+            if config.event_count_limit is not None
+            else _DEFAULT_OTEL_SPAN_EVENT_COUNT_LIMIT
         ),
         max_links=(
-            config.link_count_limit if config.link_count_limit is not None else _DEFAULT_OTEL_SPAN_LINK_COUNT_LIMIT
+            config.link_count_limit
+            if config.link_count_limit is not None
+            else _DEFAULT_OTEL_SPAN_LINK_COUNT_LIMIT
         ),
         max_event_attributes=(
             config.event_attribute_count_limit
@@ -434,52 +432,13 @@ def _create_span_limits(
             if config.link_attribute_count_limit is not None
             else _DEFAULT_OTEL_LINK_ATTRIBUTE_COUNT_LIMIT
         ),
-        max_attribute_length=(
-            attribute_value_length_limit if attribute_value_length_limit is not None else SpanLimits.UNSET
-        ),
-        max_span_attribute_length=(
-            attribute_value_length_limit if attribute_value_length_limit is not None else SpanLimits.UNSET
-        ),
-    )
-
-
-def _to_tracer_config(config: TracerConfigConfig | None) -> _TracerConfig:
-    """Map an experimental per-tracer config to an SDK ``_TracerConfig``.
-
-    Only ``enabled`` is honored — it is the sole field the SDK
-    ``_TracerConfig`` exposes. An absent ``enabled`` leaves the tracer enabled.
-    """
-    if config is None or config.enabled is None:
-        return _TracerConfig.default()
-    return _TracerConfig(is_enabled=config.enabled)
-
-
-def _create_tracer_configurator(
-    config: TracerConfiguratorConfig,
-) -> _RuleBasedTracerConfigurator:
-    """Build a rule-based tracer configurator from experimental config.
-
-    Each entry in ``tracers`` maps an instrumentation-scope name glob to a
-    per-tracer config; ``default_config`` applies to scopes matching no glob.
-    Rules are evaluated in order, so earlier entries take precedence.
-    """
-    rules = [
-        (
-            _scope_name_matches_glob(matcher.name),
-            _to_tracer_config(matcher.config),
-        )
-        for matcher in (config.tracers or [])
-    ]
-    return _RuleBasedTracerConfigurator(
-        rules=rules,
-        default_config=_to_tracer_config(config.default_config),
+        max_attribute_length=config.attribute_value_length_limit,
     )
 
 
 def create_tracer_provider(
     config: TracerProviderConfig | None,
     resource: Resource | None = None,
-    global_attribute_limits: AttributeLimits | None = None,
 ) -> TracerProvider:
     """Create an SDK TracerProvider from declarative config.
 
@@ -490,28 +449,30 @@ def create_tracer_provider(
     Args:
         config: TracerProvider config from the parsed config file, or None.
         resource: Resource to attach to the provider.
-        global_attribute_limits: Top-level attribute_limits from the root config,
-            used as a fallback when per-signal limits are not specified.
 
     Returns:
         A configured TracerProvider.
     """
-    sampler = _create_sampler(config.sampler) if config is not None and config.sampler is not None else _DEFAULT_SAMPLER
-    id_generator = (
-        _create_id_generator(config.id_generator) if config is not None and config.id_generator is not None else None
+    sampler = (
+        _create_sampler(config.sampler)
+        if config is not None and config.sampler is not None
+        else _DEFAULT_SAMPLER
     )
-    if config is not None and config.limits is not None:
-        limits = config.limits
-
-    else:
-        limits = SpanLimitsConfig()
-
-    span_limits = _create_span_limits(limits, global_attribute_limits)
-
-    tracer_configurator = (
-        _create_tracer_configurator(config.tracer_configurator_development)
-        if config is not None and config.tracer_configurator_development is not None
+    id_generator = (
+        _create_id_generator(config.id_generator)
+        if config is not None and config.id_generator is not None
         else None
+    )
+    span_limits = (
+        _create_span_limits(config.limits)
+        if config is not None and config.limits is not None
+        else SpanLimits(
+            max_span_attributes=_DEFAULT_OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT,
+            max_events=_DEFAULT_OTEL_SPAN_EVENT_COUNT_LIMIT,
+            max_links=_DEFAULT_OTEL_SPAN_LINK_COUNT_LIMIT,
+            max_event_attributes=_DEFAULT_OTEL_EVENT_ATTRIBUTE_COUNT_LIMIT,
+            max_link_attributes=_DEFAULT_OTEL_LINK_ATTRIBUTE_COUNT_LIMIT,
+        )
     )
 
     provider = TracerProvider(
@@ -519,7 +480,6 @@ def create_tracer_provider(
         sampler=sampler,
         span_limits=span_limits,
         id_generator=id_generator,
-        _tracer_configurator=tracer_configurator,
     )
 
     if config is not None:
@@ -532,7 +492,6 @@ def create_tracer_provider(
 def configure_tracer_provider(
     config: TracerProviderConfig | None,
     resource: Resource | None = None,
-    global_attribute_limits: AttributeLimits | None = None,
 ) -> None:
     """Configure the global TracerProvider from declarative config.
 
@@ -543,9 +502,7 @@ def configure_tracer_provider(
     Args:
         config: TracerProvider config from the parsed config file, or None.
         resource: Resource to attach to the provider.
-        global_attribute_limits: Top-level attribute_limits from the root config,
-            used as a fallback when per-signal limits are not specified.
     """
     if config is None:
         return
-    trace.set_tracer_provider(create_tracer_provider(config, resource, global_attribute_limits))
+    trace.set_tracer_provider(create_tracer_provider(config, resource))

@@ -58,9 +58,17 @@ Resource detectors (``opentelemetry_resource_detector``)
       ``service.name`` fallback, so there is no need to also list the built-in
       ``service`` detector.
 
-    They can be referenced via ``OTEL_EXPERIMENTAL_RESOURCE_DETECTORS``, or
-    explicitly in a declarative config file under
-    ``resource.detection/development.detectors``.
+    They can be referenced via ``OTEL_EXPERIMENTAL_RESOURCE_DETECTORS`` on the
+    ``opentelemetry-instrument`` path, or by name in a declarative config file
+    under ``resource.detection/development.detectors``.
+
+    Declarative configuration (``OTEL_CONFIG_FILE``) runs only the detectors
+    the file lists, and reads neither ``OTEL_RESOURCE_ATTRIBUTES`` nor
+    ``OTEL_SERVICE_NAME``. The distro adds nothing to the file, so a user who
+    wants ``telemetry.distro.*``, ``k8s.pod.uid`` or the ``service.name``
+    fallback names the detectors themselves. This matches the Ruby and
+    JavaScript distributions, so one config file yields the same resource in
+    every language.
 
 Instrumentations
 ================

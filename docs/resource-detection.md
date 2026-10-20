@@ -68,15 +68,27 @@ The SDK's built-in `OTELResourceDetector` picks those up automatically.
 No explicit detector configuration is required.
 
 **When you do need it: `OTEL_CONFIG_FILE`.**
-The experimental declarative SDK configuration (`OTEL_CONFIG_FILE`) ignores `OTEL_RESOURCE_ATTRIBUTES` and `OTEL_SERVICE_NAME` by design.
-In that case, reference the detectors explicitly in the config file, or via the environment variable:
+The experimental declarative SDK configuration (`OTEL_CONFIG_FILE`) reads neither `OTEL_RESOURCE_ATTRIBUTES` nor `OTEL_SERVICE_NAME`, and it runs only the detectors your config file lists.
+The distro adds nothing to that file, so name the detectors yourself to keep `telemetry.distro.*`, `k8s.pod.uid` and the `service.name` fallback:
 
-```bash
-export OTEL_EXPERIMENTAL_RESOURCE_DETECTORS=dash0_distribution,dash0_kubernetes,dash0_service_name
+```yaml
+file_format: "1.0"
+resource:
+  detection/development:
+    detectors:
+      - dash0_distribution: {}
+      - dash0_kubernetes: {}
+      - dash0_service_name: {}
 ```
 
-You must list all three if you want all three — none of the Dash0 detectors are included by default in the declarative config path.
+Each detector is independent, so list only the ones you want.
+Attributes you declare under `resource.attributes` take precedence over anything a detector reports.
+The Ruby and JavaScript distributions behave the same way, so one config file produces the same resource in all three languages.
+
+`OTEL_EXPERIMENTAL_RESOURCE_DETECTORS` has no effect here.
+Declarative configuration never reads it, so setting it alongside `OTEL_CONFIG_FILE` changes nothing.
 
 **What `OTEL_EXPERIMENTAL_RESOURCE_DETECTORS` does to the default detectors.**
+This applies to the `opentelemetry-instrument` path, not the `OTEL_CONFIG_FILE` one.
 The SDK always appends `service_instance` and `otel` (the `OTELResourceDetector`) to whatever you list.
 You do not need to add them yourself, and you cannot remove them by omitting them.

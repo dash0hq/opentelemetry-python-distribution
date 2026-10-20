@@ -33,3 +33,13 @@ ifndef VERSION
 	$(error VERSION is required, e.g. make chlog-update VERSION="0.2.0 - 2026-08-01")
 endif
 	$(CHLOGGEN) update --config $(CHLOGGEN_CONFIG) --version "$(VERSION)"
+
+.PHONY: e2e-kubernetes e2e-kubernetes-clean
+
+E2E_CLUSTER ?= dash0-python-e2e
+
+e2e-kubernetes:
+	cd tests/e2e-kubernetes && E2E_CLUSTER=$(E2E_CLUSTER) uv run --with pytest pytest -q
+
+e2e-kubernetes-clean:
+	$${KIND_BINARY:-kind} delete cluster --name $(E2E_CLUSTER)

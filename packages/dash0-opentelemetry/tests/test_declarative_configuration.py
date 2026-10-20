@@ -76,6 +76,8 @@ def _clean_env(monkeypatch):
         monkeypatch.delenv(variable, raising=False)
     monkeypatch.setattr(resource_module, "running_in_kubernetes", lambda: False)
     monkeypatch.setattr(resource_module.sys, "argv", ["/opt/app/server.py"])
+    monkeypatch.setattr(resource_module, "distributions", list)
+    monkeypatch.setattr(resource_module, "packages_distributions", dict)
 
 
 def _resource_from(tmp_path, content):

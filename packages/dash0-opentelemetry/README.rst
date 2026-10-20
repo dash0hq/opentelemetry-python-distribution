@@ -137,8 +137,21 @@ image —
 1. installs the distribution into a self-contained directory:
    ``pip install --target <dir> dash0-opentelemetry``;
 2. copies the script to ``<dir>/sitecustomize.py``;
-3. generates ``<dir>/all-dependencies.txt``, a flattened list of every
-   requirement of the installed tree (one PEP 508 requirement per line).
+3. generates ``<dir>/all-dependencies.txt`` by running
+   ``scripts/generate_all_dependencies.py <dir>``, which writes one PEP 508
+   requirement per line.
+
+Each line of ``all-dependencies.txt`` carries what the *upstream* packages of
+the tree declare about that package, not the version the tree contains. The
+bootstrap puts the injected tree last on ``sys.path``, so the application's copy
+of a shared package already wins at import; the only thing left to check is
+whether this distribution's code runs against the version the application
+brought, and ``Requires-Dist`` is where upstream states that. Writing the
+installed version instead would reject versions upstream declares compatible,
+and would stand the whole distribution down for an application that pinned any
+of them. The distribution's own exact pins are skipped when the manifest is
+built, because they record the set each release was validated against rather
+than what the code supports.
 
 The `OpenTelemetry injector
 <https://github.com/open-telemetry/opentelemetry-injector>`_ then prepends

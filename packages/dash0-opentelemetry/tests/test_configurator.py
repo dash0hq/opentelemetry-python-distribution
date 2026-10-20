@@ -1,8 +1,13 @@
 """Declarative-configuration (OTEL_CONFIG_FILE) handling of Dash0Configurator.
 
-These tests need the ``opentelemetry-configuration`` package, which the pinned
-SDK pulls in through the ``opentelemetry-sdk[file-configuration]`` extra, a dev
-dependency; they are skipped when it is not installed.
+The declarative machinery is a runtime dependency of the distro, shipped as
+``dash0-opentelemetry-configuration``; these are skipped when it is absent.
+
+``create_resource`` comes from that package's private tree because the
+generated shims re-export only the public modules. Installing the published
+``opentelemetry-configuration`` instead would occupy the same
+``opentelemetry/configuration`` path as those shims, so the distro would run
+upstream's implementation and drag ``jsonschema`` in with it.
 """
 
 from importlib.metadata import entry_points
@@ -32,7 +37,7 @@ except ImportError:
     )
 
 from opentelemetry import configuration as _configure_sdk_module
-from opentelemetry.configuration._resource import create_resource
+from opentelemetry._configuration._resource import create_resource
 
 _POD_UID = "2edc9ee8-c9a2-4f3e-9f5e-1a2b3c4d5e6f"
 

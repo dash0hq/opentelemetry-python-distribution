@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: traffic
+  namespace: dash0-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: traffic
+  template:
+    metadata:
+      labels:
+        app: traffic
+    spec:
+      initContainers:
+        - name: copy-instrumentation
+          image: dash0-demo-instrumentation:latest
+          imagePullPolicy: Never
+          command: ["sh", "-c", "cp -a /dash0/. /instrumentation/"]
+          volumeMounts:
+            - name: instrumentation
+              mountPath: /instrumentation
+      containers:
+        - name: traffic
+          image: dash0-demo-traffic:latest
+          imagePullPolicy: Never
+          env:
+            - name: PYTHONPATH
+              value: /instrumentation
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: http://collector.dash0-demo.svc.cluster.local:4318
+            - name: OTEL_SERVICE_NAME
+              value: traffic-generator
+            - name: TARGET
+              value: http://storefront.dash0-demo.svc.cluster.local:8080
+            - name: OTEL_METRIC_EXPORT_INTERVAL
+              value: "10000"
+          volumeMounts:
+            - name: instrumentation
+              mountPath: /instrumentation
+      volumes:
+        - name: instrumentation
+          emptyDir: {}

@@ -1,0 +1,91 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: collector-config
+  namespace: dash0-demo
+data:
+  config.yaml: |
+    receivers:
+      otlp:
+        protocols:
+          http:
+            endpoint: 0.0.0.0:4318
+          grpc:
+            endpoint: 0.0.0.0:4317
+
+    processors:
+      batch:
+        timeout: 5s
+
+    exporters:
+      otlphttp/dash0:
+        endpoint: ${env:DASH0_ENDPOINT}
+        headers:
+          Authorization: "Bearer ${env:DASH0_AUTH_TOKEN}"
+          Dash0-Dataset: ${env:DASH0_DATASET}
+      debug:
+        verbosity: basic
+
+    service:
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors: [batch]
+          exporters: [otlphttp/dash0, debug]
+        metrics:
+          receivers: [otlp]
+          processors: [batch]
+          exporters: [otlphttp/dash0, debug]
+        logs:
+          receivers: [otlp]
+          processors: [batch]
+          exporters: [otlphttp/dash0, debug]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: collector
+  namespace: dash0-demo
+spec:
+  selector:
+    app: collector
+  ports:
+    - name: otlp-http
+      port: 4318
+      targetPort: 4318
+    - name: otlp-grpc
+      port: 4317
+      targetPort: 4317
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: collector
+  namespace: dash0-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: collector
+  template:
+    metadata:
+      labels:
+        app: collector
+    spec:
+      containers:
+        - name: collector
+          image: otel/opentelemetry-collector-contrib:0.138.0
+          args: ["--config=/etc/collector/config.yaml"]
+          envFrom:
+            - secretRef:
+                name: dash0-credentials
+          ports:
+            - containerPort: 4318
+            - containerPort: 4317
+          volumeMounts:
+            - name: config
+              mountPath: /etc/collector
+      volumes:
+        - name: config
+          configMap:
+            name: collector-config

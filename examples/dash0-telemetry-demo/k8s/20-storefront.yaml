@@ -1,0 +1,62 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: storefront
+  namespace: dash0-demo
+spec:
+  selector:
+    app: storefront
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: storefront
+  namespace: dash0-demo
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: storefront
+  template:
+    metadata:
+      labels:
+        app: storefront
+    spec:
+      initContainers:
+        - name: copy-instrumentation
+          image: dash0-demo-instrumentation:latest
+          imagePullPolicy: Never
+          command: ["sh", "-c", "cp -a /dash0/. /instrumentation/"]
+          volumeMounts:
+            - name: instrumentation
+              mountPath: /instrumentation
+      containers:
+        - name: storefront
+          image: dash0-demo-storefront:latest
+          imagePullPolicy: Never
+          env:
+            - name: PYTHONPATH
+              value: /instrumentation
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: http://collector.dash0-demo.svc.cluster.local:4318
+            - name: OTEL_METRIC_EXPORT_INTERVAL
+              value: "10000"
+            - name: OTEL_BSP_SCHEDULE_DELAY
+              value: "2000"
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          volumeMounts:
+            - name: instrumentation
+              mountPath: /instrumentation
+      volumes:
+        - name: instrumentation
+          emptyDir: {}

@@ -89,13 +89,26 @@ When any safety check fails, the distribution:
 
 The application continues running normally, unmodified.
 
-## PYTHONPATH bridge
+## Environment variable bridges
 
-When running via injection, the `sitecustomize.py` also bridges the environment:
+The distribution needs `DASH0_OTEL_COLLECTOR_BASE_URL` to activate, and the SDK needs `OTEL_EXPORTER_OTLP_ENDPOINT` to export.
+A deployment that sets only one of the two still works, because there are two bridges, in two different files, at two different points in startup.
 
-- If `OTEL_EXPORTER_OTLP_ENDPOINT` is not set but `DASH0_OTEL_COLLECTOR_BASE_URL` is set, the script copies the value to `OTEL_EXPORTER_OTLP_ENDPOINT` before the OpenTelemetry SDK initializes.
+`sitecustomize.py`, at interpreter startup, fills in the Dash0 variable from the standard one:
 
-This allows the operator to pass a single `DASH0_OTEL_COLLECTOR_BASE_URL` environment variable without needing to know which specific `OTEL_*` variables to set.
+- If `DASH0_OTEL_COLLECTOR_BASE_URL` is unset and `OTEL_EXPORTER_OTLP_ENDPOINT` is set, the script copies the endpoint into `DASH0_OTEL_COLLECTOR_BASE_URL`.
+
+This is what lets a deployment configured only with the standard OpenTelemetry variable activate the distribution at all.
+Without it the distribution would find no collector base URL, set `OTEL_SDK_DISABLED=true` and instrument nothing.
+
+`Dash0Distro._configure` in `distro.py`, once the SDK loads, fills in the standard variable from the Dash0 one:
+
+- `OTEL_EXPORTER_OTLP_ENDPOINT` is defaulted to the value of `DASH0_OTEL_COLLECTOR_BASE_URL`, with `setdefault`, so an endpoint you set yourself is never replaced.
+
+This is what lets a deployment configured only with `DASH0_OTEL_COLLECTOR_BASE_URL` point its exporters somewhere.
+
+The two are not interchangeable.
+Only the `sitecustomize.py` bridge runs under injection before the distribution decides whether to activate, so only that one determines whether an operator who sets `OTEL_EXPORTER_OTLP_ENDPOINT` alone gets any telemetry.
 
 ## Diagnostic output
 

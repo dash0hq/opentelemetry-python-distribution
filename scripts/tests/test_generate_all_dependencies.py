@@ -14,8 +14,10 @@ from dash0.opentelemetry.injector._packaging.version import Version  # noqa: E40
 from generate_all_dependencies import (  # noqa: E402
     manifest_lines,
     normalize,
+    pins_one_version,
     read_tree,
 )
+from packaging.specifiers import SpecifierSet  # noqa: E402
 
 
 def write_dist(tree: Path, name: str, version: str, requires: list[str]) -> None:
@@ -68,6 +70,54 @@ def test_a_curation_pin_from_the_distribution_is_ignored(tmp_path):
     write_dist(tmp_path, "dash0-opentelemetry", "0.3.2", ["pyyaml==6.0.3"])
 
     assert "pyyaml" in generate(tmp_path)
+
+
+def test_a_range_from_the_distribution_is_kept(tmp_path):
+    """Only the pins of a curated distribution are curation.
+
+    ``~=1.12`` is the vendored exporter's own account of the SDK versions it
+    works against, and no package without the prefix declares
+    ``opentelemetry-sdk`` at all, so dropping it would leave the line bare and
+    let every SDK version through.
+    """
+    write_dist(tmp_path, "opentelemetry-sdk", "1.44.0", [])
+    write_dist(
+        tmp_path,
+        "dash0-opentelemetry-exporter-otlp-pyproto-grpc",
+        "0.3.2",
+        ["opentelemetry-sdk~=1.12"],
+    )
+
+    assert "opentelemetry-sdk~=1.12" in generate(tmp_path)
+
+
+def test_a_curation_pin_and_a_range_on_one_package_leave_only_the_range(tmp_path):
+    write_dist(tmp_path, "opentelemetry-sdk", "1.44.0", [])
+    write_dist(tmp_path, "dash0-opentelemetry", "0.3.2", ["opentelemetry-sdk==1.44.0"])
+    write_dist(
+        tmp_path,
+        "dash0-opentelemetry-exporter-otlp-pyproto-grpc",
+        "0.3.2",
+        ["opentelemetry-sdk~=1.12"],
+    )
+
+    line = next(
+        line for line in generate(tmp_path) if line.startswith("opentelemetry-sdk")
+    )
+    specifier = Requirement(line).specifier
+    assert specifier.contains(Version("1.45.1"))
+    assert not specifier.contains(Version("1.11.0"))
+
+
+def test_what_counts_as_pinning_one_version():
+    assert pins_one_version(SpecifierSet("==1.44.0"))
+    assert pins_one_version(SpecifierSet("===1.0"))
+    assert pins_one_version(SpecifierSet(">=1.0,==1.44.0"))
+    assert not pins_one_version(SpecifierSet(""))
+    assert not pins_one_version(SpecifierSet("~=1.12"))
+    assert not pins_one_version(SpecifierSet("==1.44.*"))
+    assert not pins_one_version(SpecifierSet("<3.0.0,>=1.0.0"))
+    assert not pins_one_version(SpecifierSet("!=1.2.0"))
 
 
 def test_an_upstream_declaration_survives_a_curation_pin_on_the_same_package(tmp_path):

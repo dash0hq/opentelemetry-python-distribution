@@ -21,14 +21,21 @@ not the version the tree happens to contain. For ``wrapt`` that is
 installed version instead rejects versions upstream declares compatible, and
 silently turns off the distribution for an application that pinned any of them.
 
-One source of declarations is deliberately ignored: the distribution's own
-packages. ``packages/dash0-opentelemetry/pyproject.toml`` pins every dependency
-to an exact version, which is a statement about the set Dash0 validated and
-builds from, not a statement about what the code can run against. Carrying
-those pins into the manifest would reproduce exactly the behaviour this script
-exists to stop. Declarations made by any distribution whose name starts with
-``--curated-prefix`` (``dash0-`` by default) are therefore skipped, and only
-the upstream packages get to constrain the application.
+Some declarations are deliberately ignored: the exact pins the distribution's
+own packages make. ``packages/dash0-opentelemetry/pyproject.toml`` pins every
+dependency to one version, which is a statement about the set Dash0 validated
+and builds from, rather than a statement about what the code can run against.
+Carrying those pins into the manifest would reproduce exactly the behaviour
+this script exists to stop. A declaration made by a distribution whose name
+starts with ``--curated-prefix`` (``dash0-`` by default) is therefore skipped
+when it admits a single version, as ``==1.44.0`` and ``===1.0`` do.
+
+Every other declaration those same packages make is kept, because a range is a
+compatibility statement whoever wrote it. The three vendored pyproto exporters
+say ``opentelemetry-sdk~=1.12``, which is their own account of the SDK versions
+they work against. Dropping it would leave ``opentelemetry-sdk`` with no
+constraint at all, since every distribution of the tree that declares it
+carries the curated prefix.
 
 A package nothing else in the tree depends on gets a bare name with no
 specifier, so no version of it can stand the distribution down. That is what
@@ -66,6 +73,21 @@ def normalize(name: str) -> str:
     return re_sub(r"[-_.]+", "-", name).lower()
 
 
+def pins_one_version(specifier: SpecifierSet) -> bool:
+    """Say whether a specifier set admits at most one version.
+
+    True for ``==1.44.0`` and for ``===1.0``, and for a set holding either of
+    them alongside anything else, since the conjunction is then no wider than
+    the pin. False for a set with no clauses at all, and for every range,
+    including the prefix match ``==1.44.*``, which admits a whole series.
+    """
+    return any(
+        clause.operator == "==="
+        or (clause.operator == "==" and not clause.version.endswith(".*"))
+        for clause in specifier
+    )
+
+
 def read_tree(
     tree: Path, curated_prefix: str = "dash0-"
 ) -> tuple[set[str], dict[str, set[tuple[str, str | None]]]]:
@@ -74,8 +96,9 @@ def read_tree(
     Returns the set of normalized names the tree contains, and a mapping from
     normalized name to the ``(specifier, marker)`` pairs the tree declares about
     it. ``marker`` is ``None`` for a requirement with no environment marker.
-    Requirements gated on an extra are left out, and so is everything declared
-    by a distribution whose normalized name starts with ``curated_prefix``.
+    Requirements gated on an extra are left out, and so is every requirement
+    that pins one version and is declared by a distribution whose normalized
+    name starts with ``curated_prefix``.
     """
     installed: set[str] = set()
     demands: dict[str, set[tuple[str, str | None]]] = defaultdict(set)
@@ -88,9 +111,7 @@ def read_tree(
         if not name:
             raise ValueError(f"{metadata_path} has no Name header")
         installed.add(normalize(name))
-
-        if normalize(name).startswith(curated_prefix):
-            continue
+        curated = normalize(name).startswith(curated_prefix)
 
         for raw in metadata.get_all("Requires-Dist") or []:
             try:
@@ -99,6 +120,8 @@ def read_tree(
                 continue
             marker = str(requirement.marker) if requirement.marker else None
             if marker and "extra ==" in marker:
+                continue
+            if curated and pins_one_version(requirement.specifier):
                 continue
             demands[normalize(requirement.name)].add(
                 (str(requirement.specifier), marker)
@@ -137,9 +160,9 @@ def main() -> int:
     parser.add_argument(
         "--curated-prefix",
         default="dash0-",
-        help="ignore requirements declared by distributions whose normalized "
-        "name starts with this; their pins curate the build rather than "
-        "describe what the code supports",
+        help="ignore exact pins declared by distributions whose normalized "
+        "name starts with this; such a pin curates the build rather than "
+        "describing what the code supports. Ranges they declare are kept",
     )
     arguments = parser.parse_args()
 

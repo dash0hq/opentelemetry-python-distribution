@@ -25,12 +25,15 @@ subtext: |
   them common in applications.
 
   ``scripts/generate_all_dependencies.py`` now owns the format. A line carries
-  the conjunction of what the upstream packages of the tree declare about that
-  package. The distribution's own pins are skipped: they record the set a
-  release was validated against, rather than what the code supports. A package
-  that only the distribution depends on comes out unconstrained, which is what
-  finally makes the ``UNPINNED_BY_DESIGN`` table of
-  ``scripts/check_pinned_dependencies.py`` reach the bootstrap.
+  the conjunction of what the packages of the tree declare about that package.
+  The exact pins the distribution's own packages make are skipped: they record
+  the set a release was validated against, rather than what the code supports.
+  Every range they declare is kept, because a range is a compatibility
+  statement whoever wrote it, so the vendored pyproto exporters still
+  constrain ``opentelemetry-sdk`` to ``~=1.12``. A package that only the
+  distribution pins comes out unconstrained, which is what finally makes the
+  ``UNPINNED_BY_DESIGN`` table of ``scripts/check_pinned_dependencies.py``
+  reach the bootstrap.
 
   Nothing in the bootstrap changed. It already evaluated whatever specifier it
   was handed.

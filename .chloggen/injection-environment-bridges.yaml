@@ -32,4 +32,9 @@ subtext: |
   The page now describes both bridges, names the file each one is in, and the
   heading says what the section is about rather than naming ``PYTHONPATH``.
 
+  It also says which of the two variables to set. ``DASH0_OTEL_COLLECTOR_BASE_URL``
+  works under ``opentelemetry-instrument`` and under injection, while
+  ``OTEL_EXPORTER_OTLP_ENDPOINT`` on its own works only under injection,
+  because the bridge that reads it is in ``sitecustomize.py``.
+
 change_logs: [user]

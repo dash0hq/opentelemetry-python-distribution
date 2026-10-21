@@ -110,6 +110,12 @@ This is what lets a deployment configured only with `DASH0_OTEL_COLLECTOR_BASE_U
 The two are not interchangeable.
 Only the `sitecustomize.py` bridge runs under injection before the distribution decides whether to activate, so only that one determines whether an operator who sets `OTEL_EXPORTER_OTLP_ENDPOINT` alone gets any telemetry.
 
+Prefer `DASH0_OTEL_COLLECTOR_BASE_URL` when you configure this yourself.
+It is the only one of the two that works on both startup paths, because `Dash0Distro._configure` derives `OTEL_EXPORTER_OTLP_ENDPOINT` from it whether the process started under `opentelemetry-instrument` or under injection.
+Setting only `OTEL_EXPORTER_OTLP_ENDPOINT` works under injection and nowhere else.
+Under `opentelemetry-instrument` the `sitecustomize.py` bridge never runs, so the distribution finds no collector base URL, sets `OTEL_SDK_DISABLED=true` and exports nothing.
+The Dash0 operator is the case the `sitecustomize.py` bridge exists for: it sets `OTEL_EXPORTER_OTLP_ENDPOINT` and always starts the process under injection, so it needs no change.
+
 ## Diagnostic output
 
 `sitecustomize.py` writes its own diagnostics to stderr as one JSON object per line, under the logger name `dash0`.

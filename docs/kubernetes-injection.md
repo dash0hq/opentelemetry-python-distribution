@@ -55,7 +55,8 @@ Only a manifest that cannot be read or decoded at all deactivates the distributi
 ### Dependency conflict check
 
 The script validates the application's installed packages against `all-dependencies.txt`, the dependency manifest shipped beside it.
-Each line states what the upstream packages in the injected tree declare they support, so an application carrying its own `wrapt` or `typing-extensions` only conflicts when that version is outside the range upstream itself allows.
+Each line states what the packages in the injected tree declare they support, so an application carrying its own `wrapt` or `typing-extensions` only conflicts when that version is outside the range upstream itself allows.
+The manifest ships in the distribution wheel at `dash0/opentelemetry/injector/all-dependencies.txt`, so the tree an operator injects carries the same file every other consumer gets.
 If a version conflict is detected that would prevent the distribution from loading correctly, it deactivates itself and logs the conflict.
 
 Every requirement in the manifest is checked, so one deactivation names every conflicting package rather than only the first.

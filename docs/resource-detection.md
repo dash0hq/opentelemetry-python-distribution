@@ -85,9 +85,8 @@ resource:
       - dash0_service_name: {}
 ```
 
-The `propagator` block is not optional.
-A configuration file without it gets an empty composite propagator, whose `extract` returns `None` rather than a root context.
-The instrumentation attaches that `None` as the current context, and every instrumented HTTP request then fails with `AttributeError: 'NoneType' object has no attribute 'get'`.
+Declare the `propagator` block even though the schema allows omitting it.
+A file without it installs a noop propagator, so no trace context is read from incoming requests or written to outgoing ones, and traces break at every service boundary.
 
 Each detector is independent, so list only the ones you want.
 Attributes you declare under `resource.attributes` take precedence over anything a detector reports.

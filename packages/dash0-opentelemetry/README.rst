@@ -63,12 +63,14 @@ Resource detectors (``opentelemetry_resource_detector``)
     under ``resource.detection/development.detectors``.
 
     Declarative configuration (``OTEL_CONFIG_FILE``) runs only the detectors
-    the file lists, and reads neither ``OTEL_RESOURCE_ATTRIBUTES`` nor
-    ``OTEL_SERVICE_NAME``. The distro adds nothing to the file, so a user who
-    wants ``telemetry.distro.*``, ``k8s.pod.uid`` or the ``service.name``
-    fallback names the detectors themselves. This matches the Ruby and
-    JavaScript distributions, so one config file yields the same resource in
-    every language.
+    the file lists, and does not read ``OTEL_RESOURCE_ATTRIBUTES`` or
+    ``OTEL_SERVICE_NAME`` by itself, although it does substitute environment
+    variables, so both can be named explicitly. The distro adds nothing to the
+    file, so a user who wants ``telemetry.distro.*``, ``k8s.pod.uid`` or the
+    ``service.name`` fallback names the detectors themselves. The Ruby and
+    JavaScript distributions handle the ``dash0_*`` detectors the same way,
+    though the complete resource still differs between them because the SDKs
+    ship different built-in detectors.
 
 Instrumentations
 ================

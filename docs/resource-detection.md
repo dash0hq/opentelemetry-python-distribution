@@ -96,7 +96,7 @@ A file without it installs a noop propagator, so no trace context is read from i
 
 Each detector is independent, so list only the ones you want.
 Attributes you declare under `resource.attributes` take precedence over anything a detector reports.
-The Ruby and JavaScript distributions behave the same way, so one config file produces the same resource in all three languages.
+The Python, Ruby and JavaScript distributions handle the `dash0_*` detectors the same way, though the complete resource still differs between them because the SDKs ship different built-in detectors.
 
 `OTEL_EXPERIMENTAL_RESOURCE_DETECTORS` has no effect here.
 Declarative configuration never reads it, so setting it alongside `OTEL_CONFIG_FILE` changes nothing.

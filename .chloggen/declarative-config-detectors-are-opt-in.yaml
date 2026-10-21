@@ -32,7 +32,8 @@ subtext: |
   precedence over detected ones.
 
   Listing the detectors explicitly, rather than having the distribution insert
-  them, keeps one config file producing the same resource in the Python, Ruby
-  and JavaScript distributions.
+  them, keeps the Python, Ruby and JavaScript distributions handling the
+  ``dash0_*`` detectors the same way. The complete resource still differs
+  between them, because the SDKs ship different built-in detectors.
 
 change_logs: [user]

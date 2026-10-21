@@ -11,9 +11,17 @@ from opentelemetry._configuration.models import (
 from opentelemetry._configuration.models import (
     TextMapPropagator as TextMapPropagatorConfig,
 )
+from opentelemetry.context.context import Context
 from opentelemetry.propagate import set_global_textmap
 from opentelemetry.propagators.composite import CompositePropagator
-from opentelemetry.propagators.textmap import TextMapPropagator
+from opentelemetry.propagators.textmap import (
+    CarrierT,
+    Getter,
+    Setter,
+    TextMapPropagator,
+    default_getter,
+    default_setter,
+)
 from opentelemetry.trace.propagation.tracecontext import (
     TraceContextTextMapPropagator,
 )
@@ -23,6 +31,37 @@ _PROPAGATOR_REGISTRY: dict[str, type[TextMapPropagator]] = {
     "tracecontext": TraceContextTextMapPropagator,
     "baggage": W3CBaggagePropagator,
 }
+
+
+class _NoOpTextMapPropagator(TextMapPropagator):
+    """A propagator that reads nothing from a carrier and writes nothing to it.
+
+    The schema says a configuration file that omits ``propagator`` gets a noop
+    propagator. ``CompositePropagator([])`` is not one. Its ``extract`` returns
+    the context it was handed, so a caller that passes none gets ``None`` back
+    where every other propagator returns a root context, and instrumentation
+    that attaches the result then fails on every request.
+    """
+
+    def extract(
+        self,
+        carrier: CarrierT,
+        context: Context | None = None,
+        getter: Getter[CarrierT] = default_getter,
+    ) -> Context:
+        return Context() if context is None else context
+
+    def inject(
+        self,
+        carrier: CarrierT,
+        context: Context | None = None,
+        setter: Setter[CarrierT] = default_setter,
+    ) -> None:
+        return None
+
+    @property
+    def fields(self) -> set[str]:
+        return set()
 
 
 def _propagators_from_textmap_config(
@@ -58,21 +97,23 @@ def _propagators_from_textmap_config(
 
 def create_propagator(
     config: PropagatorConfig | None,
-) -> CompositePropagator:
-    """Create a CompositePropagator from declarative config.
+) -> TextMapPropagator:
+    """Create the propagator described by declarative config.
 
-    If config is None or has no propagators defined, returns an empty
-    CompositePropagator (no-op), ensuring "what you see is what you get"
-    semantics — the env-var-based default propagators are not used.
+    If config is None or names no propagator, returns a noop propagator, which
+    is what the schema specifies for a file that omits ``propagator``. Either
+    way the env-var-based default propagators are not used, so "what you see is
+    what you get" still holds.
 
     Args:
         config: Propagator config from the parsed config file, or None.
 
     Returns:
-        A CompositePropagator wrapping all configured propagators.
+        A CompositePropagator wrapping all configured propagators, or a noop
+        propagator when the config names none.
     """
     if config is None:
-        return CompositePropagator([])
+        return _NoOpTextMapPropagator()
 
     propagators: dict[type[TextMapPropagator], TextMapPropagator] = {}
 
@@ -90,6 +131,9 @@ def create_propagator(
                 continue
             propagator = load_entry_point("opentelemetry_propagator", name)()
             propagators.setdefault(type(propagator), propagator)
+
+    if not propagators:
+        return _NoOpTextMapPropagator()
 
     return CompositePropagator(list(propagators.values()))
 

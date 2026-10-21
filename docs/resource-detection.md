@@ -68,7 +68,8 @@ The SDK's built-in `OTELResourceDetector` picks those up automatically.
 No explicit detector configuration is required.
 
 **When you do need it: `OTEL_CONFIG_FILE`.**
-The experimental declarative SDK configuration (`OTEL_CONFIG_FILE`) reads neither `OTEL_RESOURCE_ATTRIBUTES` nor `OTEL_SERVICE_NAME`, and it runs only the detectors your config file lists.
+The experimental declarative SDK configuration (`OTEL_CONFIG_FILE`) runs only the detectors your config file lists, and it does not read `OTEL_RESOURCE_ATTRIBUTES` or `OTEL_SERVICE_NAME` by itself.
+It does substitute environment variables, so you can still feed both in by naming them explicitly.
 The distro adds nothing to that file, so name the detectors yourself to keep `telemetry.distro.*`, `k8s.pod.uid` and the `service.name` fallback:
 
 ```yaml
@@ -78,12 +79,17 @@ propagator:
     - tracecontext: {}
     - baggage: {}
 resource:
+  attributes_list: ${OTEL_RESOURCE_ATTRIBUTES:-}
   detection/development:
     detectors:
       - dash0_distribution: {}
       - dash0_kubernetes: {}
       - dash0_service_name: {}
 ```
+
+The `attributes_list` line is optional and shown because it is how `OTEL_RESOURCE_ATTRIBUTES` reaches a config file.
+The `:-` suffix supplies an empty default, so an unset variable yields no attributes instead of an error.
+Values under `resource.attributes` override anything `attributes_list` sets.
 
 Declare the `propagator` block even though the schema allows omitting it.
 A file without it installs a noop propagator, so no trace context is read from incoming requests or written to outgoing ones, and traces break at every service boundary.

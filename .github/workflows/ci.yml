@@ -122,6 +122,19 @@ jobs:
           uv run --no-project --python 3.13
           python scripts/vendor_configuration.py --check
 
+  injector-manifest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          python-version: "3.10"
+      - name: Check all-dependencies.txt matches the tree the distro installs
+        run: >
+          uv run --no-project --with packaging --python 3.13
+          python scripts/refresh_injector_manifest.py --check
+
   build:
     runs-on: ubuntu-latest
     steps:
@@ -135,6 +148,19 @@ jobs:
           uv build --all-packages --out-dir dist \
             --build-constraints scripts/build-constraints.txt
           ls -l dist
+      - name: Check the distro wheel ships the injector files
+        run: |
+          set -euo pipefail
+          wheel=$(ls dist/dash0_opentelemetry-*.whl)
+          contents=$(unzip -Z1 "$wheel")
+          for name in sitecustomize.py all-dependencies.txt; do
+            path="dash0/opentelemetry/injector/$name"
+            if ! grep -qxF "$path" <<<"$contents"; then
+              echo "::error::$wheel does not ship $path"
+              exit 1
+            fi
+            echo "$wheel ships $path"
+          done
       - name: Validate package metadata
         run: |
           set -euo pipefail

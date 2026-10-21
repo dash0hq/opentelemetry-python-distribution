@@ -1,10 +1,11 @@
 """The Dash0 resource detectors under declarative configuration.
 
 Declarative configuration runs only the detectors a config file lists, and it
-reads neither ``OTEL_RESOURCE_ATTRIBUTES`` nor ``OTEL_SERVICE_NAME``. A user who
-wants the distro's resource attributes therefore names the ``dash0_*`` detectors
-in their file, exactly as they would any other detector. Nothing in the distro
-adds them, which matches the Ruby and JavaScript distributions.
+does not read ``OTEL_RESOURCE_ATTRIBUTES`` or ``OTEL_SERVICE_NAME`` by itself.
+A user who wants the distro's resource attributes therefore names the
+``dash0_*`` detectors in their file, exactly as they would any other detector.
+Nothing in the distro adds them, and the Ruby and JavaScript distributions
+handle the ``dash0_*`` detectors the same way.
 
 That makes the three entry-point names a public interface: they are the literal
 text a user types into YAML. The tests below hold them to the entry points they
@@ -48,6 +49,7 @@ propagator:
     - tracecontext: {}
     - baggage: {}
 resource:
+  attributes_list: ${OTEL_RESOURCE_ATTRIBUTES:-}
   detection/development:
     detectors:
       - dash0_distribution: {}
@@ -125,6 +127,27 @@ def test_a_config_file_listing_the_detectors_produces_the_dash0_attributes(tmp_p
     assert attributes["telemetry.distro.version"]
     assert attributes["service.name"] == "server"
     assert attributes["service.instance.id"]
+
+
+def test_the_documented_example_interpolates_otel_resource_attributes(
+    monkeypatch, tmp_path
+):
+    """Hold the one claim the page makes that the detectors do not cover.
+
+    Declarative configuration does not read ``OTEL_RESOURCE_ATTRIBUTES`` on its
+    own, so the documented example names it through
+    ``${OTEL_RESOURCE_ATTRIBUTES:-}``. Every other test here runs that example
+    with the variable unset, which proves the default is harmless but not that
+    a value arrives.
+    """
+    monkeypatch.setenv(
+        OTEL_RESOURCE_ATTRIBUTES, "deployment.environment=prod,team=payments"
+    )
+
+    attributes = _resource_from(tmp_path, _DOCUMENTED_EXAMPLE).attributes
+
+    assert attributes["deployment.environment"] == "prod"
+    assert attributes["team"] == "payments"
 
 
 def test_the_kubernetes_detector_reports_the_pod_uid(monkeypatch, tmp_path):

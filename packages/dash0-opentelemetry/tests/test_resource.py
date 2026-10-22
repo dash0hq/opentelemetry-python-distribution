@@ -308,6 +308,44 @@ def test_a_generic_runner_supplies_no_fallback_name(monkeypatch):
     assert detect_fallback_service_name() is None
 
 
+def test_a_generic_runner_run_as_a_module_claims_no_distribution(monkeypatch):
+    """``python -m uvicorn`` reached the runner's own distribution metadata."""
+    monkeypatch.setattr(
+        resource_module.sys, "orig_argv", [_PYTHON, "-m", "uvicorn", "--version"]
+    )
+    monkeypatch.setattr(resource_module.sys, "argv", ["-m", "--version"])
+    monkeypatch.setattr(
+        resource_module, "packages_distributions", lambda: {"uvicorn": ["uvicorn"]}
+    )
+    monkeypatch.setattr(
+        resource_module,
+        "distributions",
+        lambda: [_FakeDistribution("uvicorn", "0.54.0")],
+    )
+
+    assert distribution_of_running_program() is None
+
+
+@pytest.mark.parametrize(
+    "module", ["gunicorn", "celery", "flask", "flask.cli", "celery.__main__"]
+)
+def test_a_generic_runner_run_as_a_module_supplies_no_fallback_name(
+    monkeypatch, module
+):
+    """The check is against the top-level package, so a submodule cannot slip by."""
+    monkeypatch.setattr(resource_module.sys, "orig_argv", [_PYTHON, "-m", module])
+    monkeypatch.setattr(resource_module.sys, "argv", ["-m"])
+
+    assert detect_fallback_service_name() is None
+
+
+def test_a_module_that_is_not_a_runner_still_names_itself(monkeypatch):
+    monkeypatch.setattr(resource_module.sys, "orig_argv", [_PYTHON, "-m", "checkout"])
+    monkeypatch.setattr(resource_module.sys, "argv", ["-m"])
+
+    assert detect_fallback_service_name() == "checkout"
+
+
 def test_a_django_manage_script_supplies_no_fallback_name(monkeypatch):
     """The ``.py`` suffix comes off before the runner check, or it never matches."""
     monkeypatch.setattr(resource_module.sys, "argv", ["/app/manage.py"])

@@ -202,10 +202,18 @@ def detect_fallback_service_name():
     identifies the launcher rather than the service it launched, and for an
     argument that is an interpreter flag rather than a program. Letting the SDK
     report ``unknown_service`` beats reporting a name that names no service.
+
+    A runner reaches this function by two routes, ``gunicorn`` and
+    ``python -m gunicorn``, so both are checked. The ``-m`` route is checked
+    against the top-level package, since ``python -m flask.cli`` names the same
+    runner as ``python -m flask``.
     """
     module = module_run_with_dash_m()
     if module:
-        return module.partition(".")[0] or None
+        package = module.partition(".")[0]
+        if not package or package in _RUNNER_PROGRAMS:
+            return None
+        return package
 
     argv0 = sys.argv[0] if sys.argv else ""
     if not argv0:
@@ -227,9 +235,11 @@ def distribution_of_running_program():
     names the package, which ``packages_distributions`` maps back to the
     distribution that installed it.
 
-    A console script that is a generic runner, such as ``gunicorn``, claims
-    nothing: it declares no identity beyond its own, and reporting its version
-    as the service version would describe the launcher rather than the service.
+    A generic runner, such as ``gunicorn``, claims nothing: it declares no
+    identity beyond its own, and reporting its version as the service version
+    would describe the launcher rather than the service. Both routes to a
+    runner are checked, the console script ``gunicorn`` and the module
+    ``python -m gunicorn``, the latter against its top-level package.
 
     Returns ``None`` for a process started as a plain script, which no
     installed distribution claims.
@@ -248,7 +258,7 @@ def distribution_of_running_program():
         return None
 
     package = module.partition(".")[0]
-    if not package:
+    if not package or package in _RUNNER_PROGRAMS:
         return None
     for name in packages_distributions().get(package, []):
         for distribution in distributions():

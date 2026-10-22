@@ -145,3 +145,4 @@ def test_both_paths_agree_on_service_instance_id_being_per_process(trace_records
 
 def test_metrics_and_logs_also_arrive(deployed):
     assert read_exported("metrics.jsonl"), "no metrics reached the collector"
+    assert read_exported("logs.jsonl"), "no logs reached the collector"

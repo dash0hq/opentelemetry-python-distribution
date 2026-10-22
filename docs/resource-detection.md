@@ -56,7 +56,7 @@ Sets `service.name` and `service.version` when they have not been provided expli
 2. `service.name` key in `OTEL_RESOURCE_ATTRIBUTES`.
 3. `Name` from the installed distribution the process was started from.
 4. `[project].name` from the nearest `pyproject.toml`.
-5. Basename of the entrypoint script (e.g., `app.py` → `app`).
+5. Basename of the entrypoint script (e.g., `app.py` → `app`), or the module name for `python -m package`.
 
 Steps 3 and 4 also supply `service.version`, from `Version` and `[project].version`.
 Steps 1, 2 and 5 do not.
@@ -65,6 +65,8 @@ No version is ever invented, because an absent version is more useful than a wro
 **How the installed distribution is identified.**
 A process started by a console script is owned by the distribution that declared that script, which is the common shape of a `pip install .` deployment.
 A process started with `python -m package` is owned by the distribution that installed the top-level package, resolved through `importlib.metadata.packages_distributions`.
+That package name is read from `sys.orig_argv`, because detection runs at interpreter startup, before `runpy` has built `__main__` or rewritten `sys.argv`.
+At that point `__main__.__package__` is still `None` and `sys.argv` is `['-m']`, so neither can supply it.
 A process started as a plain script, such as `python app.py`, is owned by no distribution and falls through to the next step.
 
 Reading installed metadata rather than source is what Java's Spring Boot starter does with `build-info.properties` and what the Node.js detector does with `package.json`.

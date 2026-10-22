@@ -16,6 +16,7 @@ from dash0.opentelemetry.resource import (
     detect_fallback_service_name,
     detect_service_metadata,
     distribution_of_running_program,
+    module_run_with_dash_m,
     pod_uid_from_cgroup_v1,
     pod_uid_from_cgroup_v2,
     service_metadata_from_pyproject,
@@ -217,8 +218,48 @@ def test_a_script_run_directly_claims_no_distribution(monkeypatch):
     assert distribution_of_running_program() is None
 
 
+_PYTHON = "/usr/local/bin/python3.13"
+
+_DASH_M_COMMAND_LINES = [
+    ([_PYTHON, "-m", "checkout"], ["-m"]),
+    ([_PYTHON, "-m", "checkout", "alpha", "beta"], ["-m", "alpha", "beta"]),
+    ([_PYTHON, "-u", "-m", "checkout", "alpha"], ["-m", "alpha"]),
+    ([_PYTHON, "-um", "checkout", "alpha"], ["-m", "alpha"]),
+    ([_PYTHON, "-W", "ignore", "-m", "checkout"], ["-m"]),
+    ([_PYTHON, "-X", "importtime", "-m", "checkout", "alpha"], ["-m", "alpha"]),
+    (
+        [_PYTHON, "-B", "-W", "ignore", "-X", "utf8", "-m", "checkout", "a", "b"],
+        ["-m", "a", "b"],
+    ),
+]
+
+
+@pytest.mark.parametrize("orig_argv, argv", _DASH_M_COMMAND_LINES)
+def test_the_module_survives_every_spelling_of_dash_m(monkeypatch, orig_argv, argv):
+    """Each pair is what a real interpreter reports at ``sitecustomize`` time.
+
+    The flags are never parsed, so a cluster such as ``-um`` and an option
+    carrying a value such as ``-W ignore`` both have to land on the module.
+    """
+    monkeypatch.setattr(resource_module.sys, "orig_argv", orig_argv)
+    monkeypatch.setattr(resource_module.sys, "argv", argv)
+
+    assert module_run_with_dash_m() == "checkout"
+
+
+def test_a_command_line_without_dash_m_yields_no_module(monkeypatch):
+    monkeypatch.setattr(resource_module.sys, "orig_argv", [_PYTHON, "/opt/app/app.py"])
+    monkeypatch.setattr(resource_module.sys, "argv", ["/opt/app/app.py"])
+
+    assert module_run_with_dash_m() is None
+
+
 def test_python_dash_m_names_the_distribution_that_installed_the_package(monkeypatch):
-    monkeypatch.setattr(resource_module.sys, "argv", ["/opt/app/__main__.py"])
+    """``__main__`` does not exist yet, so the module comes from ``orig_argv``."""
+    monkeypatch.setattr(
+        resource_module.sys, "orig_argv", [_PYTHON, "-m", "checkout.cli"]
+    )
+    monkeypatch.setattr(resource_module.sys, "argv", ["-m"])
     monkeypatch.setattr(
         resource_module,
         "packages_distributions",
@@ -229,11 +270,24 @@ def test_python_dash_m_names_the_distribution_that_installed_the_package(monkeyp
         "distributions",
         lambda: [_FakeDistribution("checkout_service", "3.1.0")],
     )
-    main = type(resource_module.sys)("__main__")
-    main.__package__ = "checkout.cli"
-    monkeypatch.setitem(resource_module.sys.modules, "__main__", main)
 
     assert detect_service_metadata() == ("checkout_service", "3.1.0")
+
+
+def test_python_dash_m_never_reports_the_flag_as_the_service_name(monkeypatch):
+    """The regression: ``path.basename("-m")`` used to become the service name."""
+    monkeypatch.setattr(resource_module.sys, "orig_argv", [_PYTHON, "-m", "checkout"])
+    monkeypatch.setattr(resource_module.sys, "argv", ["-m"])
+
+    assert detect_fallback_service_name() == "checkout"
+
+
+def test_an_unresolvable_dash_m_reports_no_service_name(monkeypatch):
+    """Without ``orig_argv`` there is no module to name, and ``-m`` is not one."""
+    monkeypatch.setattr(resource_module.sys, "orig_argv", [])
+    monkeypatch.setattr(resource_module.sys, "argv", ["-m"])
+
+    assert detect_fallback_service_name() is None
 
 
 @_needs_tomllib

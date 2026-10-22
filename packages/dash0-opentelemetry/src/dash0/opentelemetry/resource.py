@@ -130,46 +130,86 @@ def _service_name_already_configured():
     return False
 
 
+def module_run_with_dash_m():
+    """The module name of a ``python -m module`` command line, if this is one.
+
+    Detection runs from ``sitecustomize`` at interpreter startup, before
+    ``runpy`` has built the real ``__main__`` or rewritten ``sys.argv``. At that
+    moment ``__main__.__package__`` is ``None`` and ``sys.argv`` is
+    ``["-m", *program_arguments]``, so the module name survives only in
+    ``sys.orig_argv``.
+
+    CPython replaces the ``-m module`` pair with the single token ``-m`` and
+    keeps every program argument after it, so the module name sits
+    ``len(sys.orig_argv) - len(sys.argv)`` places into the original command
+    line. That offset holds for every spelling, including ``python -um module``
+    and ``python -W ignore -m module``, which is why the interpreter flags are
+    never parsed.
+
+    Returns ``None`` when the process was not started with ``-m``.
+    """
+    if not sys.argv or sys.argv[0] != "-m":
+        return None
+    orig_argv = getattr(sys, "orig_argv", [])
+    index = len(orig_argv) - len(sys.argv)
+    if not 0 < index < len(orig_argv):
+        return None
+    module = orig_argv[index]
+    if not module or module.startswith("-"):
+        return None
+    return module
+
+
 def detect_fallback_service_name():
     """Best-effort service name from the running program.
 
     The last resort in :func:`detect_service_metadata`, used when the process
     cannot be traced back to an installed distribution or a ``pyproject.toml``.
+
+    Returns ``None`` for an argument that is an interpreter flag rather than a
+    program, since ``-m`` names no service.
     """
+    module = module_run_with_dash_m()
+    if module:
+        return module.partition(".")[0] or None
+
     argv0 = sys.argv[0] if sys.argv else ""
     if not argv0:
         return None
     name = path.basename(argv0)
     if name.endswith(".py"):
         name = name[: -len(".py")]
-    return name or None
+    if not name or name.startswith("-"):
+        return None
+    return name
 
 
 def distribution_of_running_program():
     """The installed distribution this process was started from, if any.
 
-    Two signals, in order. A console script leaves its own name in
-    ``sys.argv[0]``, and the distribution that declared that script owns the
-    process. Otherwise ``python -m package`` leaves the package in
-    ``__main__.__package__``, which ``packages_distributions`` maps back to the
+    Two signals, which the command line makes mutually exclusive. A console
+    script leaves its own name in ``sys.argv[0]``, and the distribution that
+    declared that script owns the process. Otherwise ``python -m package``
+    names the package, which ``packages_distributions`` maps back to the
     distribution that installed it.
 
     Returns ``None`` for a process started as a plain script, which no
     installed distribution claims.
     """
-    argv0 = sys.argv[0] if sys.argv else ""
-    script = path.basename(argv0)
-    if script and not script.endswith(".py"):
-        for distribution in distributions():
-            for entry_point in distribution.entry_points:
-                if (
-                    entry_point.group == "console_scripts"
-                    and entry_point.name == script
-                ):
-                    return distribution
+    module = module_run_with_dash_m()
+    if module is None:
+        script = path.basename(sys.argv[0] if sys.argv else "")
+        if script and not script.endswith(".py"):
+            for distribution in distributions():
+                for entry_point in distribution.entry_points:
+                    if (
+                        entry_point.group == "console_scripts"
+                        and entry_point.name == script
+                    ):
+                        return distribution
+        return None
 
-    main = sys.modules.get("__main__")
-    package = (getattr(main, "__package__", "") or "").partition(".")[0]
+    package = module.partition(".")[0]
     if not package:
         return None
     for name in packages_distributions().get(package, []):

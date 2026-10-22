@@ -68,6 +68,17 @@ On NixOS, where ``kind`` is not on ``PATH``, point the suite at a store path::
 
     export KIND_BINARY=$(nix build nixpkgs#kind --no-link --print-out-paths)/bin/kind
 
+In CI
+=====
+
+``.github/workflows/e2e-kubernetes.yml`` runs the same ``make e2e-kubernetes``
+on every push to ``main``, on any pull request touching ``packages/``,
+``tests/e2e-kubernetes/`` or the ``Makefile``, and on demand through
+``workflow_dispatch``. ``helm/kind-action`` creates the cluster under the name
+the ``E2E_CLUSTER`` default already uses, so the suite finds it and reuses it.
+A failing run dumps the pod descriptions and the last 200 log lines of every
+container before the job ends.
+
 Exporting to a real Dash0 organization
 ======================================
 

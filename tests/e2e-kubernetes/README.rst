@@ -129,7 +129,11 @@ Path                              Contents
 ``instrumentation/Dockerfile``    Builds the injectable tree. Its build context
                                   is the repository root, so it installs the
                                   distribution from this checkout rather than
-                                  from an index.
+                                  from an index. It then copies
+                                  ``sitecustomize.py`` and
+                                  ``all-dependencies.txt`` out of the
+                                  installed tree, the two copies a consumer
+                                  makes.
 ``manifests/``                    Namespace, collector, both applications and
                                   the traffic job, applied in filename order.
 ``tests/cluster.py``              Wrappers over ``kind``, ``kubectl`` and

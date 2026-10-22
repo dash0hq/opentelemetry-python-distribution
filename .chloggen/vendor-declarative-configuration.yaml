@@ -46,11 +46,4 @@ subtext: |
   Resource detectors still run only when the configuration file names them
   under ``detection/development``, so issue #6 is unaffected by this change.
 
-  A configuration file has to declare a ``propagator``. Omitting the key yields
-  an empty composite propagator, whose ``extract`` returns ``None`` rather than
-  a root context, and the instrumentation then attaches that ``None`` as the
-  current context, so every instrumented HTTP request fails. The documented
-  example in ``docs/resource-detection.md`` declares ``tracecontext`` and
-  ``baggage``.
-
 change_logs: [user]

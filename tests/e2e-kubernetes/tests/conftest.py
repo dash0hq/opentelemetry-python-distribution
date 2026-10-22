@@ -87,9 +87,19 @@ def deployed() -> None:
         timeout=360,
     )
 
+    def every_application_has_exported_a_span() -> bool:
+        exporting = {
+            attribute.get("value", {}).get("stringValue")
+            for record in read_exported("traces.jsonl")
+            for resource_spans in record.get("resourceSpans", [])
+            for attribute in resource_spans.get("resource", {}).get("attributes", [])
+            if attribute.get("key") == "k8s.pod.uid"
+        }
+        return len(exporting) >= 3
+
     wait_for(
         "all three applications to export spans",
-        lambda: len(read_exported("traces.jsonl")) >= 3,
+        every_application_has_exported_a_span,
         timeout=180,
     )
 

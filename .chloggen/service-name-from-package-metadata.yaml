@@ -21,6 +21,14 @@ subtext: |
   set before. The entrypoint basename does not, because an absent version is
   more useful than a wrong one.
 
+  A generic runner is never reported as the service. A console script such as
+  ``gunicorn``, ``uvicorn``, ``celery`` or ``flask`` launches someone else's
+  application, so neither its name nor its version describes the service, and
+  both the console-script step and the entrypoint basename decline to use it.
+  Detection falls through to ``pyproject.toml``, and when that finds nothing
+  either the SDK's ``unknown_service`` stands. The Dash0 Ruby distribution
+  skips ``puma``, ``unicorn`` and ``sidekiq`` the same way.
+
   Reading installed metadata rather than source mirrors the Java Spring Boot
   starter, which reads ``build-info.properties``, and the Node.js detector,
   which reads ``package.json``. A deployed container often ships no

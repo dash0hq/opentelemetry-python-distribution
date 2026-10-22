@@ -61,6 +61,7 @@ Sets `service.name` and `service.version` when they have not been provided expli
 Steps 3 and 4 also supply `service.version`, from `Version` and `[project].version`.
 Steps 1, 2 and 5 do not.
 No version is ever invented, because an absent version is more useful than a wrong one.
+Steps 3 and 5 both decline to name a generic runner, so a process launched by one can finish with no detected name at all.
 
 **How the installed distribution is identified.**
 A process started by a console script is owned by the distribution that declared that script, which is the common shape of a `pip install .` deployment.
@@ -78,9 +79,12 @@ It stops at a `.git` directory or at the filesystem root, so a monorepo yields t
 This step needs `tomllib` and is therefore skipped on Python 3.10, which predates it.
 `tomli` is deliberately not taken as a dependency.
 
-A generic runner is identified as itself.
-Running `gunicorn myapp:app` reports `service.name=gunicorn`, because the console script belongs to `gunicorn`.
-That already was the behavior of the entrypoint basename, so it is not a change, but it now carries `gunicorn`'s version with it.
+**Generic runners are skipped.**
+A console script such as `gunicorn`, `uvicorn`, `celery` or `flask` launches someone else's application, so its name describes the launcher and its version describes the launcher's release.
+Running `gunicorn myapp:app` therefore does not report `service.name=gunicorn`, and never reports `gunicorn`'s version as `service.version`.
+Detection falls through to `pyproject.toml`, which still finds the application when the virtual environment sits inside the project directory.
+When that finds nothing either, no name is reported and the SDK's `unknown_service` stands, because an honest absence is easier to act on than a name that every deployment shares.
+The Dash0 Ruby distribution skips `puma`, `unicorn` and `sidekiq` for the same reason, so the two distributions behave alike.
 Set `OTEL_SERVICE_NAME` for those deployments.
 
 The detection chain ensures that every process has a human-readable `service.name` even in injection scenarios where no explicit name has been configured.

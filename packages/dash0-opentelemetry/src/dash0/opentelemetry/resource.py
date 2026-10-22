@@ -45,6 +45,38 @@ _K8S_POD_UID = "k8s.pod.uid"
 _DISTRO_NAME = "telemetry.distro.name"
 _DISTRO_VERSION = "telemetry.distro.version"
 
+_RUNNER_PROGRAMS = frozenset(
+    {
+        "celery",
+        "daphne",
+        "django-admin",
+        "dramatiq",
+        "flask",
+        "granian",
+        "gunicorn",
+        "honcho",
+        "huey_consumer",
+        "hypercorn",
+        "manage",
+        "nox",
+        "pdm",
+        "pipenv",
+        "pipx",
+        "poetry",
+        "pytest",
+        "python",
+        "python3",
+        "rq",
+        "rqworker",
+        "supervisord",
+        "tox",
+        "uv",
+        "uvicorn",
+        "uvx",
+        "waitress-serve",
+    }
+)
+
 _ETC_HOSTS = "/etc/hosts"
 _K8S_HOSTS_MARKER = "# Kubernetes-managed hosts file"
 _CGROUP_V1_MOUNTINFO = "/proc/self/mountinfo"
@@ -166,8 +198,10 @@ def detect_fallback_service_name():
     The last resort in :func:`detect_service_metadata`, used when the process
     cannot be traced back to an installed distribution or a ``pyproject.toml``.
 
-    Returns ``None`` for an argument that is an interpreter flag rather than a
-    program, since ``-m`` names no service.
+    Returns ``None`` for a generic runner such as ``gunicorn``, whose name
+    identifies the launcher rather than the service it launched, and for an
+    argument that is an interpreter flag rather than a program. Letting the SDK
+    report ``unknown_service`` beats reporting a name that names no service.
     """
     module = module_run_with_dash_m()
     if module:
@@ -179,7 +213,7 @@ def detect_fallback_service_name():
     name = path.basename(argv0)
     if name.endswith(".py"):
         name = name[: -len(".py")]
-    if not name or name.startswith("-"):
+    if not name or name.startswith("-") or name in _RUNNER_PROGRAMS:
         return None
     return name
 
@@ -193,13 +227,17 @@ def distribution_of_running_program():
     names the package, which ``packages_distributions`` maps back to the
     distribution that installed it.
 
+    A console script that is a generic runner, such as ``gunicorn``, claims
+    nothing: it declares no identity beyond its own, and reporting its version
+    as the service version would describe the launcher rather than the service.
+
     Returns ``None`` for a process started as a plain script, which no
     installed distribution claims.
     """
     module = module_run_with_dash_m()
     if module is None:
         script = path.basename(sys.argv[0] if sys.argv else "")
-        if script and not script.endswith(".py"):
+        if script and not script.endswith(".py") and script not in _RUNNER_PROGRAMS:
             for distribution in distributions():
                 for entry_point in distribution.entry_points:
                     if (

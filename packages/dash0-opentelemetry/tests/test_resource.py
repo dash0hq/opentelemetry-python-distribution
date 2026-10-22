@@ -290,6 +290,51 @@ def test_an_unresolvable_dash_m_reports_no_service_name(monkeypatch):
     assert detect_fallback_service_name() is None
 
 
+def test_a_generic_runner_claims_no_distribution(monkeypatch):
+    """``gunicorn`` declares a console script, but it launches someone else."""
+    monkeypatch.setattr(resource_module.sys, "argv", ["/usr/local/bin/gunicorn"])
+    monkeypatch.setattr(
+        resource_module,
+        "distributions",
+        lambda: [_FakeDistribution("gunicorn", "23.0.0", ("gunicorn",))],
+    )
+
+    assert distribution_of_running_program() is None
+
+
+def test_a_generic_runner_supplies_no_fallback_name(monkeypatch):
+    monkeypatch.setattr(resource_module.sys, "argv", ["/usr/local/bin/gunicorn"])
+
+    assert detect_fallback_service_name() is None
+
+
+def test_a_django_manage_script_supplies_no_fallback_name(monkeypatch):
+    """The ``.py`` suffix comes off before the runner check, or it never matches."""
+    monkeypatch.setattr(resource_module.sys, "argv", ["/app/manage.py"])
+
+    assert detect_fallback_service_name() is None
+
+
+def test_a_generic_runner_leaves_the_service_name_unset(monkeypatch):
+    """Nothing identifies the service, so ``unknown_service`` has to stand."""
+    monkeypatch.setattr(resource_module.sys, "argv", ["/usr/local/bin/gunicorn"])
+    monkeypatch.setattr(
+        resource_module,
+        "distributions",
+        lambda: [_FakeDistribution("gunicorn", "23.0.0", ("gunicorn",))],
+    )
+    monkeypatch.setattr(
+        resource_module, "service_metadata_from_pyproject", lambda: (None, None)
+    )
+
+    assert detect_service_metadata() == (None, None)
+
+    apply_detected_resource_attributes("9.9.9")
+
+    assert OTEL_SERVICE_NAME not in os.environ
+    assert "service.version" not in os.environ.get(OTEL_RESOURCE_ATTRIBUTES, "")
+
+
 @_needs_tomllib
 def test_pyproject_supplies_the_name_when_nothing_is_installed(monkeypatch, tmp_path):
     source = tmp_path / "src"

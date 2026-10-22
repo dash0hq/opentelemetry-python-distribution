@@ -38,7 +38,7 @@ jobs:
         run: |
           kubectl --context kind-dash0-python-e2e -n dash0-e2e get pods -o wide
           kubectl --context kind-dash0-python-e2e -n dash0-e2e describe pods
-          for app in collector app-environment app-declarative; do
+          for app in collector app-environment app-installed app-declarative; do
             kubectl --context kind-dash0-python-e2e -n dash0-e2e \
               logs --all-containers --tail=200 --selector "app=$app"
           done

@@ -79,6 +79,11 @@ the ``E2E_CLUSTER`` default already uses, so the suite finds it and reuses it.
 A failing run dumps the pod descriptions and the last 200 log lines of every
 container before the job ends.
 
+Every image the suite pulls names an exact tag, the collector included, and the
+``docker`` entry in ``.github/dependabot.yml`` watches the three directories
+that name one. The two ``dash0-e2e-*:test`` images are built from this checkout
+and exist in no registry, so that entry ignores them.
+
 Exporting to a real Dash0 organization
 ======================================
 

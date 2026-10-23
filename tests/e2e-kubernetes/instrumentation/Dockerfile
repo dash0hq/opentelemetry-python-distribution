@@ -14,5 +14,5 @@ RUN cp /dash0/dash0/opentelemetry/injector/sitecustomize.py /dash0/sitecustomize
 RUN python /src/scripts/generate_all_dependencies.py /dash0 -o /dash0/all-dependencies.txt \
  && cat /dash0/all-dependencies.txt
 
-FROM busybox:1.37
+FROM busybox:1.38
 COPY --from=build /dash0 /dash0

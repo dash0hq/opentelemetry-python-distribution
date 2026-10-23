@@ -51,6 +51,7 @@ MANIFEST: Path = (
     DISTRO / "src" / "dash0" / "opentelemetry" / "injector" / "all-dependencies.txt"
 )
 TARGET_PYTHON: str = "3.10"
+SCRIPT: Path = Path(__file__).resolve().relative_to(REPO_ROOT)
 
 
 def main() -> int:
@@ -105,8 +106,11 @@ def main() -> int:
     ):
         print(line, end="")
     print(
-        f"{relative} is not what {Path(__file__).name} generates; "
-        f"re-run it instead of editing the file by hand."
+        f"{relative} is not what {SCRIPT} generates. "
+        f"Run `python3 {SCRIPT}` and commit the result rather than editing "
+        f"the file by hand. Any pull request that moves a pin in "
+        f"{DISTRO.relative_to(REPO_ROOT)}/pyproject.toml needs this, "
+        f"including a Dependabot bump of the opentelemetry group."
     )
     return 1
 

@@ -43,7 +43,7 @@ spec:
             initialDelaySeconds: 2
             periodSeconds: 2
         - name: reader
-          image: busybox:1.37
+          image: busybox:1.38
           command: ["sh", "-c", "sleep infinity"]
           volumeMounts:
             - name: output

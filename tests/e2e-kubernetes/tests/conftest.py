@@ -61,7 +61,12 @@ def deployed() -> None:
     for manifest in sorted(MANIFESTS.glob("*.yaml")):
         kubectl("apply", "-f", str(manifest))
 
-    for deployment in ("collector", "app-environment", "app-declarative"):
+    for deployment in (
+        "collector",
+        "app-environment",
+        "app-declarative",
+        "app-installed",
+    ):
         kubectl(
             "-n",
             NAMESPACE,
@@ -82,9 +87,19 @@ def deployed() -> None:
         timeout=360,
     )
 
+    def every_application_has_exported_a_span() -> bool:
+        exporting = {
+            attribute.get("value", {}).get("stringValue")
+            for record in read_exported("traces.jsonl")
+            for resource_spans in record.get("resourceSpans", [])
+            for attribute in resource_spans.get("resource", {}).get("attributes", [])
+            if attribute.get("key") == "k8s.pod.uid"
+        }
+        return len(exporting) >= 3
+
     wait_for(
-        "both applications to export spans",
-        lambda: len(read_exported("traces.jsonl")) >= 2,
+        "all three applications to export spans",
+        every_application_has_exported_a_span,
         timeout=180,
     )
 

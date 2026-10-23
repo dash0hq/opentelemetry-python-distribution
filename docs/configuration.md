@@ -6,7 +6,7 @@
 |---|---|
 | `DASH0_OTEL_COLLECTOR_BASE_URL` | **Required.** OTLP endpoint to export to. If unset, the distribution disables itself entirely and sets `OTEL_SDK_DISABLED=true`. |
 | `DASH0_DISABLE` | Set to `true` to disable the distribution entirely. The SDK becomes a no-op. |
-| `DASH0_AUTOMATIC_SERVICE_NAME` | Set to `false` to opt out of the entrypoint-derived `service.name` fallback. |
+| `DASH0_AUTOMATIC_SERVICE_NAME` | Set to `false` to opt out of detected `service.name` and `service.version`. |
 | `DASH0_BOOTSTRAP_SPAN` | Name of a single span to emit once at startup. Useful for confirming the distribution is active. |
 | `DASH0_FLUSH_ON_SIGTERM_SIGINT` | Set to `true` to flush all telemetry (traces, metrics, logs) on `SIGTERM` or `SIGINT` before exiting. Signal handlers can only be installed from the main thread; if the distribution is configured from a non-main thread, this setting is silently ignored. |
 
@@ -50,11 +50,15 @@ The distribution uses the following priority order for `service.name`:
 
 1. `OTEL_SERVICE_NAME` (you set it explicitly)
 2. `service.name` from `OTEL_RESOURCE_ATTRIBUTES`
-3. Name derived from the entrypoint script basename (e.g., `app.py` → `app`)
+3. `Name` from the installed distribution the process was started from
+4. `[project].name` from the nearest `pyproject.toml`, walking up from the entrypoint script
+5. Name derived from the entrypoint script basename (e.g., `app.py` → `app`)
 
-Steps 2 and 3 are suppressed when `DASH0_AUTOMATIC_SERVICE_NAME=false`.
+Steps 3 and 4 also set `service.version`.
+Steps 2 through 5 are suppressed when `DASH0_AUTOMATIC_SERVICE_NAME=false`.
+See `docs/resource-detection.md` for how a distribution is identified and where the `pyproject.toml` walk stops.
 
-To disable the entrypoint fallback and keep `service.name` unset when you have not provided one:
+To disable detection and keep `service.name` unset when you have not provided one:
 
 ```bash
 export DASH0_AUTOMATIC_SERVICE_NAME=false

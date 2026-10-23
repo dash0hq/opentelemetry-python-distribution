@@ -54,8 +54,8 @@ Resource detectors (``opentelemetry_resource_detector``)
     * ``dash0_kubernetes`` — ``k8s.pod.uid``;
     * ``dash0_service_name`` — wraps the upstream service detection (a
       process-stable ``service.instance.id`` and ``service.name`` from
-      ``OTEL_SERVICE_NAME``) and adds the distro's entrypoint-derived
-      ``service.name`` fallback, so there is no need to also list the built-in
+      ``OTEL_SERVICE_NAME``) and adds the distro's detected ``service.name``
+      and ``service.version``, so there is no need to also list the built-in
       ``service`` detector.
 
     They can be referenced via ``OTEL_EXPERIMENTAL_RESOURCE_DETECTORS`` on the
@@ -106,10 +106,12 @@ Ported from the Node.js distribution's custom detectors:
 * **Kubernetes pod UID** (``k8s.pod.uid``): confirms it is running in Kubernetes
   (via ``/etc/hosts``), then extracts the pod UID from cgroup v1
   (``/proc/self/mountinfo``) or cgroup v2 (``/proc/self/cgroup``).
-* **Service-name fallback**: if ``OTEL_SERVICE_NAME`` / ``service.name`` are not
-  set (and ``DASH0_AUTOMATIC_SERVICE_NAME`` is not ``false``), derives a name
-  from the entrypoint script. (Node.js reads ``package.json``; Python has no
-  universal equivalent, so this is a best-effort analog.)
+* **Service name and version**: if ``OTEL_SERVICE_NAME`` / ``service.name`` are
+  not set (and ``DASH0_AUTOMATIC_SERVICE_NAME`` is not ``false``), reads them
+  from the installed distribution the process was started from, then from the
+  nearest ``pyproject.toml``, and falls back to the entrypoint script basename.
+  Only the first two carry a ``service.version``; no version is invented. Node.js
+  reads ``package.json``, and reading installed metadata is the Python analog.
 * **Distribution attributes**: ``telemetry.distro.name=dash0-python`` and
   ``telemetry.distro.version``.
 

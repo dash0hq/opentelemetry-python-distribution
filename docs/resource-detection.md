@@ -42,21 +42,54 @@ See the [OpenTelemetry Kubernetes attributes best practices](https://www.dash0.c
 
 ## Service name detector (`dash0_service_name`)
 
-Sets `service.name` when it has not been provided explicitly:
+Sets `service.name` and `service.version` when they have not been provided explicitly:
 
 | Attribute | Value |
 |---|---|
-| `service.name` | Derived from `OTEL_SERVICE_NAME`, `OTEL_RESOURCE_ATTRIBUTES`, or entrypoint basename |
+| `service.name` | Derived from `OTEL_SERVICE_NAME`, `OTEL_RESOURCE_ATTRIBUTES`, installed package metadata, `pyproject.toml`, or entrypoint basename |
+| `service.version` | The version of the installed distribution or the `pyproject.toml` that supplied the name |
 | `service.instance.id` | Stable per-process UUID |
 
 **Priority order for `service.name`:**
 
 1. `OTEL_SERVICE_NAME` environment variable.
 2. `service.name` key in `OTEL_RESOURCE_ATTRIBUTES`.
-3. Basename of the entrypoint script (e.g., `app.py` → `app`).
+3. `Name` from the installed distribution the process was started from.
+4. `[project].name` from the nearest `pyproject.toml`.
+5. Basename of the entrypoint script (e.g., `app.py` → `app`), or the module name for `python -m package`.
 
-The entrypoint fallback ensures that every process has a human-readable `service.name` even in injection scenarios where no explicit name has been configured.
-To disable this fallback, set `DASH0_AUTOMATIC_SERVICE_NAME=false`.
+Steps 3 and 4 also supply `service.version`, from `Version` and `[project].version`.
+Steps 1, 2 and 5 do not.
+No version is ever invented, because an absent version is more useful than a wrong one.
+Steps 3 and 5 both decline to name a generic runner, so a process launched by one can finish with no detected name at all.
+
+**How the installed distribution is identified.**
+A process started by a console script is owned by the distribution that declared that script, which is the common shape of a `pip install .` deployment.
+A process started with `python -m package` is owned by the distribution that installed the top-level package, resolved through `importlib.metadata.packages_distributions`.
+That package name is read from `sys.orig_argv`, because detection runs at interpreter startup, before `runpy` has built `__main__` or rewritten `sys.argv`.
+At that point `__main__.__package__` is still `None` and `sys.argv` is `['-m']`, so neither can supply it.
+A process started as a plain script, such as `python app.py`, is owned by no distribution and falls through to the next step.
+
+Reading installed metadata rather than source is what Java's Spring Boot starter does with `build-info.properties` and what the Node.js detector does with `package.json`.
+A deployed container often ships no `pyproject.toml`, and `.dist-info/METADATA` is derived from `pyproject.toml` at build time anyway.
+
+**How `pyproject.toml` is found.**
+The walk starts at the directory holding the entrypoint script, not the working directory, because `python path/to/app.py` can be run from anywhere.
+It stops at a `.git` directory or at the filesystem root, so a monorepo yields the project that owns the entrypoint rather than the one at the top of the checkout.
+This step needs `tomllib` and is therefore skipped on Python 3.10, which predates it.
+`tomli` is deliberately not taken as a dependency.
+
+**Generic runners are skipped.**
+A console script such as `gunicorn`, `uvicorn`, `celery` or `flask` launches someone else's application, so its name describes the launcher and its version describes the launcher's release.
+Running `gunicorn myapp:app` therefore does not report `service.name=gunicorn`, and never reports `gunicorn`'s version as `service.version`.
+A runner started as a module is skipped too, so `python -m gunicorn` and `python -m flask run` behave the same way, matched on the top-level package so that `python -m flask.cli` is also covered.
+Detection falls through to `pyproject.toml`, which still finds the application when the virtual environment sits inside the project directory.
+When that finds nothing either, no name is reported and the SDK's `unknown_service` stands, because an honest absence is easier to act on than a name that every deployment shares.
+The Dash0 Ruby distribution skips `puma`, `unicorn` and `sidekiq` for the same reason, so the two distributions behave alike.
+Set `OTEL_SERVICE_NAME` for those deployments.
+
+The detection chain ensures that every process has a human-readable `service.name` even in injection scenarios where no explicit name has been configured.
+To disable all of it, set `DASH0_AUTOMATIC_SERVICE_NAME=false`.
 
 This detector also wraps the upstream `service` detector, so there is no need to list both `service` and `dash0_service_name` in `OTEL_EXPERIMENTAL_RESOURCE_DETECTORS`.
 

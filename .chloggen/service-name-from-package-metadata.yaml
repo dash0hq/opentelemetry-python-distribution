@@ -1,0 +1,42 @@
+change_type: enhancement
+component: resource-detectors
+note: Derive ``service.name`` and ``service.version`` from installed package metadata
+issues: [39]
+subtext: |
+  ``service.name`` previously came from the entrypoint script basename whenever
+  neither ``OTEL_SERVICE_NAME`` nor a ``service.name`` in
+  ``OTEL_RESOURCE_ATTRIBUTES`` was set, so an application installed as a
+  distribution reported the name of the file that happened to start it.
+
+  Two steps now come first. A process started by a console script is attributed
+  to the distribution that declared that script, and a process started with
+  ``python -m package`` to the distribution that installed the package. Failing
+  that, the nearest ``pyproject.toml`` is read, walking up from the directory
+  holding the entrypoint script and stopping at a ``.git`` directory, so a
+  monorepo yields the project that owns the entrypoint. The entrypoint basename
+  remains the last resort, and ``DASH0_AUTOMATIC_SERVICE_NAME=false`` still
+  turns all of it off.
+
+  Both new steps also report ``service.version``, which the distribution did not
+  set before. The entrypoint basename does not, because an absent version is
+  more useful than a wrong one.
+
+  A generic runner is never reported as the service. A console script such as
+  ``gunicorn``, ``uvicorn``, ``celery`` or ``flask`` launches someone else's
+  application, so neither its name nor its version describes the service. Every
+  step that could name one declines: the console script, the ``python -m``
+  module, and the entrypoint basename. The module is matched on its top-level
+  package, so ``python -m flask run`` and ``python -m flask.cli`` are both
+  covered. Detection falls through to ``pyproject.toml``, and when that finds
+  nothing either the SDK's ``unknown_service`` stands. The Dash0 Ruby
+  distribution skips ``puma``, ``unicorn`` and ``sidekiq`` the same way.
+
+  Reading installed metadata rather than source mirrors the Java Spring Boot
+  starter, which reads ``build-info.properties``, and the Node.js detector,
+  which reads ``package.json``. A deployed container often ships no
+  ``pyproject.toml``, while ``.dist-info/METADATA`` is derived from it at build
+  time.
+
+  The ``pyproject.toml`` step needs ``tomllib`` and is skipped on Python 3.10,
+  which predates it. ``tomli`` is deliberately not taken as a dependency.
+change_logs: [user]

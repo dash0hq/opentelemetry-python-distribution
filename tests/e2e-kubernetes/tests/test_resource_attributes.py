@@ -6,7 +6,7 @@ on how the process was actually started, and the injected tree only exists once
 something has built it.
 """
 
-from cluster import pod_uid, read_exported
+from cluster import pod_uid, read_exported, wait_for
 
 
 def resource_attributes(records: list[dict]) -> list[dict[str, str]]:
@@ -144,8 +144,22 @@ def test_both_paths_agree_on_service_instance_id_being_per_process(trace_records
 
 
 def test_metrics_and_logs_also_arrive(deployed):
-    assert read_exported("metrics.jsonl"), "no metrics reached the collector"
-    assert read_exported("logs.jsonl"), "no logs reached the collector"
+    """The fixture waits for spans, which are not the last signal to arrive.
+
+    Metrics and logs leave the application on their own schedules, so reading
+    the files the moment the spans are in catches whichever one is still in
+    flight.
+    """
+    wait_for(
+        "metrics to reach the collector",
+        lambda: read_exported("metrics.jsonl"),
+        timeout=180,
+    )
+    wait_for(
+        "logs to reach the collector",
+        lambda: read_exported("logs.jsonl"),
+        timeout=180,
+    )
 
 
 def test_an_installed_distribution_names_itself(trace_records):

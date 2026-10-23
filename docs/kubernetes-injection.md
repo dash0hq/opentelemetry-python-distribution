@@ -55,7 +55,10 @@ Only a manifest that cannot be read or decoded at all deactivates the distributi
 ### Dependency conflict check
 
 The script validates the application's installed packages against `all-dependencies.txt`, the dependency manifest shipped beside it.
-Each line states what the upstream packages in the injected tree declare they support, so an application carrying its own `wrapt` or `typing-extensions` only conflicts when that version is outside the range upstream itself allows.
+Each line states what the packages in the injected tree declare they support, so an application carrying its own `wrapt` or `typing-extensions` only conflicts when that version is outside the range upstream itself allows.
+The manifest ships in the distribution wheel at `dash0/opentelemetry/injector/all-dependencies.txt`, so a consumer that builds an injectable tree can copy it instead of deriving one.
+The Dash0 Operator does not read it yet.
+`images/instrumentation/python/extract-flattened-requirements.sh` in `dash0hq/dash0-operator` still derives an equivalent file with `pipdeptree` while the instrumentation image is built, so an injected tree currently carries that file rather than the one in the wheel.
 If a version conflict is detected that would prevent the distribution from loading correctly, it deactivates itself and logs the conflict.
 
 Every requirement in the manifest is checked, so one deactivation names every conflicting package rather than only the first.

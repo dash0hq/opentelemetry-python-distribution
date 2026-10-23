@@ -100,6 +100,31 @@ title with ``chore`` or add the "Skip Changelog" label. CI validates all
 pending entries on every pull request.
 
 
+Generated files
+===============
+
+``packages/dash0-opentelemetry/src/dash0/opentelemetry/injector/all-dependencies.txt``
+is generated rather than written by hand. Each line states what the packages in
+the injected tree declare they support, and ``sitecustomize.py`` reads it at
+interpreter startup to decide whether the application it was injected into
+conflicts with the distribution.
+
+Regenerate it whenever a pin in
+``packages/dash0-opentelemetry/pyproject.toml`` moves::
+
+    python3 scripts/refresh_injector_manifest.py
+
+The ``injector-manifest`` job runs the same script with ``--check``, prints a
+diff and fails when the checked-in file does not match.
+
+The weekly Dependabot pull request for the ``opentelemetry`` group declared in
+``.github/dependabot.yml`` moves those pins, and Dependabot does not run the
+script, so that job fails until someone pushes the regenerated file to the
+branch. Dependabot stops managing a pull request once the branch carries a
+commit it did not write, so close and reopen the pull request if you need it to
+take the branch back.
+
+
 Coding conventions
 =================
 

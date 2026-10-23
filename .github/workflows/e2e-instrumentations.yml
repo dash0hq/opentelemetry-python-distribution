@@ -1,0 +1,31 @@
+name: Instrumentation E2E
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - "packages/**"
+      - "tests/e2e-instrumentations/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "Makefile"
+      - ".github/workflows/e2e-instrumentations.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-instrumentations-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  instrumentations:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: tests/e2e-instrumentations/go.mod
+          cache-dependency-path: tests/e2e-instrumentations/go.sum
+      - name: Run the instrumentation end-to-end suite
+        run: make e2e-instrumentations

@@ -30,25 +30,16 @@ which the distribution deactivates itself.
 the three ``dash0_*`` detectors. Running both against one collector is what lets
 the suite compare the two resources key by key.
 
-The propagator block is not optional
-====================================
+Why the declarative manifest declares a propagator
+==================================================
 
 ``manifests/30-app-declarative.yaml`` declares a ``propagator`` with
-``tracecontext`` and ``baggage``. Omitting it crashes every instrumented HTTP
-request, which this test found:
-
-* ``_propagator.py`` builds ``CompositePropagator([])`` when the config file has
-  no ``propagator`` key, which the schema describes as "a noop propagator".
-* ``CompositePropagator.extract`` returns its ``context`` argument unchanged
-  when it holds no propagators, and ``opentelemetry.propagate.extract`` passes
-  ``context=None``, so the call returns ``None`` rather than a root ``Context``.
-* ``opentelemetry.instrumentation.utils._start_internal_or_server_span`` then
-  runs ``context.attach(None)``, which stores ``None`` in the ``ContextVar``.
-* Every later ``get_current()`` on that thread returns ``None``, and the request
-  fails with ``AttributeError: 'NoneType' object has no attribute 'get'``.
-
-Any declarative config file shipped for this distribution needs the
-``propagator`` block until that chain is fixed.
+``tracecontext`` and ``baggage``. The schema allows omitting it, and a file
+without it installs a noop propagator, so no trace context is read from an
+incoming request or written to an outgoing one, and traces break at every
+service boundary. Every declarative config file shipped for this distribution
+declares the block for that reason, which is what ``docs/resource-detection.md``
+tells users to do, so the manifest here matches the documented example.
 
 Running it
 ==========

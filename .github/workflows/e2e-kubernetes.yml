@@ -6,7 +6,10 @@ on:
   pull_request:
     paths:
       - "packages/**"
+      - "scripts/**"
       - "tests/e2e-kubernetes/**"
+      - "pyproject.toml"
+      - "uv.lock"
       - "Makefile"
       - ".github/workflows/e2e-kubernetes.yml"
   workflow_dispatch:

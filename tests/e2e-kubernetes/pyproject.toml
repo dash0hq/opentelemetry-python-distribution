@@ -1,0 +1,9 @@
+[project]
+name = "dash0-kubernetes-e2e"
+version = "0.1.0"
+description = "End-to-end test of the Dash0 Python distribution under Kubernetes injection"
+requires-python = ">=3.12"
+dependencies = ["pytest>=7.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

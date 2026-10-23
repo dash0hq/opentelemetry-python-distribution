@@ -1,0 +1,44 @@
+name: Kubernetes E2E
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - "packages/**"
+      - "scripts/**"
+      - "tests/e2e-kubernetes/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "Makefile"
+      - ".github/workflows/e2e-kubernetes.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-kubernetes-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  kind:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      - uses: helm/kind-action@v1
+        with:
+          cluster_name: dash0-python-e2e
+      - name: Run the Kubernetes end-to-end suite
+        run: make e2e-kubernetes
+      - name: Describe the namespace and dump every pod log
+        if: failure()
+        continue-on-error: true
+        run: |
+          kubectl --context kind-dash0-python-e2e -n dash0-e2e get pods -o wide
+          kubectl --context kind-dash0-python-e2e -n dash0-e2e describe pods
+          for app in collector app-environment app-declarative; do
+            kubectl --context kind-dash0-python-e2e -n dash0-e2e \
+              logs --all-containers --tail=200 --selector "app=$app"
+          done

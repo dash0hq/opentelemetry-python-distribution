@@ -1,0 +1,24 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: traffic
+  namespace: dash0-e2e
+spec:
+  backoffLimit: 10
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: curl
+          image: curlimages/curl:8.11.1
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              for target in app-environment app-declarative; do
+                for i in 1 2 3 4 5; do
+                  curl -sf "http://$target.dash0-e2e.svc.cluster.local:8080/order/book-$i" > /dev/null
+                done
+              done
+              echo "traffic done"

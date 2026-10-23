@@ -162,7 +162,7 @@ jobs:
             # The old PyPI upload validated metadata server-side; nothing does
             # once artifacts go straight onto an immutable release. Runs
             # before publish, where a failure is still recoverable.
-            uv run --no-project --with twine==6.2.0 --python 3.13 \
+            uv run --no-project --with twine==7.0.0 --python 3.13 \
               python -m twine check --strict dist/*.whl dist/*.tar.gz
           fi
       - name: Attest build provenance

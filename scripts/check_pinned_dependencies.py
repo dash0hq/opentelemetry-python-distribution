@@ -114,11 +114,14 @@ def _is_exact_pin(specifier):
     return _EXACT_PIN.match(specifier) is not None and not specifier.endswith(".*")
 
 
-def main():
-    with open(DISTRO_PYPROJECT, "rb") as file:
-        project = tomllib.load(file)["project"]
+def policy_violations(project, workspace_members, closure):
+    """Every way ``project`` breaks the dependency policy, as a list of strings.
 
-    workspace_members = {_normalize(member) for member in _workspace_members()}
+    ``project`` is the ``[project]`` table of the distro's pyproject file,
+    ``workspace_members`` the normalized names of the in-repo packages, and
+    ``closure`` the ``{normalized name: version}`` mapping a plain install of
+    the distro produces. An empty list means the policy holds.
+    """
     violations = []
 
     pinned_in_base = {}
@@ -163,7 +166,7 @@ def main():
                     f"version nor covered by an exact pin in dependencies"
                 )
 
-    for name, version in sorted(_distro_closure().items()):
+    for name, version in sorted(closure.items()):
         if name in unpinned_by_design:
             continue
         if name not in pinned_in_base:
@@ -176,6 +179,19 @@ def main():
                 f"closure: {name} resolves to {version} but dependencies pins "
                 f"{pinned_in_base[name]}"
             )
+
+    return violations
+
+
+def main():
+    with open(DISTRO_PYPROJECT, "rb") as file:
+        project = tomllib.load(file)["project"]
+
+    violations = policy_violations(
+        project,
+        {_normalize(member) for member in _workspace_members()},
+        _distro_closure(),
+    )
 
     if violations:
         print(f"{DISTRO_PYPROJECT.relative_to(ROOT)} violates the dependency policy:")

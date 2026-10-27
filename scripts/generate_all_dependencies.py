@@ -37,11 +37,13 @@ they work against. Dropping it would leave ``opentelemetry-sdk`` with no
 constraint at all, since every distribution of the tree that declares it
 carries the curated prefix.
 
-A package nothing else in the tree depends on gets a bare name with no
-specifier, so no version of it can stand the distribution down. That is what
-makes the ``UNPINNED_BY_DESIGN`` table in ``scripts/check_pinned_dependencies.py``
+A package nothing else in the tree depends on carries only what the
+distribution's own packages declare about it, which once their exact pins are
+dropped is either a bare name or a range. That is what makes the
+``EXEMPT_FROM_EXACT_PIN`` table in ``scripts/check_pinned_dependencies.py``
 actually reach the bootstrap: ``pyyaml`` is required only by the distribution's
-own packages, so it comes out unconstrained.
+own packages, and the ``>=5.1`` they declare is a range, so the floor comes
+through while nothing bounds the application from above.
 
 Requirements gated on an extra are skipped, because the extra may not be
 installed. Environment markers are carried through on their own line rather

@@ -9,12 +9,15 @@ exact version (``== X.Y.Z``). Two exemptions:
 * optional-dependency entries whose package is already pinned exactly in the
   base dependencies (e.g. an extra that re-references the SDK to pull in one of
   its extras);
-* the names in ``UNPINNED_BY_DESIGN``, which must be declared with no version
-  specifier at all. A specifier makes the injector's conflict check
-  (``sitecustomize.py``) self-deactivate the distro whenever the application
-  pins a different version, so for a package that is both common in
-  applications and dependency-free, an unbounded requirement is the safer
-  choice. Each entry records why.
+* the names in ``EXEMPT_FROM_EXACT_PIN``, which must be declared with exactly
+  the specifier that table gives, and often that is none at all. Every
+  specifier reaches the injector's conflict check (``sitecustomize.py``)
+  through ``all-dependencies.txt``, and one violated line stands the whole
+  distro down, so for a package that is both common in applications and
+  dependency-free an unbounded requirement is usually the safer choice. A
+  bound belongs there only when the versions it excludes cannot work at all,
+  where standing down beats failing inside the package. Each entry records
+  which case it is and why.
 
 Additionally, the pyproject file must spell out the distro's *entire* installed
 tree: every package the distro pulls in transitively (per ``uv export`` over
@@ -35,11 +38,19 @@ import tomllib
 ROOT = Path(__file__).resolve().parent.parent
 DISTRO_PYPROJECT = ROOT / "packages" / "dash0-opentelemetry" / "pyproject.toml"
 
-UNPINNED_BY_DESIGN = {
+EXEMPT_FROM_EXACT_PIN = {
     "pyyaml": (
-        "read by dash0-opentelemetry-configuration to parse OTEL_CONFIG_FILE; "
-        "pyyaml has no dependencies of its own and every release since 3.x "
-        "provides safe_load, so any version the application already has works"
+        ">=5.1",
+        "read by dash0-opentelemetry-configuration to parse OTEL_CONFIG_FILE. "
+        "pyyaml has no dependencies of its own, so it is left unbounded above "
+        "and whatever version the application already has is used. It is "
+        "bounded below because pyyaml 3.10 through 3.13 call "
+        "collections.Hashable in yaml/constructor.py, an alias Python 3.10 "
+        "removed, so safe_load raises AttributeError on any mapping, which is "
+        "every real configuration file. Those releases declare no "
+        "requires-python, so nothing but this floor stops pip installing them "
+        "on an interpreter they cannot work on. 5.1 is the first stable "
+        "release after the last broken one, with only prereleases in between.",
     ),
 }
 
@@ -125,20 +136,22 @@ def policy_violations(project, workspace_members, closure):
     violations = []
 
     pinned_in_base = {}
-    unpinned_by_design = set()
+    exempt_from_exact_pin = set()
     for requirement in project.get("dependencies", []):
         name, specifier = _parse(requirement)
         if name is None:
             violations.append(f"dependencies: cannot parse {requirement!r}")
         elif name in workspace_members:
             continue
-        elif name in UNPINNED_BY_DESIGN:
-            unpinned_by_design.add(name)
-            if specifier:
+        elif name in EXEMPT_FROM_EXACT_PIN:
+            exempt_from_exact_pin.add(name)
+            required, reason = EXEMPT_FROM_EXACT_PIN[name]
+            if re.sub(r"\s+", "", specifier) != required:
+                expected = f"{name} {required}".strip()
                 violations.append(
-                    f"dependencies: {requirement!r} carries a version "
-                    f"specifier, but {name} is unpinned by design "
-                    f"({UNPINNED_BY_DESIGN[name]})"
+                    f"dependencies: {requirement!r} must be declared as "
+                    f"'{expected}' and carry no other version specifier "
+                    f"({reason})"
                 )
         elif _is_exact_pin(specifier):
             pinned_in_base[name] = specifier.removeprefix("==").strip()
@@ -156,7 +169,7 @@ def policy_violations(project, workspace_members, closure):
             elif (
                 name in workspace_members
                 or name in pinned_in_base
-                or name in UNPINNED_BY_DESIGN
+                or name in EXEMPT_FROM_EXACT_PIN
                 or _is_exact_pin(specifier)
             ):
                 continue
@@ -167,7 +180,7 @@ def policy_violations(project, workspace_members, closure):
                 )
 
     for name, version in sorted(closure.items()):
-        if name in unpinned_by_design:
+        if name in exempt_from_exact_pin:
             continue
         if name not in pinned_in_base:
             violations.append(

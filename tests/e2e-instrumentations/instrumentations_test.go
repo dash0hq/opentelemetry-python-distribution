@@ -25,6 +25,7 @@ import (
 
 	"github.com/open-telemetry/opentelemetry-packaging/testutil/otelsink"
 	"github.com/stretchr/testify/assert"
+	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 
@@ -53,8 +54,7 @@ func TestFlask(t *testing.T) {
 		"the server span carries no http.method")
 	assert.Positive(t, server.WithSpanAttributeValue("http.route", "/items/<int:item_id>").Len(),
 		"the server span carries no http.route")
-	assert.Positive(t, server.WithSpanAttributeValue("http.status_code", "200").Len(),
-		"the server span carries no http.status_code")
+	assertIntSpanAttribute(t, server.Spans(), "http.status_code", 200)
 	assertServiceName(t, sink)
 }
 
@@ -77,8 +77,7 @@ func TestRequests(t *testing.T) {
 		"the client span carries no http.method")
 	assert.Positive(t, client.WithSpanAttribute("http.url").Len(),
 		"the client span carries no http.url")
-	assert.Positive(t, client.WithSpanAttributeValue("http.status_code", "200").Len(),
-		"the client span carries no http.status_code")
+	assertIntSpanAttribute(t, client.Spans(), "http.status_code", 200)
 	assertServiceName(t, sink)
 }
 
@@ -140,6 +139,37 @@ func TestLogging(t *testing.T) {
 		assert.Equal(t, spans[0].Span.GetTraceId(), record.Record.GetTraceId(),
 			"the log record does not carry the trace id of the span it was emitted inside")
 	}
+}
+
+// assertIntSpanAttribute checks that the named attribute is carried as an
+// integer with the given value, on at least one span of the view and on every
+// span that carries it at all.
+//
+// The sink's own WithSpanAttributeValue compares the rendered string, so the
+// integer 200 and the string "200" satisfy it equally. The semantic
+// conventions define http.status_code as an integer, and a release that
+// started emitting it as a string would be a conformance regression that
+// pinning the shape of the telemetry is supposed to catch, so the comparison
+// has to reach the typed value.
+func assertIntSpanAttribute(t *testing.T, spans []otelsink.SpanView, key string, want int64) {
+	t.Helper()
+
+	carrying := 0
+	for _, view := range spans {
+		for _, attribute := range view.Span.GetAttributes() {
+			if attribute.GetKey() != key {
+				continue
+			}
+			carrying++
+			value, isInt := attribute.GetValue().GetValue().(*commonpb.AnyValue_IntValue)
+			if !assert.True(t, isInt, "%s is %T, and the semantic conventions define it as an integer",
+				key, attribute.GetValue().GetValue()) {
+				continue
+			}
+			assert.Equal(t, want, value.IntValue, "%s carries the wrong value", key)
+		}
+	}
+	assert.Positive(t, carrying, "no span carries %s", key)
 }
 
 // assertServiceName checks the resource attribute every case sets explicitly,

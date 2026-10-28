@@ -8,8 +8,9 @@
 // matches upstream and that the pins resolve. Neither says anything about what
 // an instrumented library produces, so an upstream release that renames a span
 // or drops an attribute passes everything this repository runs today. These
-// tests run a real application per instrumentation and assert on the spans,
-// metrics and log records that reach an OTLP sink.
+// tests run a real application per instrumentation and assert on the spans
+// and log records that reach an OTLP sink. Metrics are not covered: the
+// harness sets OTEL_METRICS_EXPORTER to none, so nothing emits them.
 //
 // One case per distinct telemetry shape is covered here rather than one per
 // shipped package: a web framework producing a server span, an HTTP client

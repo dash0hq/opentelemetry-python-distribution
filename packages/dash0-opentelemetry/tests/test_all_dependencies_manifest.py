@@ -65,15 +65,23 @@ def test_wrapt_accepts_what_opentelemetry_instrumentation_declares():
     assert not specifier.contains(Version("2.0.0"))
 
 
-def test_pyyaml_is_unconstrained():
-    """``UNPINNED_BY_DESIGN`` in ``scripts/check_pinned_dependencies.py``.
+def test_pyyaml_carries_its_floor_and_no_ceiling():
+    """``EXEMPT_FROM_EXACT_PIN`` in ``scripts/check_pinned_dependencies.py``.
 
-    Only the distribution's own packages require ``pyyaml``, and they pin it,
-    so every constraint on it is curation. Leaving the line bare is what makes
-    the exemption reach the bootstrap rather than stopping at the pyproject
-    file.
+    Only the distribution's own packages require ``pyyaml``, so the line is
+    whatever they declare. ``>=5.1`` excludes 3.10 through 3.13, which call
+    ``collections.Hashable`` and so cannot parse a mapping on any interpreter
+    this distribution supports. Nothing bounds it from above, because a
+    ceiling would stand the distribution down for an application that simply
+    runs a newer ``pyyaml`` than the one tested here.
     """
-    assert not requirement_for("pyyaml").specifier
+    specifier = requirement_for("pyyaml").specifier
+
+    assert specifier
+    assert not specifier.contains(Version("3.13"))
+    assert specifier.contains(Version("5.1"))
+    assert specifier.contains(Version("6.0.3"))
+    assert specifier.contains(Version("99.0"))
 
 
 def test_opentelemetry_sdk_is_constrained_without_being_pinned():

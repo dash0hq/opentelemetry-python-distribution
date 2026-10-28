@@ -12,7 +12,7 @@ requires-python = ">=3.10"
 dependencies = [
   "opentelemetry-api == 1.44.0",
   "opentelemetry-sdk == 1.44.0",
-  "pyyaml",
+  "pyyaml >=5.1",
 ]
 
 [tool.hatch.version]

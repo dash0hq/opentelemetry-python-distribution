@@ -185,7 +185,7 @@ requires-dist = [
     { name = "opentelemetry-util-http", specifier = "==0.65b0" },
     { name = "packaging", specifier = "==26.3" },
     { name = "psutil", specifier = "==7.2.2" },
-    { name = "pyyaml" },
+    { name = "pyyaml", specifier = ">=5.1" },
     { name = "typing-extensions", specifier = "==4.16.0" },
     { name = "wrapt", specifier = "==1.17.3" },
 ]
@@ -206,7 +206,7 @@ dependencies = [
 requires-dist = [
     { name = "opentelemetry-api", specifier = "==1.44.0" },
     { name = "opentelemetry-sdk", specifier = "==1.44.0" },
-    { name = "pyyaml" },
+    { name = "pyyaml", specifier = ">=5.1" },
 ]
 
 [[package]]

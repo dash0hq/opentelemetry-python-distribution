@@ -15,7 +15,6 @@ classifiers = [
   "Intended Audience :: Developers",
   "License :: OSI Approved :: Apache Software License",
   "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
@@ -36,8 +35,8 @@ dependencies = [
   # Published on both the Dash0 package index and public PyPI.
   "dash0-opentelemetry-exporter-otlp-pyproto-http == 1.44.0.post1",
   "dash0-opentelemetry-exporter-otlp-pyproto-grpc == 1.44.0.post1",
-  "dash0-opentelemetry-configuration == 0.65b0.post1",
-  "pyyaml",
+  "dash0-opentelemetry-configuration == 0.65b0.post2",
+  "pyyaml >=5.1",
 
   # --- Curated instrumentation set ---
   # The full upstream auto-instrumentation list (the bootstrap_gen module of

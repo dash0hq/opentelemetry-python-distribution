@@ -108,6 +108,14 @@ every push to ``main`` and on pull requests that touch ``packages/``,
 ``tests/e2e-instrumentations/``, ``pyproject.toml``, ``uv.lock``, the
 ``Makefile`` or the workflow itself.
 
+The images are kept rather than deleted. ``harness.Run`` sets ``KeepImage:
+true``, so each run leaves one image per case, around 215MB each, plus a
+dangling intermediate of about 250MB. That is deliberate: keeping them is what
+makes a second run take seconds instead of minutes. The cost is disk on a
+development machine, since a continuous integration runner is discarded anyway.
+Reclaim it with ``docker image prune`` for the intermediates, and by removing
+the images testcontainers named with a UUID for the rest.
+
 Adding a case
 =============
 

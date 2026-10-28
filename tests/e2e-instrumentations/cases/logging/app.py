@@ -6,7 +6,7 @@ logger, and the span around the call is what gives the record a trace context
 to carry.
 """
 
-from logging import INFO, basicConfig, getLogger
+from logging import INFO, getLogger
 
 from opentelemetry.trace import get_tracer
 
@@ -14,7 +14,7 @@ logger = getLogger(__name__)
 
 
 def main() -> None:
-    basicConfig(level=INFO)
+    getLogger().setLevel(INFO)
     with get_tracer(__name__).start_as_current_span("handle-request"):
         logger.info("handled request for item %s", 7)
 

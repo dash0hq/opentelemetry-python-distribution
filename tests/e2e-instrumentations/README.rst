@@ -90,6 +90,28 @@ for the container to exit separately, with ``wait.ForExit``.
 The marker string is duplicated: ``READY_MARKER`` in ``run_case.py`` and
 ``readyMarker`` in ``harness/harness.go``. They have to stay equal.
 
+Why every query is filtered by a resource attribute
+===================================================
+
+The sink scopes everything it answers to one attribute. ``sink.Env()`` sets
+``OTEL_RESOURCE_ATTRIBUTES`` to a per-test id, and the query API drops any
+resource that does not carry that exact attribute. ``harness.Run`` passes that
+environment to the container unchanged, so every assertion in
+``instrumentations_test.go`` depends on the value surviving the trip.
+
+The distribution rewrites ``OTEL_RESOURCE_ATTRIBUTES`` when it adds its own
+detected attributes, in ``_merge_into_resource_attributes`` in
+``packages/dash0-opentelemetry/src/dash0/opentelemetry/resource.py``, and it
+keeps whatever was already there. The suite relies on that.
+
+The failure mode is worth knowing because it misdirects. If that preservation
+regressed, the telemetry would still reach the sink, the filter would discard
+all of it, and every case would fail with ``otelsink: timed out ... waiting for
+traces``. That message points at telemetry never arriving, so the search starts
+at the exporter, the tunnel and the container, none of which would be at fault.
+Note also that the test id is not what isolates the four parallel cases from
+each other: each gets its own sink on its own ports.
+
 Running it
 ==========
 

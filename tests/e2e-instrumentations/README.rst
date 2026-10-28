@@ -58,9 +58,19 @@ and starts the container.
 
 The build context has to be the repository root because the image builds the
 workspace wheels from ``packages/`` with ``uv build --all-packages`` and then
-installs ``dash0-opentelemetry`` from them. That is also why the harness does
+installs every one of them by file path. That is also why the harness does
 not use upstream's ``RunPackageTest``, which derives the build context from
 the nearest ``go.mod`` and would make it this directory.
+
+The install names the wheel files rather than the distribution. Passing
+``--find-links`` and the name ``dash0-opentelemetry`` would leave the package
+index enabled, so pip would weigh the locally built wheel against the released
+one and take the release whenever it is the same version or newer, which is the
+normal state of a development branch. The suite would then test the last
+release on every branch and never the change under review. A file path admits
+no such choice. Every distribution the workspace builds is installed from
+``packages/``; the upstream ``opentelemetry-*`` dependencies and the per-case
+pins in ``requirements.txt`` still resolve from the index, which is intended.
 
 Why the container does not start the application directly
 =========================================================

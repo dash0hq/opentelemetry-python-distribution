@@ -15,6 +15,47 @@ are compiled.
 
 .. <!-- next version -->
 
+0.3.3 - 2026-10-28
+========================================
+
+Bug Fixes
+---------
+
+- ``deps``: Require pyyaml >= 5.1, because 3.10 through 3.13 cannot parse a configuration file on any supported interpreter (`#100 <https://github.com/dash0hq/opentelemetry-python-distribution/issues/100>`__)
+
+  ``pyyaml`` was declared with no version specifier on purpose: it is common in
+  applications and has no dependencies of its own, so an unbounded requirement
+  keeps the distribution from standing itself down over a disagreement that
+  does not matter.
+  
+  Four releases make that wrong. ``pyyaml`` 3.10, 3.11, 3.12 and 3.13 call
+  ``collections.Hashable`` in ``yaml/constructor.py``, an alias Python 3.10
+  removed, so ``safe_load`` raises ``AttributeError`` while constructing a
+  mapping. A scalar document still loads, which is why the breakage is easy to
+  miss, and every ``OTEL_CONFIG_FILE`` worth loading is a mapping.
+  
+  Nothing excluded those four from an interpreter this distribution supports.
+  Three of them publish no ``requires-python`` and the fourth publishes the
+  empty string, and their classifiers stop at Python 3.5, so pip installs them
+  anywhere without a word.
+  
+  5.1 is the first stable release after 3.13, with only prereleases in
+  between. The requirement stays unbounded above, so an application running a
+  newer ``pyyaml`` than the one a release was tested against keeps its
+  telemetry.
+  
+  The floor reaches the injector because
+  ``scripts/generate_all_dependencies.py`` keeps the ranges the
+  distribution's own packages declare and drops only their exact pins, so the
+  ``all-dependencies.txt`` line is now ``pyyaml>=5.1``. An application on a
+  broken release is now stood down at startup with a reason, instead of
+  failing inside ``pyyaml`` when the configuration file is read.
+  
+  ``UNPINNED_BY_DESIGN`` in ``scripts/check_pinned_dependencies.py`` becomes
+  ``EXEMPT_FROM_EXACT_PIN`` and maps a name to the specifier it must carry
+  rather than only forbidding one.
+  
+
 0.3.2 - 2026-10-24
 ========================================
 

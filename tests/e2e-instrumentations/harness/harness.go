@@ -135,9 +135,9 @@ func repoRoot(t *testing.T) string {
 	dir, err := os.Getwd()
 	require.NoError(t, err)
 	for {
-		_, pyproject := os.Stat(filepath.Join(dir, "pyproject.toml"))
-		_, packages := os.Stat(filepath.Join(dir, "packages"))
-		if pyproject == nil && packages == nil {
+		_, pyprojectErr := os.Stat(filepath.Join(dir, "pyproject.toml"))
+		_, packagesErr := os.Stat(filepath.Join(dir, "packages"))
+		if pyprojectErr == nil && packagesErr == nil {
 			return dir
 		}
 		parent := filepath.Dir(dir)

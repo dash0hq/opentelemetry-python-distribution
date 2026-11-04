@@ -138,7 +138,7 @@ dash0_service_name = "dash0.opentelemetry.resource:Dash0ServiceNameResourceDetec
 
 [dependency-groups]
 dev = [
-  "pytest >= 7.0",
+  "pytest>=9.2.0",
 ]
 
 [tool.hatch.version]

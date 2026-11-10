@@ -50,9 +50,6 @@ const RunTimeout = 5 * time.Minute
 // distribution's own fallback detection is not what the assertions depend on.
 const ServiceName = "instrumentation-case"
 
-// PythonVersion is the interpreter the cases run on.
-const PythonVersion = "3.13"
-
 // readyMarker is the line run_case.py writes before it waits for the sink, and
 // it has to stay equal to READY_MARKER there.
 //
@@ -78,7 +75,6 @@ func Run(t *testing.T, ctx context.Context, name string) *otelsink.Sink {
 	env["DASH0_OTEL_COLLECTOR_BASE_URL"] = env["OTEL_EXPORTER_OTLP_ENDPOINT"]
 	env["OTEL_METRICS_EXPORTER"] = "none"
 
-	pythonVersion := PythonVersion
 	caseName := name
 
 	req := testcontainers.ContainerRequest{
@@ -86,8 +82,7 @@ func Run(t *testing.T, ctx context.Context, name string) *otelsink.Sink {
 			Context:    repoRoot(t),
 			Dockerfile: filepath.Join("tests", "e2e-instrumentations", "Dockerfile"),
 			BuildArgs: map[string]*string{
-				"case":           &caseName,
-				"python_version": &pythonVersion,
+				"case": &caseName,
 			},
 			KeepImage:     true,
 			PrintBuildLog: testing.Verbose(),

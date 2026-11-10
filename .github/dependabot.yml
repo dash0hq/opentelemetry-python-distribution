@@ -29,6 +29,7 @@ updates:
 
   - package-ecosystem: "docker"
     directories:
+      - "/tests/e2e-instrumentations"
       - "/tests/e2e-kubernetes/app"
       - "/tests/e2e-kubernetes/app-installed"
       - "/tests/e2e-kubernetes/instrumentation"

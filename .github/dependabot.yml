@@ -22,6 +22,11 @@ updates:
     schedule:
       interval: "weekly"
 
+  - package-ecosystem: "gomod"
+    directory: "/tests/e2e-instrumentations"
+    schedule:
+      interval: "weekly"
+
   - package-ecosystem: "docker"
     directories:
       - "/tests/e2e-kubernetes/app"

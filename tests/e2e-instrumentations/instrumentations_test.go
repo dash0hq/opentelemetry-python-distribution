@@ -15,8 +15,15 @@
 // One case per distinct telemetry shape is covered here rather than one per
 // shipped package: a web framework producing a server span, an HTTP client
 // producing a client span, a DB-API driver producing a client span with db
-// attributes, and the log pipeline. Adding another instrumentation is a
-// cases/<name>/app.py, a cases/<name>/requirements.txt, and a function here.
+// attributes, and the log pipeline.
+//
+// Adding an instrumentation that runs self-contained is a cases/<name>/app.py,
+// a cases/<name>/requirements.txt, and a function here. An instrumentation
+// that needs a backing service takes more than that: harness.Run starts one
+// container and nothing else, so postgres, mysql, redis, kafka, mongo,
+// cassandra and rabbitmq cannot be covered until the harness can start a
+// second container and hand the case its address. The README lists which
+// shipped packages fall on either side.
 package instrumentations_test
 
 import (

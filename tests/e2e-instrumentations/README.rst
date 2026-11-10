@@ -143,8 +143,32 @@ Adding a case
 
 Write ``cases/<name>/app.py`` and ``cases/<name>/requirements.txt``, then add a
 function to ``instrumentations_test.go`` that calls ``harness.Run`` with
-``<name>`` and asserts on what the sink received. Nothing else needs changing.
+``<name>`` and asserts on what the sink received. Nothing else needs changing,
+as long as the case runs self-contained.
 
 Keep the application deterministic and short. It has to exit on its own, since
 a clean interpreter exit is what flushes the batch processors, and a case that
 does not exit fails on ``harness.RunTimeout``.
+
+What a case cannot do yet
+=========================
+
+``harness.Run`` starts one container and nothing else. It creates no network,
+starts no second container and waits for no second service, so a case that
+needs a backing service cannot be added by writing those two files.
+
+That rules out a large part of what the distribution ships. These need a daemon
+the harness does not start: ``aiokafka``, ``aiopg``, ``aio-pika``, ``asyncpg``,
+``cassandra``, ``celery``, ``confluent-kafka``, ``kafka-python``, ``mysql``,
+``mysqlclient``, ``pika``, ``psycopg``, ``psycopg2``, ``pymemcache``,
+``pymongo``, ``pymssql``, ``pymysql``, ``redis`` and ``remoulade``. These need a
+stub for a remote API: ``boto3sqs``, ``botocore``, ``openai-v2`` and
+``vertexai``. Covering any of them means teaching ``harness.Run`` to start a
+second container, put both on one network, and pass the case its address.
+
+Everything else can be added today with no change to the harness, which is most
+of the remaining packages: ``django``, ``fastapi``, ``starlette``, ``tornado``,
+``falcon`` and ``pyramid`` for server spans, ``httpx``, ``urllib``, ``urllib3``
+and ``aiohttp-client`` for client spans, ``sqlalchemy`` and ``tortoiseorm`` over
+sqlite, and ``asyncio``, ``threading``, ``click``, ``jinja2`` and ``structlog``
+for the rest.

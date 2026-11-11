@@ -1,20 +1,11 @@
-# One of 'breaking', 'deprecation', 'new_component', 'enhancement', 'bug_fix'.
 change_type: enhancement
 
-# A single word describing the area of concern (e.g. distro, pyproto, exporter,
-# resource-detectors, deps, ci, release, docs).
 component: distro
 
-# A brief description of the change. Surround your text with quotes ("") if it
-# needs to start with a backtick (`).
 note: Default OTEL_TRACES_SAMPLER to always_on, so an incoming trace context can no longer decide whether this process is traced
 
-# One or more tracking issues related to the change. At least one is required.
 issues: [110]
 
-# (Optional) One or more lines of additional information to render under the
-# primary note. These lines are padded with 2 spaces and inserted directly into
-# the document. Use pipe (|) for multiline entries.
 subtext: |
   The distribution set no sampler and inherited the OpenTelemetry default,
   ``parentbased_always_on``. ``ParentBased`` holds five sub-samplers, and the
@@ -43,10 +34,4 @@ subtext: |
   the OpenTelemetry default; see ``docs/configuration.md`` for the sampler
   declaration that matches this default.
 
-# If your change doesn't affect end users or the exported elements of any package,
-# you should instead start your pull request title with "chore" or use the "Skip
-# Changelog" label.
-# Optional: The change log or logs in which this entry should be included.
-# e.g. '[user]'. Include 'user' if the change is relevant to end users.
-# Default: '[user]'
 change_logs: [user]

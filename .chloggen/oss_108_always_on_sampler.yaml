@@ -1,5 +1,5 @@
 # One of 'breaking', 'deprecation', 'new_component', 'enhancement', 'bug_fix'.
-change_type: breaking
+change_type: enhancement
 
 # A single word describing the area of concern (e.g. distro, pyproto, exporter,
 # resource-detectors, deps, ci, release, docs).
@@ -31,13 +31,13 @@ subtext: |
   samples traces after ingestion with Signal Control, which evaluates a whole
   trace at once, and a span dropped by a sampler inside the process never
   reaches that evaluation.
-  This is marked breaking because nobody has to change their configuration to
-  be affected by it. Expect more spans to leave the application, costing CPU
-  in the process and bandwidth to the collector, and reduce the volume with
-  Signal Control or a collector-side processor rather than in the SDK. Set
-  ``OTEL_TRACES_SAMPLER`` on the workload to keep the previous behaviour; the
-  distribution applies the default with ``setdefault`` and never overrides a
-  value you provide.
+  Nothing stops working and no setting becomes invalid, but an existing
+  deployment is affected without changing its configuration. Expect more spans
+  to leave the application, costing CPU in the process and bandwidth to the
+  collector, and reduce the volume with Signal Control or a collector-side
+  processor rather than in the SDK. Set ``OTEL_TRACES_SAMPLER`` on the workload
+  to keep the previous behaviour; the distribution applies the default with
+  ``setdefault`` and never overrides a value you provide.
   Declarative configuration is unaffected, because it never reads
   ``OTEL_TRACES_SAMPLER``. A configuration file that omits ``sampler`` keeps
   the OpenTelemetry default; see ``docs/configuration.md`` for the sampler

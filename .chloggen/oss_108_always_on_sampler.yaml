@@ -1,0 +1,37 @@
+change_type: enhancement
+
+component: distro
+
+note: Default OTEL_TRACES_SAMPLER to always_on, so an incoming trace context can no longer decide whether this process is traced
+
+issues: [110]
+
+subtext: |
+  The distribution set no sampler and inherited the OpenTelemetry default,
+  ``parentbased_always_on``. ``ParentBased`` holds five sub-samplers, and the
+  ``root`` one applies only to a span with no parent. A span whose parent
+  arrived in a ``traceparent`` header is decided by ``remote_parent_sampled``
+  or ``remote_parent_not_sampled`` instead, which default to ``AlwaysOn`` and
+  ``AlwaysOff``.
+  A caller that sends a ``traceparent`` with the sampled flag off therefore
+  silenced every span in the service receiving the request, and in every
+  service that one called. That caller is often outside the organization
+  operating the service, so the clients of an API decided whether its owner
+  got to trace it.
+  ``always_on`` takes the incoming trace context out of the decision. Dash0
+  samples traces after ingestion with Signal Control, which evaluates a whole
+  trace at once, and a span dropped by a sampler inside the process never
+  reaches that evaluation.
+  Nothing stops working and no setting becomes invalid, but an existing
+  deployment is affected without changing its configuration. Expect more spans
+  to leave the application, costing CPU in the process and bandwidth to the
+  collector, and reduce the volume with Signal Control or a collector-side
+  processor rather than in the SDK. Set ``OTEL_TRACES_SAMPLER`` on the workload
+  to keep the previous behaviour; the distribution applies the default with
+  ``setdefault`` and never overrides a value you provide.
+  Declarative configuration is unaffected, because it never reads
+  ``OTEL_TRACES_SAMPLER``. A configuration file that omits ``sampler`` keeps
+  the OpenTelemetry default; see ``docs/configuration.md`` for the sampler
+  declaration that matches this default.
+
+change_logs: [user]

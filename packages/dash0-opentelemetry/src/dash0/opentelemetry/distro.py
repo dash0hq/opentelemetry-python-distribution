@@ -5,6 +5,8 @@ by ``opentelemetry-instrument`` when the Dash0 distribution is installed. It run
 before the configurator, so it is where the distribution:
 
 * gates itself off if disabled or if no collector endpoint is configured;
+* defaults the sampler to ``always_on``, so an incoming trace context cannot
+  decide whether this process is traced;
 * selects the pure-Python OTLP exporters (no native dependencies, safe to
   inject) matching the configured OTLP protocol — ``http/protobuf`` by
   default, ``grpc`` when requested — and points them at the Dash0 collector;
@@ -37,6 +39,7 @@ from ._environment_variables import (
     OTEL_METRICS_EXPORTER,
     OTEL_SDK_DISABLED,
     OTEL_TRACES_EXPORTER,
+    OTEL_TRACES_SAMPLER,
 )
 from .resource import apply_detected_resource_attributes
 from .settings import evaluate_gate
@@ -57,6 +60,8 @@ _PYPROTO_EXPORTERS_BY_PROTOCOL = {
 }
 
 _DEFAULT_PROTOCOL = _HTTP_PROTOCOL
+
+_DEFAULT_SAMPLER = "always_on"
 
 # Default OTLP receiver port per protocol. OTLP/gRPC and OTLP/HTTP conventionally
 # listen on different ports, so a single collector base URL cannot address both.
@@ -144,6 +149,8 @@ class Dash0Distro(BaseDistro):
                 reason,
             )
             return
+
+        environ.setdefault(OTEL_TRACES_SAMPLER, _DEFAULT_SAMPLER)
 
         default_protocol = environ.setdefault(
             OTEL_EXPORTER_OTLP_PROTOCOL, _DEFAULT_PROTOCOL

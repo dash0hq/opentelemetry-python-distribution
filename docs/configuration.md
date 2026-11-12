@@ -23,6 +23,7 @@ The following variables are relevant to the distribution's behavior:
 | `OTEL_METRICS_EXPORTER` | `otlp_proto_http` | Pure-Python OTLP/HTTP exporter. |
 | `OTEL_LOGS_EXPORTER` | `otlp_proto_http` | Pure-Python OTLP/HTTP exporter. |
 | `OTEL_EXPORTER_OTLP_PROTOCOL` | `http/protobuf` | Set to `grpc` for OTLP/gRPC. |
+| `OTEL_TRACES_SAMPLER` | `always_on` | The SDK records and exports every span, whatever an incoming trace context says. See [Sampling](#sampling). Declarative configuration (`OTEL_CONFIG_FILE`) never reads it. |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Value of `DASH0_OTEL_COLLECTOR_BASE_URL` | Derived automatically; override if needed. |
 | `OTEL_EXPORTER_OTLP_HEADERS` | — | Headers sent with every OTLP request. Required for Dash0 authentication: `Authorization=Bearer <token>,Dash0-Dataset=default`. |
 | `OTEL_EXPORTER_OTLP_<SIGNAL>_PROTOCOL` | — | Per-signal protocol override (`TRACES`, `METRICS`, `LOGS`). |
@@ -32,6 +33,57 @@ The following variables are relevant to the distribution's behavior:
 | `OTEL_PYTHON_DISABLED_INSTRUMENTATIONS` | — | Comma-separated list of instrumentor entry-point names to skip (e.g. `flask,redis`). Honored by the auto-instrumentation loader. |
 | `OTEL_EXPERIMENTAL_RESOURCE_DETECTORS` | — | Comma-separated resource detector names, honored by the SDK's environment-based configuration. Declarative configuration (`OTEL_CONFIG_FILE`) never reads it. |
 | `OTEL_CONFIG_FILE` | — | Path to a declarative SDK configuration file, which takes over from every variable above that configures providers, exporters or the resource. List the `dash0_*` detectors in the file to keep `telemetry.distro.*`, `k8s.pod.uid` and the `service.name` fallback. |
+
+## Sampling
+
+The distribution sets `OTEL_TRACES_SAMPLER` to `always_on`.
+The SDK records and exports every span your application starts.
+
+OpenTelemetry's own default is `parentbased_always_on`.
+This is the only default the distribution sets to something other than the specification's value.
+
+`ParentBased` holds five sub-samplers, and the `root` one covers only a span with no parent.
+When a parent arrives in a `traceparent` header, `remote_parent_sampled` or `remote_parent_not_sampled` makes the decision instead, and those two default to `AlwaysOn` and `AlwaysOff`.
+A caller that sends a `traceparent` with the sampled flag off therefore silences every span in the service handling that request, and in every service it calls.
+
+That caller is often outside your organization, which means your clients decide whether you get to trace your own API.
+Resetting the trace context at your network boundary fixes it.
+Getting that right at every entry point is harder than it sounds, so the usual result is missing traces and no obvious cause.
+
+`always_on` takes the incoming trace context out of the decision.
+Dash0 samples traces after ingestion rather than inside your process, using [Signal Control](https://dash0.com/docs/dash0/telemetry/signal-control/sample-traces), which evaluates a whole trace at once.
+A sampler in your process drops a span before it ever reaches that evaluation.
+
+Set `OTEL_TRACES_SAMPLER` yourself to override the default:
+
+```bash
+export OTEL_TRACES_SAMPLER=parentbased_traceidratio
+export OTEL_TRACES_SAMPLER_ARG=0.1
+```
+
+Your application exports more spans than it would under `parentbased_always_on`, which costs CPU in the process and bandwidth to your collector.
+Cut the volume with Signal Control, or with a sampling processor in a collector you run, rather than in the SDK.
+
+Outgoing requests now carry a `traceparent` with the sampled flag set.
+A downstream service still on `parentbased_always_on` will sample the traces you start.
+That is `ParentBased` deferring to an incoming flag again, this time in someone else's process rather than yours.
+
+Declarative configuration does not read `OTEL_TRACES_SAMPLER`.
+When `OTEL_CONFIG_FILE` is set and the file omits `sampler`, the OpenTelemetry default applies.
+Declare the sampler in the file to get the same behavior:
+
+```yaml
+tracer_provider:
+  processors:
+    - batch:
+        exporter:
+          otlp_http: {}
+  sampler:
+    always_on: {}
+```
+
+A `tracer_provider` block must contain `processors`.
+Add the `sampler` key to the block you already have rather than writing one that holds only a sampler.
 
 ## Disabling the distribution
 

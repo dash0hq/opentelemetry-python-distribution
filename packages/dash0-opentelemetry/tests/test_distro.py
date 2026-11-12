@@ -16,6 +16,7 @@ from dash0.opentelemetry._environment_variables import (
     OTEL_METRICS_EXPORTER,
     OTEL_SDK_DISABLED,
     OTEL_TRACES_EXPORTER,
+    OTEL_TRACES_SAMPLER,
 )
 from dash0.opentelemetry.distro import Dash0Distro
 
@@ -34,6 +35,7 @@ _MANAGED_VARS = (
     OTEL_EXPORTER_OTLP_METRICS_ENDPOINT,
     OTEL_EXPORTER_OTLP_LOGS_ENDPOINT,
     OTEL_SDK_DISABLED,
+    OTEL_TRACES_SAMPLER,
 )
 
 
@@ -268,6 +270,32 @@ def test_configure_does_not_override_explicit_configuration(monkeypatch):
     Dash0Distro().configure()
 
     assert os.environ[OTEL_TRACES_EXPORTER] == "console"
+
+
+def test_configure_defaults_sampler_to_always_on(monkeypatch):
+    monkeypatch.setenv(DASH0_OTEL_COLLECTOR_BASE_URL, "http://collector:4318")
+
+    Dash0Distro().configure()
+
+    assert os.environ[OTEL_TRACES_SAMPLER] == "always_on"
+
+
+def test_configure_does_not_override_explicit_sampler(monkeypatch):
+    monkeypatch.setenv(DASH0_OTEL_COLLECTOR_BASE_URL, "http://collector:4318")
+    monkeypatch.setenv(OTEL_TRACES_SAMPLER, "parentbased_traceidratio")
+
+    Dash0Distro().configure()
+
+    assert os.environ[OTEL_TRACES_SAMPLER] == "parentbased_traceidratio"
+
+
+def test_configure_sets_no_sampler_when_disabled(monkeypatch):
+    monkeypatch.setenv(DASH0_OTEL_COLLECTOR_BASE_URL, "http://collector:4318")
+    monkeypatch.setenv(DASH0_DISABLE, "true")
+
+    Dash0Distro().configure()
+
+    assert OTEL_TRACES_SAMPLER not in os.environ
 
 
 def test_configure_disabled_by_flag(monkeypatch):

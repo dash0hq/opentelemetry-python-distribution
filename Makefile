@@ -43,3 +43,8 @@ e2e-kubernetes:
 
 e2e-kubernetes-clean:
 	$${KIND_BINARY:-kind} delete cluster --name $(E2E_CLUSTER)
+
+.PHONY: e2e-instrumentations
+
+e2e-instrumentations:
+	cd tests/e2e-instrumentations && go test -timeout 30m ./...

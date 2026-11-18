@@ -1,11 +1,11 @@
-FROM python:3.13-slim AS build
+FROM python:3.15-slim AS build
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1
 RUN pip install --no-cache-dir uv
 WORKDIR /src
 COPY . /src
 RUN uv build --all-packages --out-dir /wheels
 
-FROM python:3.13-slim
+FROM python:3.15-slim
 ARG case
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1
 ENV PYTHONUNBUFFERED=1

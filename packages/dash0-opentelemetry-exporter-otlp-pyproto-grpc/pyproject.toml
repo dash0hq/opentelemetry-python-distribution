@@ -28,7 +28,7 @@ otlp_proto_grpc = "opentelemetry.exporter.otlp.proto.grpc._log_exporter:OTLPLogE
 
 [dependency-groups]
 dev = [
-    "pytest>=7.0",
+    "pytest>=9.2.0",
 ]
 
 [tool.hatch.version]

@@ -23,6 +23,7 @@ that a process accepts only once.
 
 from importlib.metadata import entry_points
 from pathlib import Path
+from sys import executable
 
 import pytest
 from dash0.opentelemetry import resource as resource_module
@@ -171,7 +172,7 @@ def test_a_config_file_without_the_detectors_has_no_dash0_attributes(tmp_path):
 
     assert "telemetry.distro.name" not in attributes
     assert "k8s.pod.uid" not in attributes
-    assert attributes["service.name"] == "unknown_service"
+    assert attributes["service.name"] == f"unknown_service:{Path(executable).name}"
 
 
 def test_attributes_declared_in_the_config_file_win_over_detected_ones(tmp_path):

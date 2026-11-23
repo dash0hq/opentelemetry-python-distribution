@@ -1,0 +1,27 @@
+change_type: bug_fix
+
+component: distro
+
+note: Move to opentelemetry-api and opentelemetry-sdk 1.45.2 and contrib 0.66b2, which fix two ReDoS vulnerabilities in trace context parsing
+
+issues: [118]
+
+subtext: |
+  ``opentelemetry-api`` 1.44.0 parses ``tracestate`` and ``traceparent`` with
+  regular expressions that take quadratic time on crafted input
+  (CVE-2026-114603, fixed in 1.45.1, and CVE-2026-126360, fixed in 1.45.2).
+  ``opentelemetry-sdk`` and ``opentelemetry-semantic-conventions`` require
+  ``opentelemetry-api`` at exactly their own version, so the injected
+  distribution only activates in an application whose ``opentelemetry-api``
+  is the one it ships.
+  Until now that was 1.44.0, so an application that depends on the API for
+  manual instrumentation had to keep a vulnerable version to stay
+  instrumented.
+  Applications that declare ``opentelemetry-api`` should move to 1.45.2.
+  An application that keeps 1.44.0 now trips the dependency conflict check,
+  and the distribution deactivates itself for that process.
+  Declarative configuration now defaults ``service.name`` to
+  ``unknown_service:<executable>``, such as ``unknown_service:python``, as the
+  specification requires, instead of ``unknown_service``.
+
+change_logs: [user]

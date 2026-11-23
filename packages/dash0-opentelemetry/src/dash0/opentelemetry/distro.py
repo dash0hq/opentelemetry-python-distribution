@@ -7,6 +7,8 @@ before the configurator, so it is where the distribution:
 * gates itself off if disabled or if no collector endpoint is configured;
 * defaults the sampler to ``always_on``, so an incoming trace context cannot
   decide whether this process is traced;
+* defaults the propagators to ``tracecontext,baggage,xray``, so a trace keeps its
+  context across AWS load balancers and services that speak X-Ray;
 * selects the pure-Python OTLP exporters (no native dependencies, safe to
   inject) matching the configured OTLP protocol — ``http/protobuf`` by
   default, ``grpc`` when requested — and points them at the Dash0 collector;
@@ -23,7 +25,14 @@ from logging import getLogger
 from os import environ
 from urllib.parse import urlparse, urlunparse
 
+from opentelemetry.baggage.propagation import W3CBaggagePropagator
 from opentelemetry.instrumentation.distro import BaseDistro
+from opentelemetry.propagate import set_global_textmap
+from opentelemetry.propagators.aws import AwsXRayPropagator
+from opentelemetry.propagators.composite import CompositePropagator
+from opentelemetry.trace.propagation.tracecontext import (
+    TraceContextTextMapPropagator,
+)
 
 from ._environment_variables import (
     DASH0_OTEL_COLLECTOR_BASE_URL,
@@ -37,6 +46,7 @@ from ._environment_variables import (
     OTEL_EXPORTER_OTLP_TRACES_PROTOCOL,
     OTEL_LOGS_EXPORTER,
     OTEL_METRICS_EXPORTER,
+    OTEL_PROPAGATORS,
     OTEL_SDK_DISABLED,
     OTEL_TRACES_EXPORTER,
     OTEL_TRACES_SAMPLER,
@@ -62,6 +72,20 @@ _PYPROTO_EXPORTERS_BY_PROTOCOL = {
 _DEFAULT_PROTOCOL = _HTTP_PROTOCOL
 
 _DEFAULT_SAMPLER = "always_on"
+
+
+def _default_propagator():
+    """Return the ``tracecontext,baggage,xray`` composite.
+
+    The composite runs extractors in order and the last valid context wins, so
+    an incoming X-Amzn-Trace-Id with a Parent takes precedence over traceparent.
+    A header without a Parent (an ALB-added Root) fails extraction and keeps the
+    traceparent context.
+    """
+    return CompositePropagator(
+        [TraceContextTextMapPropagator(), W3CBaggagePropagator(), AwsXRayPropagator()]
+    )
+
 
 # Default OTLP receiver port per protocol. OTLP/gRPC and OTLP/HTTP conventionally
 # listen on different ports, so a single collector base URL cannot address both.
@@ -151,6 +175,12 @@ class Dash0Distro(BaseDistro):
             return
 
         environ.setdefault(OTEL_TRACES_SAMPLER, _DEFAULT_SAMPLER)
+        # An empty value counts as unset, as the specification requires. The
+        # propagator is installed directly: opentelemetry.propagate has already
+        # read OTEL_PROPAGATORS on import, and writing the variable would leak
+        # an "xray" name into child processes that may not know it.
+        if not environ.get(OTEL_PROPAGATORS):
+            set_global_textmap(_default_propagator())
 
         default_protocol = environ.setdefault(
             OTEL_EXPORTER_OTLP_PROTOCOL, _DEFAULT_PROTOCOL

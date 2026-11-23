@@ -29,6 +29,10 @@ Entry points
       setups and a base URL on the "wrong" default port still export
       correctly. Custom ports and explicit per-signal endpoints are always
       left untouched.
+    * Installs the ``tracecontext,baggage,xray`` propagators when
+      ``OTEL_PROPAGATORS`` is unset, so a trace keeps its context across AWS
+      load balancers and services that only speak X-Ray. It does not write the
+      variable, and a value you set is honored.
     * Injects detected **resource attributes** into ``OTEL_RESOURCE_ATTRIBUTES``/
       ``OTEL_SERVICE_NAME`` (see below) so the SDK's Resource picks them up.
     * Overrides ``load_instrumentor`` to activate each instrumentor

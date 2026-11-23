@@ -24,6 +24,7 @@ The following variables are relevant to the distribution's behavior:
 | `OTEL_LOGS_EXPORTER` | `otlp_proto_http` | Pure-Python OTLP/HTTP exporter. |
 | `OTEL_EXPORTER_OTLP_PROTOCOL` | `http/protobuf` | Set to `grpc` for OTLP/gRPC. |
 | `OTEL_TRACES_SAMPLER` | `always_on` | The SDK records and exports every span, whatever an incoming trace context says. See [Sampling](#sampling). Declarative configuration (`OTEL_CONFIG_FILE`) never reads it. |
+| `OTEL_PROPAGATORS` | `tracecontext,baggage,xray` | Installed directly; the variable itself stays unset. Reads and writes W3C `traceparent`, W3C `baggage`, and AWS `X-Amzn-Trace-Id`. See [Propagation](#propagation). Declarative configuration (`OTEL_CONFIG_FILE`) never reads it. |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Value of `DASH0_OTEL_COLLECTOR_BASE_URL` | Derived automatically; override if needed. |
 | `OTEL_EXPORTER_OTLP_HEADERS` | — | Headers sent with every OTLP request. Required for Dash0 authentication: `Authorization=Bearer <token>,Dash0-Dataset=default`. |
 | `OTEL_EXPORTER_OTLP_<SIGNAL>_PROTOCOL` | — | Per-signal protocol override (`TRACES`, `METRICS`, `LOGS`). |
@@ -84,6 +85,39 @@ tracer_provider:
 
 A `tracer_provider` block must contain `processors`.
 Add the `sampler` key to the block you already have rather than writing one that holds only a sampler.
+
+## Propagation
+
+When `OTEL_PROPAGATORS` is unset or empty, the distribution installs the `tracecontext,baggage,xray` propagators.
+It does not write the variable, so child processes, which may not know `xray`, keep their own default.
+OpenTelemetry's own default is `tracecontext,baggage`.
+The added `xray` propagator reads and writes the `X-Amzn-Trace-Id` header, so a trace stays whole when it passes through an AWS load balancer or a service instrumented with X-Ray.
+
+Outgoing requests carry both `traceparent` and `X-Amzn-Trace-Id`, each with the current span as the parent.
+On an incoming request the propagators run in order, and a later one that finds a valid context replaces an earlier one.
+When both headers are present and the X-Ray header has a `Parent`, the X-Ray context wins.
+
+An Application Load Balancer adds `X-Amzn-Trace-Id` with only a `Root` when a request arrives without one.
+That header has no parent span, so the `xray` propagator ignores it and the `traceparent` context is kept.
+Fields such as `Self` that a load balancer adds to an existing header are ignored.
+
+Set `OTEL_PROPAGATORS` yourself to override the default:
+
+```bash
+export OTEL_PROPAGATORS=tracecontext,baggage
+```
+
+Declarative configuration does not read `OTEL_PROPAGATORS`.
+When `OTEL_CONFIG_FILE` is set, the `propagator` section of the file decides, and a file without one propagates nothing.
+Declare the propagators in the file to get the same behavior:
+
+```yaml
+propagator:
+  composite:
+    - tracecontext: {}
+    - baggage: {}
+    - xray: {}
+```
 
 ## Disabling the distribution
 

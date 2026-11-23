@@ -152,6 +152,7 @@ A single broken instrumentor does not abort the entire auto-instrumentation proc
 
 The AWS X-Ray propagator ([`opentelemetry-propagator-aws-xray`](https://pypi.org/project/opentelemetry-propagator-aws-xray/)) is explicitly included.
 The W3C TraceContext and Baggage propagators are built into the OpenTelemetry SDK and always available.
+The distribution defaults `OTEL_PROPAGATORS` to `tracecontext,baggage,xray`; see [Propagation](configuration.md#propagation).
 B3 format propagation is not included; it requires the separate [`opentelemetry-propagator-b3`](https://pypi.org/project/opentelemetry-propagator-b3/) package, which is not a dependency of this distribution.
 
 ## What is not included

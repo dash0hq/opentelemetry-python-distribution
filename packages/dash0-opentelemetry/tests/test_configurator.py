@@ -107,6 +107,8 @@ def test_default_config_file_is_used_when_variable_unset_or_empty(
     assert sdk_calls["loaded"] == [str(default_config_file)]
     assert len(sdk_calls["configured"]) == 1
     assert sdk_calls["from_environment"] == 0
+    # Child processes, including other languages' agents, must not inherit it.
+    assert configurator_module.environ.get(OTEL_CONFIG_FILE) == unset_value
 
 
 def test_environment_variables_configure_sdk_without_any_config_file(

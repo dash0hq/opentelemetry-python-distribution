@@ -45,7 +45,8 @@ At startup the distribution picks its configuration in this order:
 
 A Dash0 language package installs the file at that path, so a host with the package runs from it by default.
 Hosts and containers without the file keep the environment-variable configuration.
-When the distribution falls back to the file, it sets `OTEL_CONFIG_FILE` to its path, and child processes inherit it.
+When the distribution falls back to the file, it loads the file without setting `OTEL_CONFIG_FILE`.
+Child processes, including ones in other languages, do not inherit a path to the Python file.
 
 An `OTEL_CONFIG_FILE` that names a missing file is still honored.
 The SDK logs that it cannot find the file and does not start, and the application keeps running without telemetry.

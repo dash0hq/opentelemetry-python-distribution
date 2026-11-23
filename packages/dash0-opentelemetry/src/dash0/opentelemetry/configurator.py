@@ -53,12 +53,18 @@ class Dash0Configurator(_OTelSDKConfigurator):
             return
 
         if not environ.get(OTEL_CONFIG_FILE) and isfile(_DEFAULT_CONFIG_FILE):
-            environ[OTEL_CONFIG_FILE] = _DEFAULT_CONFIG_FILE
+            # Load the file directly rather than setting OTEL_CONFIG_FILE, so
+            # child processes, including other languages' agents, never inherit
+            # a path to the Python file. Imported here, as the SDK does, so the
+            # environment-variable path skips the import.
+            from opentelemetry.configuration import configure_sdk, load_config_file
+
             _logger.debug(
                 "dash0: %s is not set; using %s", OTEL_CONFIG_FILE, _DEFAULT_CONFIG_FILE
             )
-
-        super()._configure(**kwargs)
+            configure_sdk(load_config_file(_DEFAULT_CONFIG_FILE))
+        else:
+            super()._configure(**kwargs)
 
         bootstrap_span_name = environ.get(DASH0_BOOTSTRAP_SPAN)
         if bootstrap_span_name:

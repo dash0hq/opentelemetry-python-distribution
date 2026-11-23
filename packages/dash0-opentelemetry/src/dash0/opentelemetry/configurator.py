@@ -7,6 +7,14 @@ exporters and Resource from that environment, then adds two Dash0 behaviors from
 the Node.js distribution: an optional startup ("bootstrap") span and optional
 graceful flushing on SIGTERM/SIGINT.
 
+Before that, it picks the declarative configuration file: ``OTEL_CONFIG_FILE``
+when it is set and not empty, otherwise
+``/etc/opentelemetry/python/otel-config.yaml`` when that file exists, which is
+where a Dash0 language package installs it. With neither, the SDK configures
+itself from environment variables. An ``OTEL_CONFIG_FILE`` that names a missing
+file is still honored, so the SDK reports the error instead of the distribution
+silently picking another file.
+
 Normal-exit flushing is already handled by the SDK: the tracer/meter/logger
 providers register ``atexit`` shutdown hooks. The signal handling below covers
 container termination, where ``atexit`` does not run by default.
@@ -15,9 +23,11 @@ container termination, where ``atexit`` does not run by default.
 import signal
 from logging import getLogger
 from os import environ, getpid, kill
+from os.path import isfile
 
 from opentelemetry import _logs, metrics, trace
 from opentelemetry.sdk._configuration import _OTelSDKConfigurator
+from opentelemetry.sdk.environment_variables import OTEL_CONFIG_FILE
 
 from ._environment_variables import (
     DASH0_BOOTSTRAP_SPAN,
@@ -26,6 +36,8 @@ from ._environment_variables import (
 from .settings import evaluate_gate, is_true
 
 _logger = getLogger(__name__)
+
+_DEFAULT_CONFIG_FILE = "/etc/opentelemetry/python/otel-config.yaml"
 
 
 class Dash0Configurator(_OTelSDKConfigurator):
@@ -39,6 +51,12 @@ class Dash0Configurator(_OTelSDKConfigurator):
                 reason,
             )
             return
+
+        if not environ.get(OTEL_CONFIG_FILE) and isfile(_DEFAULT_CONFIG_FILE):
+            environ[OTEL_CONFIG_FILE] = _DEFAULT_CONFIG_FILE
+            _logger.debug(
+                "dash0: %s is not set; using %s", OTEL_CONFIG_FILE, _DEFAULT_CONFIG_FILE
+            )
 
         super()._configure(**kwargs)
 

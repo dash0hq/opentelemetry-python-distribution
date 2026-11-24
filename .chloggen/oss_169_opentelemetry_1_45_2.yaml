@@ -56,10 +56,14 @@ subtext: |
   process exports. Read any file you already ship before upgrading.
   A key written with an empty value is read as an empty object rather than as
   absent, which the specification requires: ``always_on:`` means
-  ``always_on: {}``. A detector, sampler, exporter or propagator written that
-  way used to be skipped and now runs. A ``detection/development`` list
-  containing ``- host:`` and ``- process:`` starts adding the twelve ``host.*``
-  and ``process.*`` attributes those detectors produce, among them
+  ``always_on: {}``. A detector written that way used to be skipped and now
+  runs. A sampler, an exporter, an ``id_generator`` and a view's
+  ``aggregation`` written that way used to fail the whole file with a
+  ``ConfigurationError`` such as ``No exporter type specified in span exporter
+  config``, so under injection the distribution deactivated itself for that
+  process; each now builds the component it names. A ``detection/development``
+  list containing ``- host:`` and ``- process:`` starts adding the twelve
+  ``host.*`` and ``process.*`` attributes those detectors produce, among them
   ``process.command`` and ``process.owner``. A ``propagator.composite`` list
   written as ``- tracecontext:`` and ``- baggage:`` used to leave the process
   with a no-op propagator that read and wrote no trace context at all, and now
@@ -91,8 +95,18 @@ subtext: |
   The attribute-limit environment variables no longer reach a process
   configured from a file: the loader now passes explicit span and log-record
   limits whether or not the file declares any, so
-  ``OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT`` and ``OTEL_ATTRIBUTE_COUNT_LIMIT`` are
-  ignored. Move those values into a top-level ``attribute_limits`` block.
+  ``OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT``,
+  ``OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT``,
+  ``OTEL_LOGRECORD_ATTRIBUTE_VALUE_LENGTH_LIMIT`` and
+  ``OTEL_LOGRECORD_ATTRIBUTE_COUNT_LIMIT`` are all ignored, and
+  ``OTEL_ATTRIBUTE_COUNT_LIMIT`` stops reaching log records. It never reached
+  span attributes under a configuration file, since the previous release
+  already passed the default count of 128 explicitly, and neither did
+  ``OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT``. Move a value that applied to both
+  signals into a top-level ``attribute_limits`` block, and a per-signal value
+  into ``tracer_provider.limits`` or ``logger_provider.limits``: the top-level
+  block applies to spans and to log records alike, so it cannot express a
+  limit that applied to only one of them.
   A ``${VAR}`` reference in a JSON configuration file must now stand where JSON
   accepts a string, because substitution runs on the parsed document rather
   than on the file text. ``"attribute_count_limit": ${LIMIT}`` used to load and

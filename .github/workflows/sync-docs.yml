@@ -38,7 +38,7 @@ jobs:
           permission-pull-requests: write
 
       - name: Sync docs to the Dash0 website
-        uses: dash0hq/sync-docs-action@c30aaaaa93f3f8a88b9f9e3acd31cfff3e086954  # v0.6.0
+        uses: dash0hq/sync-docs-action@c30aaaaa93f3f8a88b9f9e3acd31cfff3e086954 # v0.6.0
         with:
           dry-run: ${{ github.event_name == 'pull_request' || inputs.dry-run }}
           target-repository: ${{ secrets.SYNC_DOCUMENTATION_TARGET_REPOSITORY }}

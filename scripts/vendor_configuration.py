@@ -1,10 +1,12 @@
 """Regenerate ``packages/dash0-opentelemetry-configuration`` from the fork.
 
-The declarative-configuration code is not written here. It lives on the
-``dash0`` branch of https://github.com/dash0hq/opentelemetry-python, which
-carries the Dash0 patches as commits on top of an upstream commit so they can
-be rebased when upstream moves. This script is the only thing that turns that
-branch into a package in this workspace, which is what keeps the two in step:
+The declarative-configuration code is not written here. It lives on the branch
+of https://github.com/dash0hq/opentelemetry-python that ``UPSTREAM`` names,
+which carries the Dash0 patches as commits on top of an upstream commit so they
+can be rebased when upstream moves. A branch is named ``dash0-v<upstream
+version>`` after the upstream tag its commits sit on. This script is the only
+thing that turns that branch into a package in this workspace, which is what
+keeps the two in step:
 a change made here by hand is lost on the next run, and CI fails if the
 checked-in tree is not what this script produces.
 
@@ -24,8 +26,8 @@ What it generates, all of which is therefore not to be edited by hand:
   pins are copied from the fork's own package metadata. The vendored code uses
   SDK internals that move between releases, so it is only correct against the
   SDK the fork pins. When that disagrees with what this distribution pins, the
-  script stops rather than papering over it: rebase the ``dash0`` branch onto
-  the upstream tag matching the distribution's SDK, or move the distribution's
+  script stops rather than papering over it: rebase the fork branch onto the
+  upstream tag matching the distribution's SDK, or move the distribution's
   pin to match the fork.
 
 Two files inside the package are deliberately left alone. ``README.rst``
@@ -37,11 +39,15 @@ Usage::
 
     python3 scripts/vendor_configuration.py
     python3 scripts/vendor_configuration.py --commit <sha>
+    python3 scripts/vendor_configuration.py --commit <sha> --branch <name>
     python3 scripts/vendor_configuration.py --check
 
 ``--commit`` re-points ``UPSTREAM`` at a new fork commit, which is what to run
-after rebasing the ``dash0`` branch. ``--check`` regenerates into a scratch
-directory and reports what differs without writing anything.
+after adding a commit to the branch ``UPSTREAM`` names. ``--branch`` re-points
+it at a different fork branch, which a rebase onto a new upstream tag always
+produces, since the branch is named after that tag; omitting it there leaves
+``UPSTREAM`` naming a branch the new commit is not on. ``--check`` regenerates
+into a scratch directory and reports what differs without writing anything.
 
 Runs on Python >= 3.11 (tomllib) with git on the PATH.
 """
@@ -131,7 +137,7 @@ def agreed_pins(fork_pyproject: Path) -> dict[str, str]:
     only correct against the SDK its own package pins. Copying the
     distribution's pin over the fork's would hide a disagreement until a
     provider blew up at runtime, so a disagreement stops the vendoring instead:
-    rebase the ``dash0`` branch onto the upstream tag matching the SDK this
+    rebase the fork branch onto the upstream tag matching the SDK this
     distribution pins, or move the distribution's pin to match the fork.
     """
     pins: dict[str, str] = {}
@@ -190,15 +196,22 @@ def generate(source: Path, destination: Path, fork_pyproject: Path) -> None:
 def main() -> int:
     parser = ArgumentParser(description=__doc__)
     parser.add_argument("--commit", help="re-point UPSTREAM at this fork commit")
+    parser.add_argument("--branch", help="re-point UPSTREAM at this fork branch")
     parser.add_argument(
         "--check",
         action="store_true",
         help="report differences instead of writing",
     )
     arguments: Namespace = parser.parse_args()
+    if arguments.branch and not arguments.commit:
+        parser.error(
+            "--branch needs --commit: a rebase moves both, and recording a new "
+            "branch beside the old commit names a pair that is not on the fork"
+        )
 
     fields = read_upstream()
     commit: str = arguments.commit or fields["commit"]
+    branch: str = arguments.branch or fields["branch"]
 
     with TemporaryDirectory() as scratch:
         clone = Path(scratch) / "fork"
@@ -261,7 +274,7 @@ def main() -> int:
 
     UPSTREAM.write_text(
         f"repository = {fields['repository']}\n"
-        f"branch = {fields['branch']}\n"
+        f"branch = {branch}\n"
         f"commit = {commit}\n"
         f"source = {fields['source']}\n"
     )

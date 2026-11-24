@@ -6,6 +6,11 @@ agrees with ``jsonschema``. Neither runs here. What is specific to this
 repository is the packaging: that the shims resolve, that the dependency the
 whole exercise exists to avoid is really absent, and that a configuration file
 drives the distribution end to end.
+
+The three tests named for an unset variable, for a bare propagator entry and
+for a bare detector entry are the exception. They pin behaviour that a
+re-vendor can reverse without a word, since the only check on the vendored
+tree compares it with the fork rather than with what the previous release did.
 """
 
 from importlib.metadata import requires
@@ -14,6 +19,8 @@ from pathlib import Path
 import pytest
 from opentelemetry import configuration as public
 from opentelemetry._configuration import _generated_validator
+from opentelemetry._configuration._propagator import create_propagator
+from opentelemetry._configuration._resource import create_resource
 from opentelemetry._configuration.file._loader import _validate_schema
 from opentelemetry._logs import get_logger_provider
 from opentelemetry.configuration import (
@@ -44,16 +51,44 @@ tracer_provider:
     - simple:
         exporter:
           console: {}
+  tracer_configurator/development:
+    default_config:
+      enabled: true
+    tracers:
+      - name: a.scope.this.test.never.creates.*
+        config:
+          enabled: false
 meter_provider:
   readers:
     - periodic:
         exporter:
           console: {}
+        cardinality_limits:
+          default: 100
+  views:
+    - selector:
+        instrument_name: an.instrument.this.test.never.creates
+      stream:
+        aggregation_cardinality_limit: 100
+  meter_configurator/development:
+    default_config:
+      enabled: true
+    meters:
+      - name: a.scope.this.test.never.creates.*
+        config:
+          enabled: false
 logger_provider:
   processors:
     - simple:
         exporter:
           console: {}
+  logger_configurator/development:
+    default_config:
+      enabled: true
+    loggers:
+      - name: a.scope.this.test.never.creates.*
+        config:
+          enabled: false
 propagator:
   composite:
     - tracecontext: {}
@@ -73,6 +108,33 @@ tracer_provider:
     - simple:
         exporter:
           console: {}
+"""
+
+_UNSET_VARIABLE: str = """
+file_format: "1.0-rc.1"
+tracer_provider:
+  processors:
+    - simple:
+        exporter:
+          otlp_http:
+            endpoint: ${DASH0_TEST_ENDPOINT_THAT_IS_NEVER_SET}
+"""
+
+_BARE_PROPAGATORS: str = """
+file_format: "1.0-rc.1"
+propagator:
+  composite:
+    - tracecontext:
+    - baggage:
+"""
+
+_BARE_DETECTORS: str = """
+file_format: "1.0-rc.1"
+resource:
+  detection/development:
+    detectors:
+      - host:
+      - process:
 """
 
 
@@ -137,6 +199,56 @@ def test_configure_sdk_sets_every_global_against_the_pinned_sdk(
         "TraceContextTextMapPropagator",
         "W3CBaggagePropagator",
     ]
+
+
+def test_an_unset_variable_with_no_default_leaves_the_setting_null(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A reference the environment does not answer no longer fails the load.
+
+    It substitutes an empty value, which the parser reads as null, so the
+    setting falls back instead of standing the distribution down.
+    """
+    monkeypatch.delenv("DASH0_TEST_ENDPOINT_THAT_IS_NEVER_SET", raising=False)
+    config_file: Path = tmp_path / "otel-config.yaml"
+    config_file.write_text(_UNSET_VARIABLE)
+
+    config = load_config_file(str(config_file))
+
+    exporter = config.tracer_provider.processors[0].simple.exporter
+    assert exporter.otlp_http.endpoint is None
+
+
+def test_a_propagator_written_with_an_empty_value_is_installed(
+    tmp_path: Path,
+) -> None:
+    """``- tracecontext:`` selects the propagator rather than being skipped.
+
+    A key present with an empty value means an empty object, so a composite
+    list written without ``{}`` propagates context instead of leaving the
+    process with the noop propagator.
+    """
+    config_file: Path = tmp_path / "otel-config.yaml"
+    config_file.write_text(_BARE_PROPAGATORS)
+
+    propagator = create_propagator(load_config_file(str(config_file)).propagator)
+
+    assert sorted(propagator.fields) == ["baggage", "traceparent", "tracestate"]
+
+
+def test_a_detector_written_with_an_empty_value_runs(tmp_path: Path) -> None:
+    """``- host:`` selects the detector rather than being skipped.
+
+    The same empty-value rule as the bare propagator entry, on the path that
+    widens the resource carried by every span, metric and log record.
+    """
+    config_file: Path = tmp_path / "otel-config.yaml"
+    config_file.write_text(_BARE_DETECTORS)
+
+    resource = create_resource(load_config_file(str(config_file)).resource)
+
+    assert "host.arch" in resource.attributes
+    assert "process.pid" in resource.attributes
 
 
 def test_an_invalid_document_is_rejected_with_the_property_named() -> None:

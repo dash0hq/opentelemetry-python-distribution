@@ -84,7 +84,7 @@ A console script such as `gunicorn`, `uvicorn`, `celery` or `flask` launches som
 Running `gunicorn myapp:app` therefore does not report `service.name=gunicorn`, and never reports `gunicorn`'s version as `service.version`.
 A runner started as a module is skipped too, so `python -m gunicorn` and `python -m flask run` behave the same way, matched on the top-level package so that `python -m flask.cli` is also covered.
 Detection falls through to `pyproject.toml`, which still finds the application when the virtual environment sits inside the project directory.
-When that finds nothing either, no name is reported and the SDK's `unknown_service` stands, because an honest absence is easier to act on than a name that every deployment shares.
+When that finds nothing either, no name is reported and the SDK's own default stands, `unknown_service:<executable>` such as `unknown_service:python3`, because an honest absence is easier to act on than a name that every deployment shares.
 The Dash0 Ruby distribution skips `puma`, `unicorn` and `sidekiq` for the same reason, so the two distributions behave alike.
 Set `OTEL_SERVICE_NAME` for those deployments.
 
@@ -121,7 +121,8 @@ resource:
 ```
 
 The `attributes_list` line is optional and shown because it is how `OTEL_RESOURCE_ATTRIBUTES` reaches a config file.
-The `:-` suffix supplies an empty default, so an unset variable yields no attributes instead of an error.
+An unset `OTEL_RESOURCE_ATTRIBUTES` yields no attributes, because an unset variable substitutes an empty value that the parser reads as null.
+The `:-` suffix spells that out and is the place to put a non-empty default.
 Values under `resource.attributes` override anything `attributes_list` sets.
 
 Declare the `propagator` block even though the schema allows omitting it.

@@ -35,10 +35,10 @@ subtext: |
   implementations already do. It used to fail the load, and under injection the
   distribution deactivated itself naming the variable. A file that relied on
   that failure now starts with the setting left at its fallback, wherever the
-  schema admits a null there. Where it does not, as for ``log_level``,
-  ``encoding`` and the ``tls`` file paths, the load still fails, but with a
-  schema message such as ``data.log_level must be one of [...]`` that does not
-  name the variable that was unset.
+  schema admits a null there. Where it does not, as for ``log_level``, an
+  exporter's ``encoding`` and a resource attribute's ``name``, the load still
+  fails, but with a schema message such as ``data.log_level must be one of
+  [...]`` that does not name the variable that was unset.
   An ``otlp_http`` ``endpoint`` left null falls back to
   ``OTEL_EXPORTER_OTLP_<SIGNAL>_ENDPOINT``, then to
   ``OTEL_EXPORTER_OTLP_ENDPOINT``, which the distribution sets from
@@ -76,9 +76,10 @@ subtext: |
   Python SDK LoggerProvider constructor; limits will be ignored.`` and now
   truncates log-record attributes.
   A ``cardinality_limits`` block on a metric reader, and
-  ``aggregation_cardinality_limit`` on a view's stream, used to be refused the
-  same way and now cap the number of series per instrument, collapsing the
-  excess into a single series carrying ``otel.metric.overflow: true``.
+  ``aggregation_cardinality_limit`` on a view's stream, used to be ignored, the
+  pull-reader case with a log line and the rest in silence. Both now cap the
+  number of series per instrument, collapsing the excess into a single series
+  carrying ``otel.metric.overflow: true``.
   A ``tracer_configurator/development``, ``logger_configurator/development`` or
   ``meter_configurator/development`` block now applies, and ``enabled: false``
   in one of them stops that signal for every tracer, logger or meter it
@@ -86,7 +87,7 @@ subtext: |
   A top-level ``log_level`` is applied to the ``opentelemetry`` logger. The
   OTLP exporter reports a failed export at ERROR, so only ``log_level: fatal``
   silences that report; ``log_level: error`` drops everything below ERROR.
-  Two things that worked under a configuration file stop working.
+  Three things that worked under a configuration file stop working.
   The attribute-limit environment variables no longer reach a process
   configured from a file: the loader now passes explicit span and log-record
   limits whether or not the file declares any, so
@@ -96,9 +97,17 @@ subtext: |
   accepts a string, because substitution runs on the parsed document rather
   than on the file text. ``"attribute_count_limit": ${LIMIT}`` used to load and
   now fails the file with ``Failed to parse JSON``, and quoting it does not
-  help, because the substituted value stays a string. The same move means a
-  YAML value taken from the environment is no longer re-parsed as YAML, so a
-  value containing ``#``, a leading ``*`` or a trailing space now reaches the
-  exporter as written, and a ``${VAR}`` used as a mapping key is left alone.
+  help, because the substituted value stays a string.
+  A ``${VAR}`` written as a mapping key is left alone for the same reason,
+  since a key is not a value. ``${EXPORTER_NAME}: {}`` under an exporter used
+  to name whatever the variable held and now parses as the literal key
+  ``${EXPORTER_NAME}``, which the entry-point lookup then fails on at startup.
+  The plugin exporter, plugin sampler and
+  ``prometheus/development.resource_constant_labels`` positions all take an
+  arbitrary key, so write the key out.
+  That same move means a YAML value taken from the environment is no longer
+  re-parsed as YAML, which breaks nothing: a value containing ``#``, a leading
+  ``*`` or a trailing space now reaches the exporter as written instead of
+  being cut short, aliased or trimmed.
 
 change_logs: [user]

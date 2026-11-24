@@ -10,9 +10,10 @@ subtext: |
   ``opentelemetry-api`` 1.44.0 parses ``tracestate`` and ``traceparent`` with
   regular expressions that take quadratic time on crafted input
   (CVE-2026-114603, fixed in 1.45.1, and CVE-2026-126360, fixed in 1.45.2).
-  ``opentelemetry-sdk`` and ``opentelemetry-semantic-conventions`` require
-  ``opentelemetry-api`` at exactly their own version, so the injected
-  distribution only activates in an application whose ``opentelemetry-api``
+  ``opentelemetry-sdk`` and ``opentelemetry-semantic-conventions`` each
+  require ``opentelemetry-api`` at one exact version, the one they are released
+  alongside, so the injected distribution only activates in an application
+  whose ``opentelemetry-api``
   is the one it ships.
   Until now that was 1.44.0, so an application that depends on the API for
   manual instrumentation had to keep a vulnerable version to stay
@@ -46,9 +47,11 @@ subtext: |
   elsewhere go to the Dash0 collector instead, and nothing is logged. Only one
   of these settings reports itself: an entry under ``resource.attributes``
   whose value is null is skipped with the warning ``Ignoring resource attribute
-  '<name>' with empty value``. Give every reference a default, as in
-  ``${COLLECTOR_ENDPOINT:-http://collector:4318}``, so a missing variable
-  cannot reach a fallback.
+  '<name>' with empty value``. Give every reference a default that is a real
+  value, as in ``${COLLECTOR_ENDPOINT:-http://collector:4318}``, so a missing
+  variable
+  cannot reach a fallback. An empty default does not do it: ``${VAR:-}``
+  resolves to null exactly as ``${VAR}`` does.
   ``EnvSubstitutionError`` is gone from ``opentelemetry.configuration.file``,
   because nothing raises it any more.
   Several parts of a configuration file now behave differently: some the
@@ -98,7 +101,7 @@ subtext: |
   OTLP exporter reports a failed export at ERROR, so a ``log_level`` of
   ``fatal`` or above silences that report, and ``log_level: error`` drops
   everything below ERROR.
-  Four things that worked under a configuration file stop working.
+  Several things that worked under a configuration file stop working.
   The attribute-limit environment variables no longer reach a process
   configured from a file: the loader now passes explicit span and log-record
   limits whether or not the file declares any, so
@@ -139,11 +142,16 @@ subtext: |
   it. The previous release re-parsed such a value, so it could be cut short at
   a ``#``, rejected as an undefined YAML alias, trimmed, or stripped of quote
   characters that were part of it; now it reaches the exporter exactly as the
-  environment holds it. Most of that is a repair, and one case is a break:
-  a variable whose value starts and ends with a quote keeps the quotes, so an
-  endpoint written that way now names a host nobody can resolve. A standalone
-  unquoted reference is still typed as before, so ``${LIMIT}`` holding ``100``
-  still reaches an integer field as the integer 100, and quoting it as
-  ``"${LIMIT}"`` fails the file in this release and in the previous one alike.
+  environment holds it. Most of that is a repair, and two cases are breaks.
+  A variable whose value starts and ends with a quote keeps the quotes, so an
+  endpoint written that way now names a host nobody can resolve. A reference
+  that is only part of a value is no longer typed, so a numeric field built
+  from a reference and literal text, as in ``export_timeout: ${SECS}000``,
+  used to load and now fails the file with ``must be integer or null``: write
+  the whole value as one reference instead.
+  A reference that is the whole value is still typed as before, so ``${LIMIT}``
+  holding ``100`` still reaches an integer field as the integer 100, and
+  quoting it as ``"${LIMIT}"`` fails the file in this release and in the
+  previous one alike.
 
 change_logs: [user]

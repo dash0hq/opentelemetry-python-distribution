@@ -10,10 +10,12 @@ of https://github.com/open-telemetry/opentelemetry-configuration, and
 ``file_format`` minor the loader knows. A file declaring a higher minor loads
 with a warning that some settings may be ignored. Whether a setting this schema
 does not carry is in fact ignored depends on where it sits, since the document
-is validated before the ``file_format`` is read. The document root accepts an
-unknown key. A block the schema closes rejects one and fails the load. A block
-the schema leaves open, which is every plugin position, accepts one and then
-fails at component construction with ``Plugin '<name>' not found``.
+is validated before the ``file_format`` is read. A block the schema closes
+rejects an unknown key and fails the load. A block the schema leaves open
+accepts one, and what happens next is decided by the code that reads the
+block, not by the validator: a plugin position raises ``Plugin '<name>' not
+found``, the document root ignores the key, and a processor raises an error
+of its own.
 
 Do not edit this package by hand
 --------------------------------

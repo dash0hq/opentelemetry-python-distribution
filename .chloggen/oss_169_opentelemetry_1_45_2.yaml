@@ -34,8 +34,12 @@ subtext: |
   null, as the specification requires and as the Java and Node.js
   implementations already do. It used to fail the load, and under injection the
   distribution deactivated itself naming the variable. A file that relied on
-  that failure now starts with the setting left at its fallback. An
-  ``otlp_http`` ``endpoint`` left null falls back to
+  that failure now starts with the setting left at its fallback, wherever the
+  schema admits a null there. Where it does not, as for ``log_level``,
+  ``encoding`` and the ``tls`` file paths, the load still fails, but with a
+  schema message such as ``data.log_level must be one of [...]`` that does not
+  name the variable that was unset.
+  An ``otlp_http`` ``endpoint`` left null falls back to
   ``OTEL_EXPORTER_OTLP_<SIGNAL>_ENDPOINT``, then to
   ``OTEL_EXPORTER_OTLP_ENDPOINT``, which the distribution sets from
   ``DASH0_OTEL_COLLECTOR_BASE_URL``, so the spans the file meant to send

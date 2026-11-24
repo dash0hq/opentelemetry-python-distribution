@@ -51,9 +51,11 @@ subtext: |
   cannot reach a fallback.
   ``EnvSubstitutionError`` is gone from ``opentelemetry.configuration.file``,
   because nothing raises it any more.
-  Several parts of a configuration file that the previous release parsed and
-  then ignored now take effect, so a file nobody has edited can change what the
-  process exports. Read any file you already ship before upgrading.
+  Several parts of a configuration file now behave differently: some the
+  previous release parsed and then ignored, some it refused outright. A file
+  nobody has edited can change what the process exports, and a file that used
+  to fail the load can start succeeding. Read any file you already ship before
+  upgrading.
   A key written with an empty value is read as an empty object rather than as
   absent, which the specification requires: ``always_on:`` means
   ``always_on: {}``. A detector written that way used to be skipped and now
@@ -91,7 +93,7 @@ subtext: |
   A top-level ``log_level`` is applied to the ``opentelemetry`` logger. The
   OTLP exporter reports a failed export at ERROR, so only ``log_level: fatal``
   silences that report; ``log_level: error`` drops everything below ERROR.
-  Three things that worked under a configuration file stop working.
+  Four things that worked under a configuration file stop working.
   The attribute-limit environment variables no longer reach a process
   configured from a file: the loader now passes explicit span and log-record
   limits whether or not the file declares any, so
@@ -116,12 +118,20 @@ subtext: |
   since a key is not a value. ``${EXPORTER_NAME}: {}`` under an exporter used
   to name whatever the variable held and now parses as the literal key
   ``${EXPORTER_NAME}``, which the entry-point lookup then fails on at startup.
-  The plugin exporter, plugin sampler and
-  ``prometheus/development.resource_constant_labels`` positions all take an
-  arbitrary key, so write the key out.
-  That same move means a YAML value taken from the environment is no longer
-  re-parsed as YAML, which breaks nothing: a value containing ``#``, a leading
-  ``*`` or a trailing space now reaches the exporter as written instead of
-  being cut short, aliased or trimmed.
+  A plugin exporter, a plugin sampler, a plugin propagator, a plugin
+  ``id_generator``, a plugin processor, a plugin metric producer and a plugin
+  resource detector all take an arbitrary key, so write the key out. The
+  resource detector is the position the Dash0 package's own
+  ``otel-config.yaml`` uses, for ``dash0_distribution``, ``dash0_service_name``
+  and ``dash0_kubernetes``.
+  A ``${VAR}`` whose value supplied YAML structure stops supplying it, for the
+  same reason: substitution now writes into the parsed document, so the value
+  stays a string instead of being re-parsed. ``composite: ${PROPAGATORS}`` with
+  ``PROPAGATORS`` holding ``[{tracecontext: {}}, {baggage: {}}]`` used to load
+  and now fails the file with ``data.propagator.composite must be array``.
+  A scalar value taken from the environment is no longer re-parsed either, and
+  that part breaks nothing: a value containing ``#``, a leading ``*`` or a
+  trailing space now reaches the exporter as written instead of being cut
+  short, rejected as an undefined YAML alias, or trimmed.
 
 change_logs: [user]

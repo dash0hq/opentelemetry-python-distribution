@@ -15,6 +15,231 @@ are compiled.
 
 .. <!-- next version -->
 
+0.4.0 - 2026-11-24
+========================================
+
+Breaking Changes
+----------------
+
+- ``distro``: Move to opentelemetry-api and opentelemetry-sdk 1.45.2 and contrib 0.66b2, which fix two ReDoS vulnerabilities in trace context parsing (`#118 <https://github.com/dash0hq/opentelemetry-python-distribution/issues/118>`__)
+
+  ``opentelemetry-api`` 1.44.0 parses ``tracestate`` and ``traceparent`` with
+  regular expressions that take quadratic time on crafted input
+  (CVE-2026-114603, fixed in 1.45.1, and CVE-2026-126360, fixed in 1.45.2).
+  ``opentelemetry-sdk`` and ``opentelemetry-semantic-conventions`` each
+  require ``opentelemetry-api`` at one exact version, the one they are released
+  alongside, so the injected distribution only activates in an application
+  whose ``opentelemetry-api``
+  is the one it ships.
+  Until now that was 1.44.0, so an application that depends on the API for
+  manual instrumentation had to keep a vulnerable version to stay
+  instrumented.
+  Applications that declare ``opentelemetry-api`` should move to 1.45.2.
+  An application that keeps 1.44.0 now trips the dependency conflict check,
+  and the distribution deactivates itself for that process.
+  ``service.name`` now defaults to ``unknown_service:<executable>``, such as
+  ``unknown_service:python3``, instead of ``unknown_service``, as the
+  specification requires. The ``opentelemetry-instrument`` path and declarative
+  configuration both produce it, each from its own copy of the rule, and it is
+  what a process gets whenever nothing names the service:
+  no ``OTEL_SERVICE_NAME``, no ``service.name`` in
+  ``OTEL_RESOURCE_ATTRIBUTES``, and a generic runner such as ``gunicorn`` that
+  the Dash0 service-name detector declines to name. Anything matching the
+  literal ``unknown_service`` has to match the prefix instead.
+  A ``${VAR}`` reference in a configuration file that has no default and whose
+  variable is unset now substitutes an empty value, which the parser reads as
+  null, as the specification requires and as the Java and Node.js
+  implementations already do. It used to fail the load, and under injection the
+  distribution deactivated itself naming the variable. A file that relied on
+  that failure now starts with the setting left at its fallback, wherever the
+  schema admits a null there. Where it does not, as for ``log_level``, an
+  exporter's ``encoding`` and a resource attribute's ``name``, the load still
+  fails, but with a schema message such as ``data.log_level must be one of
+  [...]`` that does not name the variable that was unset.
+  An ``otlp_http`` ``endpoint`` left null falls back to
+  ``OTEL_EXPORTER_OTLP_<SIGNAL>_ENDPOINT``, then to
+  ``OTEL_EXPORTER_OTLP_ENDPOINT``, which the distribution sets from
+  ``DASH0_OTEL_COLLECTOR_BASE_URL``, so the spans the file meant to send
+  elsewhere go to the Dash0 collector instead, and nothing is logged. Only one
+  of these settings reports itself: an entry under ``resource.attributes``
+  whose value is null is skipped with the warning ``Ignoring resource attribute
+  '<name>' with empty value``. Give every reference a default that is a real
+  value, as in ``${COLLECTOR_ENDPOINT:-http://collector:4318}``, so a missing
+  variable
+  cannot reach a fallback. An empty default does not do it: ``${VAR:-}``
+  resolves to null exactly as ``${VAR}`` does. No default of any kind covers a
+  variable the environment has but holds empty, since a default applies only
+  to a name the environment does not have at all.
+  ``EnvSubstitutionError`` is gone from ``opentelemetry.configuration.file``,
+  because nothing raises it any more.
+  Several parts of a configuration file now behave differently: some the
+  previous release parsed and then ignored, some it refused outright. A file
+  nobody has edited can change what the process exports, and a file that used
+  to fail the load can start succeeding. Read any file you already ship before
+  upgrading.
+  A key written with an empty value is read as an empty object rather than as
+  absent, which the specification requires: ``host:`` means ``host: {}``. A
+  detector written that way used to be skipped and now runs. A sampler, an
+  exporter, an ``id_generator`` and a view's
+  ``aggregation`` written that way used to fail the whole file with a
+  ``ConfigurationError`` such as ``No exporter type specified in span exporter
+  config``, so under injection the distribution deactivated itself for that
+  process; each now builds the component it names. A ``detection/development``
+  list containing ``- host:`` and ``- process:`` starts adding the twelve
+  ``host.*`` and ``process.*`` attributes those detectors produce, among them
+  ``process.command`` and ``process.owner``. A ``propagator.composite`` list
+  written as ``- tracecontext:`` and ``- baggage:`` used to leave the process
+  with a no-op propagator that read and wrote no trace context at all, and now
+  installs the propagators it names, so the process starts taking part in
+  distributed traces.
+  A top-level ``attribute_limits`` block applies to spans and to log records,
+  for every attribute limit the signal's own ``limits`` block leaves unset. A
+  ``tracer_provider.limits`` block that sets only ``link_count_limit`` still
+  takes both attribute limits from the top-level block. A file carrying
+  ``attribute_count_limit: 2`` used to leave the SDK defaults of 128 attributes
+  and no length limit in place. It now keeps two attributes per span and per
+  log record, and because the SDK evicts the oldest when the limit is reached,
+  the two that survive are the two recorded last.
+  A per-signal ``logger_provider.limits`` block used to be refused with the log
+  line ``log_record_limits are specified in config but are not supported by the
+  Python SDK LoggerProvider constructor; limits will be ignored.`` and now
+  truncates log-record attributes.
+  A ``cardinality_limits`` block on a metric reader, and
+  ``aggregation_cardinality_limit`` on a view's stream, used to be ignored, the
+  pull-reader case with a log line and the rest in silence. Both now cap the
+  number of series per instrument, collapsing the excess into a single series
+  carrying ``otel.metric.overflow: true``. A pull reader whose exporter is a
+  plugin is the exception: it still logs that the limits are not supported and
+  still ignores them.
+  A ``tracer_configurator/development``, ``logger_configurator/development`` or
+  ``meter_configurator/development`` block now applies, and ``enabled: false``
+  in one of them stops that signal for every tracer, logger or meter it
+  matches.
+  A top-level ``log_level`` is applied to the ``opentelemetry`` logger. The
+  OTLP exporter reports a failed export at ERROR, so a ``log_level`` of
+  ``fatal`` or above silences that report, and ``log_level: error`` drops
+  everything below ERROR.
+  Several things that worked under a configuration file stop working.
+  The attribute-limit environment variables no longer reach a process
+  configured from a file: the loader now passes explicit span and log-record
+  limits whether or not the file declares any, so
+  ``OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT``,
+  ``OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT``,
+  ``OTEL_LOGRECORD_ATTRIBUTE_VALUE_LENGTH_LIMIT`` and
+  ``OTEL_LOGRECORD_ATTRIBUTE_COUNT_LIMIT`` are all ignored, and
+  ``OTEL_ATTRIBUTE_COUNT_LIMIT`` stops reaching log records. It never reached
+  span attributes under a configuration file, since the previous release
+  already passed the default count of 128 explicitly, and neither did
+  ``OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT``. Move a value that applied to both
+  signals into a top-level ``attribute_limits`` block, and a per-signal value
+  into ``tracer_provider.limits`` or ``logger_provider.limits``: the top-level
+  block applies to spans and to log records alike, so it cannot express a
+  limit that applied to only one of them.
+  A ``${VAR}`` reference in a JSON configuration file must now stand where JSON
+  accepts a string, because substitution runs on the parsed document rather
+  than on the file text. ``"attribute_count_limit": ${LIMIT}`` used to load and
+  now fails the file with ``Failed to parse JSON``, and quoting it does not
+  help, because the substituted value stays a string.
+  A ``${VAR}`` written as a mapping key is left alone for the same reason,
+  since a key is not a value. ``${EXPORTER_NAME}: {}`` under an exporter used
+  to name whatever the variable held and now parses as the literal key
+  ``${EXPORTER_NAME}``, which the entry-point lookup then fails on at startup.
+  A plugin exporter, a plugin sampler, a plugin propagator, a plugin
+  ``id_generator``, a plugin resource detector and an instrumentation name
+  under ``instrumentation/development.python`` all take an arbitrary key, so
+  write the key out. The resource detector is the position the Dash0 package's
+  own
+  ``otel-config.yaml`` uses, for ``dash0_distribution``, ``dash0_service_name``
+  and ``dash0_kubernetes``.
+  A ``${VAR}`` whose value supplied YAML structure stops supplying it, for the
+  same reason: substitution now writes into the parsed document, so the value
+  stays a string instead of being re-parsed. ``composite: ${PROPAGATORS}`` with
+  ``PROPAGATORS`` holding ``[{tracecontext: {}}, {baggage: {}}]`` used to load
+  and now fails the file with ``data.propagator.composite must be array``.
+  A scalar value taken from the environment no longer carries YAML syntax with
+  it. The previous release substituted into the file text and let the parser
+  read the result, so a value could be cut short at a ``#``, rejected as an
+  undefined YAML alias, stripped of quote characters, or trimmed of the spaces
+  around it. Now it arrives exactly as the environment holds it. Check every
+  variable a configuration file reads for surrounding quotes and surrounding
+  whitespace: the quotes now reach the exporter, so an endpoint written that
+  way names a host nobody can resolve, and the whitespace now fails the file
+  wherever the schema wants a number or one of a fixed set of words, as at
+  ``log_level`` or an exporter's ``encoding``.
+  A reference that is only part of a value is no longer typed either, so a
+  numeric field built from a reference and literal text, as in
+  ``export_timeout: ${SECS}000``, used to load and now fails the file with
+  ``must be integer or null``: write the whole value as one reference instead.
+  A reference that is the whole value is still typed as before, so ``${LIMIT}``
+  holding ``100`` still reaches an integer field as the integer 100, and
+  quoting it as ``"${LIMIT}"`` fails the file in this release and in the
+  previous one alike.
+  
+- ``distro``: Default OTEL_PROPAGATORS to tracecontext,baggage,xray, so traces stay connected across AWS load balancers and X-Ray services (`#117 <https://github.com/dash0hq/opentelemetry-python-distribution/issues/117>`__)
+
+  The default propagators change from ``tracecontext,baggage`` to
+  ``tracecontext,baggage,xray``. When an incoming request carries both
+  ``traceparent`` and ``X-Amzn-Trace-Id``, the X-Ray context wins. Set
+  ``OTEL_PROPAGATORS=tracecontext,baggage`` to restore the previous behavior.
+  
+
+Enhancements
+------------
+
+- ``distro``: Default OTEL_TRACES_SAMPLER to always_on, so an incoming trace context can no longer decide whether this process is traced (`#110 <https://github.com/dash0hq/opentelemetry-python-distribution/issues/110>`__)
+
+  The distribution set no sampler and inherited the OpenTelemetry default,
+  ``parentbased_always_on``. ``ParentBased`` holds five sub-samplers, and the
+  ``root`` one applies only to a span with no parent. A span whose parent
+  arrived in a ``traceparent`` header is decided by ``remote_parent_sampled``
+  or ``remote_parent_not_sampled`` instead, which default to ``AlwaysOn`` and
+  ``AlwaysOff``.
+  A caller that sends a ``traceparent`` with the sampled flag off therefore
+  silenced every span in the service receiving the request, and in every
+  service that one called. That caller is often outside the organization
+  operating the service, so the clients of an API decided whether its owner
+  got to trace it.
+  ``always_on`` takes the incoming trace context out of the decision. Dash0
+  samples traces after ingestion with Signal Control, which evaluates a whole
+  trace at once, and a span dropped by a sampler inside the process never
+  reaches that evaluation.
+  Nothing stops working and no setting becomes invalid, but an existing
+  deployment is affected without changing its configuration. Expect more spans
+  to leave the application, costing CPU in the process and bandwidth to the
+  collector, and reduce the volume with Signal Control or a collector-side
+  processor rather than in the SDK. Set ``OTEL_TRACES_SAMPLER`` on the workload
+  to keep the previous behaviour; the distribution applies the default with
+  ``setdefault`` and never overrides a value you provide.
+  Declarative configuration is unaffected, because it never reads
+  ``OTEL_TRACES_SAMPLER``. A configuration file that omits ``sampler`` keeps
+  the OpenTelemetry default; see ``docs/configuration.md`` for the sampler
+  declaration that matches this default.
+  
+- ``distro``: Use /etc/opentelemetry/python/otel-config.yaml as the declarative configuration file when OTEL_CONFIG_FILE is unset (`#119 <https://github.com/dash0hq/opentelemetry-python-distribution/issues/119>`__)
+
+  At startup the distribution now picks its configuration in this order:
+  ``OTEL_CONFIG_FILE`` when it is set and not empty, then
+  ``/etc/opentelemetry/python/otel-config.yaml`` when that file exists, then
+  the environment variables, as before.
+  A host with a Dash0 language package installed therefore runs in
+  declarative-configuration mode from the file that package ships, without
+  anyone setting ``OTEL_CONFIG_FILE``. Hosts and containers without the file
+  are unaffected.
+  An ``OTEL_CONFIG_FILE`` that names a missing file is still honored: the SDK
+  reports the error and the distribution does not fall back to the default
+  file.
+  In file mode the SDK ignores ``OTEL_*`` variables unless the file
+  interpolates them, so a variable set for one service only takes effect when
+  the shipped file references it.
+  
+- ``distro``: Declare support for Python 3.14 and 3.15, and run the unit tests on both (`#120 <https://github.com/dash0hq/opentelemetry-python-distribution/issues/120>`__)
+
+  The package metadata now lists Python 3.14 and 3.15 alongside 3.10 to 3.13,
+  and CI runs the distribution and declarative-configuration unit tests on
+  every one of those versions. The end-to-end images already run on
+  Python 3.15.
+  
+
 0.3.3 - 2026-10-28
 ========================================
 

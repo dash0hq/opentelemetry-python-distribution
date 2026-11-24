@@ -14,6 +14,7 @@ from pathlib import Path
 import pytest
 from opentelemetry import configuration as public
 from opentelemetry._configuration import _generated_validator
+from opentelemetry._configuration._propagator import create_propagator
 from opentelemetry._configuration.file._loader import _validate_schema
 from opentelemetry._logs import get_logger_provider
 from opentelemetry.configuration import (
@@ -73,6 +74,24 @@ tracer_provider:
     - simple:
         exporter:
           console: {}
+"""
+
+_UNSET_VARIABLE: str = """
+file_format: "1.0-rc.1"
+tracer_provider:
+  processors:
+    - simple:
+        exporter:
+          otlp_http:
+            endpoint: ${DASH0_TEST_ENDPOINT_THAT_IS_NEVER_SET}
+"""
+
+_BARE_PROPAGATORS: str = """
+file_format: "1.0-rc.1"
+propagator:
+  composite:
+    - tracecontext:
+    - baggage:
 """
 
 
@@ -137,6 +156,41 @@ def test_configure_sdk_sets_every_global_against_the_pinned_sdk(
         "TraceContextTextMapPropagator",
         "W3CBaggagePropagator",
     ]
+
+
+def test_an_unset_variable_with_no_default_leaves_the_setting_null(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A reference the environment does not answer no longer fails the load.
+
+    It substitutes an empty value, which the parser reads as null, so the
+    setting falls back instead of standing the distribution down.
+    """
+    monkeypatch.delenv("DASH0_TEST_ENDPOINT_THAT_IS_NEVER_SET", raising=False)
+    config_file: Path = tmp_path / "otel-config.yaml"
+    config_file.write_text(_UNSET_VARIABLE)
+
+    config = load_config_file(str(config_file))
+
+    exporter = config.tracer_provider.processors[0].simple.exporter
+    assert exporter.otlp_http.endpoint is None
+
+
+def test_a_propagator_written_with_an_empty_value_is_installed(
+    tmp_path: Path,
+) -> None:
+    """``- tracecontext:`` selects the propagator rather than being skipped.
+
+    A key present with an empty value means an empty object, so a composite
+    list written without ``{}`` propagates context instead of leaving the
+    process with the noop propagator.
+    """
+    config_file: Path = tmp_path / "otel-config.yaml"
+    config_file.write_text(_BARE_PROPAGATORS)
+
+    propagator = create_propagator(load_config_file(str(config_file)).propagator)
+
+    assert sorted(propagator.fields) == ["baggage", "traceparent", "tracestate"]
 
 
 def test_an_invalid_document_is_rejected_with_the_property_named() -> None:

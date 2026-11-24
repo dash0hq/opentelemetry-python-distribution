@@ -1,0 +1,15 @@
+change_type: enhancement
+
+component: distro
+
+note: Declare support for Python 3.14 and 3.15, and run the unit tests on both
+
+issues: [120]
+
+subtext: |
+  The package metadata now lists Python 3.14 and 3.15 alongside 3.10 to 3.13,
+  and CI runs the distribution and declarative-configuration unit tests on
+  every one of those versions. The end-to-end images already run on
+  Python 3.15.
+
+change_logs: [user]

@@ -39,11 +39,15 @@ Usage::
 
     python3 scripts/vendor_configuration.py
     python3 scripts/vendor_configuration.py --commit <sha>
+    python3 scripts/vendor_configuration.py --commit <sha> --branch <name>
     python3 scripts/vendor_configuration.py --check
 
 ``--commit`` re-points ``UPSTREAM`` at a new fork commit, which is what to run
-after rebasing the fork branch. ``--check`` regenerates into a scratch
-directory and reports what differs without writing anything.
+after adding a commit to the branch ``UPSTREAM`` names. ``--branch`` re-points
+it at a different fork branch, which a rebase onto a new upstream tag always
+produces, since the branch is named after that tag; omitting it there leaves
+``UPSTREAM`` naming a branch the new commit is not on. ``--check`` regenerates
+into a scratch directory and reports what differs without writing anything.
 
 Runs on Python >= 3.11 (tomllib) with git on the PATH.
 """
@@ -192,6 +196,7 @@ def generate(source: Path, destination: Path, fork_pyproject: Path) -> None:
 def main() -> int:
     parser = ArgumentParser(description=__doc__)
     parser.add_argument("--commit", help="re-point UPSTREAM at this fork commit")
+    parser.add_argument("--branch", help="re-point UPSTREAM at this fork branch")
     parser.add_argument(
         "--check",
         action="store_true",
@@ -201,6 +206,7 @@ def main() -> int:
 
     fields = read_upstream()
     commit: str = arguments.commit or fields["commit"]
+    branch: str = arguments.branch or fields["branch"]
 
     with TemporaryDirectory() as scratch:
         clone = Path(scratch) / "fork"
@@ -263,7 +269,7 @@ def main() -> int:
 
     UPSTREAM.write_text(
         f"repository = {fields['repository']}\n"
-        f"branch = {fields['branch']}\n"
+        f"branch = {branch}\n"
         f"commit = {commit}\n"
         f"source = {fields['source']}\n"
     )

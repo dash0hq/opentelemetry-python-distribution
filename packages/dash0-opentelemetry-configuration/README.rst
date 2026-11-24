@@ -31,11 +31,20 @@ commits sit on, so ``dash0-v1.45.2`` carries the Dash0 commits on top of
 upstream ``v1.45.2``. The older ``dash0`` branch sits on upstream ``v1.44.0``
 and is no longer the one this package tracks.
 
-That naming is what makes the patches survive upstream moving: rebase the
-branch ``UPSTREAM`` names onto the new upstream tag, push it under the new
-name, then run::
+A commit added to the branch ``UPSTREAM`` already names reaches the package
+with::
 
     python3 scripts/vendor_configuration.py --commit <new sha>
+
+A rebase onto a new upstream tag produces a differently named branch, so it
+needs ``--branch`` as well. Rebase the branch ``UPSTREAM`` names onto the new
+tag, push it under the name that tag gives it, then run::
+
+    python3 scripts/vendor_configuration.py --commit <new sha> --branch dash0-v<upstream version>
+
+Without ``--branch`` the script keeps the branch name already in ``UPSTREAM``
+and writes the new commit beside it, leaving the file naming a branch the
+commit is not on.
 
 ``scripts/vendor_configuration.py`` stops when the fork's ``opentelemetry-api``
 or ``opentelemetry-sdk`` pin disagrees with the distribution's, which is what

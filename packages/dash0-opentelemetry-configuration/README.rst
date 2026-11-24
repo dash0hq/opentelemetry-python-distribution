@@ -7,8 +7,10 @@ distribution, read from ``OTEL_CONFIG_FILE``.
 The package is experimental. The vendored ``schema.json`` is the 1.1.0 release
 of https://github.com/open-telemetry/opentelemetry-configuration, and
 ``_SUPPORTED_SCHEMA_MINOR`` in ``file/_loader.py`` records the highest
-``file_format`` minor the loader knows. A file declaring a higher minor still
-loads, with a warning that some settings may be ignored.
+``file_format`` minor the loader knows. A file declaring a higher minor loads
+with a warning that some settings may be ignored, but only while every setting
+it uses is one this schema already knows: the document is validated before the
+``file_format`` is read, so a setting the schema does not carry fails the load.
 
 Do not edit this package by hand
 --------------------------------

@@ -26,13 +26,24 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Create GitHub App token for the documentation repository
+        id: app-token
+        if: ${{ !(github.event_name == 'pull_request' || inputs.dry-run) }}
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.DOCS_SYNC_APP_CLIENT_ID }}
+          private-key: ${{ secrets.DOCS_SYNC_APP_PRIVATE_KEY }}
+          repositories: ${{ secrets.SYNC_DOCUMENTATION_TARGET_REPOSITORY }}
+          permission-contents: write
+          permission-pull-requests: write
+
       - name: Sync docs to the Dash0 website
-        uses: dash0hq/sync-docs-action@c30aaaaa93f3f8a88b9f9e3acd31cfff3e086954  # v0.6.0
+        uses: dash0hq/sync-docs-action@c30aaaaa93f3f8a88b9f9e3acd31cfff3e086954 # v0.6.0
         with:
           dry-run: ${{ github.event_name == 'pull_request' || inputs.dry-run }}
           target-repository: ${{ secrets.SYNC_DOCUMENTATION_TARGET_REPOSITORY }}
           target-directory: ${{ secrets.SYNC_DOCUMENTATION_TARGET_DIRECTORY }}
-          target-github-token: ${{ secrets.DASH0_WEBSITE_SYNC_TOKEN }}
+          target-github-token: ${{ steps.app-token.outputs.token }}
           pr-branch: sync/opentelemetry-python-distribution-docs
           pr-title: "docs: synchronize Python distribution documentation"
           pr-body: |

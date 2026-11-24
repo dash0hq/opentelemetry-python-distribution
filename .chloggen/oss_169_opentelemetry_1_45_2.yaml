@@ -23,5 +23,17 @@ subtext: |
   Declarative configuration now defaults ``service.name`` to
   ``unknown_service:<executable>``, such as ``unknown_service:python``, as the
   specification requires, instead of ``unknown_service``.
+  A ``${VAR}`` reference in a configuration file that has no default and whose
+  variable is unset now substitutes an empty value, which the parser reads as
+  null, as the specification requires and as the Java and Node.js
+  implementations already do. It used to fail the load, and the distribution
+  deactivated itself with the name of the variable. A file that relied on that
+  failure now starts with the SDK default for the setting, so an
+  ``otlp_http`` ``endpoint`` left null sends to
+  ``http://localhost:4318/v1/traces``. Give every reference a default, as in
+  ``${COLLECTOR_ENDPOINT:-http://collector:4318}``, to keep a missing variable
+  from reaching that fallback.
+  ``EnvSubstitutionError`` is gone from ``opentelemetry.configuration.file``,
+  because nothing raises it any more.
 
 change_logs: [user]

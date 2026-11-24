@@ -121,7 +121,8 @@ resource:
 ```
 
 The `attributes_list` line is optional and shown because it is how `OTEL_RESOURCE_ATTRIBUTES` reaches a config file.
-The `:-` suffix supplies an empty default, so an unset variable yields no attributes instead of an error.
+An unset `OTEL_RESOURCE_ATTRIBUTES` yields no attributes, because an unset variable substitutes an empty value that the parser reads as null.
+The `:-` suffix spells that out and is the place to put a non-empty default.
 Values under `resource.attributes` override anything `attributes_list` sets.
 
 Declare the `propagator` block even though the schema allows omitting it.

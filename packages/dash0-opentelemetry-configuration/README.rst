@@ -8,9 +8,10 @@ The package is experimental. The vendored ``schema.json`` is the 1.1.0 release
 of https://github.com/open-telemetry/opentelemetry-configuration, and
 ``_SUPPORTED_SCHEMA_MINOR`` in ``file/_loader.py`` records the highest
 ``file_format`` minor the loader knows. A file declaring a higher minor loads
-with a warning that some settings may be ignored, but only while every setting
-it uses is one this schema already knows: the document is validated before the
-``file_format`` is read, so a setting the schema does not carry fails the load.
+with a warning that some settings may be ignored. Whether a setting this schema
+does not carry is in fact ignored depends on where it sits, since the document
+is validated before the ``file_format`` is read: the document root accepts an
+unknown key, while a block the schema closes rejects one and fails the load.
 
 Do not edit this package by hand
 --------------------------------
@@ -82,6 +83,6 @@ Upstream validates configuration files with ``jsonschema``, which brings
 four would land in the tree the injector adds to an application's
 ``sys.path``, and ``rpds-py`` is a compiled extension, so that tree would stop
 being pure Python. The fork compiles the schema to plain Python with
-``fastjsonschema`` at development time instead, leaving a validator that
-imports ``decimal`` and nothing else. The fork's own test suite checks that
-validator against ``jsonschema`` document by document.
+``fastjsonschema`` at development time instead, leaving a validator whose only
+imports are ``decimal`` and a sibling module of its own. The fork's own suite
+checks that validator against ``jsonschema`` document by document.

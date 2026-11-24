@@ -40,9 +40,15 @@ Entry points
       rather than aborting auto-instrumentation of the host process.
 
 ``Dash0Configurator`` (``opentelemetry_configurator``)
-    Runs after the distro. Delegates to the standard OpenTelemetry SDK
-    configurator to build the providers/exporters/Resource from the environment,
-    then adds two behaviors from the Node.js distribution:
+    Runs after the distro. When ``OTEL_CONFIG_FILE`` is unset or empty and
+    ``/etc/opentelemetry/python/otel-config.yaml`` exists, it configures the
+    SDK from that file, so a host with a Dash0 language package runs from the
+    shipped file. It does not write ``OTEL_CONFIG_FILE``, so child processes do
+    not inherit the path. A set ``OTEL_CONFIG_FILE`` is always honored, even
+    when the file is missing. Otherwise it delegates to the standard
+    OpenTelemetry SDK configurator to build the providers/exporters/Resource
+    from ``OTEL_CONFIG_FILE`` or from the environment. Either way it then adds
+    two behaviors from the Node.js distribution:
 
     * an optional **bootstrap span** emitted once at startup
       (``DASH0_BOOTSTRAP_SPAN=<name>``);

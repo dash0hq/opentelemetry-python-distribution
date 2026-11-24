@@ -22,9 +22,9 @@ subtext: |
   and the distribution deactivates itself for that process.
   ``service.name`` now defaults to ``unknown_service:<executable>``, such as
   ``unknown_service:python3``, instead of ``unknown_service``, as the
-  specification requires. The default comes from ``opentelemetry-sdk``, so it
-  applies to declarative configuration and to the ``opentelemetry-instrument``
-  path alike, and it is what a process gets whenever nothing names the service:
+  specification requires. The ``opentelemetry-instrument`` path and declarative
+  configuration both produce it, each from its own copy of the rule, and it is
+  what a process gets whenever nothing names the service:
   no ``OTEL_SERVICE_NAME``, no ``service.name`` in
   ``OTEL_RESOURCE_ATTRIBUTES``, and a generic runner such as ``gunicorn`` that
   the Dash0 service-name detector declines to name. Anything matching the

@@ -41,5 +41,23 @@ subtext: |
   from reaching that fallback.
   ``EnvSubstitutionError`` is gone from ``opentelemetry.configuration.file``,
   because nothing raises it any more.
+  Three fields of a configuration file that the previous release parsed and
+  then ignored now take effect, so a file nobody has edited can change what the
+  process exports.
+  A top-level ``attribute_limits`` block applies to spans and to log records
+  wherever the signal declares no ``limits`` of its own. A file carrying
+  ``attribute_count_limit: 2`` used to leave the SDK defaults of 128 attributes
+  and no length limit in place, and now drops every attribute past the second.
+  Metrics are unaffected.
+  A top-level ``log_level`` is applied to the ``opentelemetry`` logger, so
+  ``log_level: error`` now silences the exporter's warnings about failed
+  exports.
+  A key written with an empty value is read as an empty object rather than as
+  absent, which the specification requires: ``always_on:`` means
+  ``always_on: {}``. A detector, sampler or exporter written that way used to be
+  skipped and now runs, so a ``detection/development`` list containing
+  ``- host:`` and ``- process:`` starts adding the twelve ``host.*`` and
+  ``process.*`` attributes those detectors produce, among them
+  ``process.command`` and ``process.owner``.
 
 change_logs: [user]

@@ -41,23 +41,54 @@ subtext: |
   from reaching that fallback.
   ``EnvSubstitutionError`` is gone from ``opentelemetry.configuration.file``,
   because nothing raises it any more.
-  Three fields of a configuration file that the previous release parsed and
+  Several parts of a configuration file that the previous release parsed and
   then ignored now take effect, so a file nobody has edited can change what the
-  process exports.
+  process exports. Read any file you already ship before upgrading.
+  A key written with an empty value is read as an empty object rather than as
+  absent, which the specification requires: ``always_on:`` means
+  ``always_on: {}``. A detector, sampler, exporter or propagator written that
+  way used to be skipped and now runs. A ``detection/development`` list
+  containing ``- host:`` and ``- process:`` starts adding the twelve ``host.*``
+  and ``process.*`` attributes those detectors produce, among them
+  ``process.command`` and ``process.owner``. A ``propagator.composite`` list
+  written as ``- tracecontext:`` and ``- baggage:`` used to leave the process
+  with a no-op propagator that read and wrote no trace context at all, and now
+  installs the propagators it names, so the process starts taking part in
+  distributed traces.
   A top-level ``attribute_limits`` block applies to spans and to log records
   wherever the signal declares no ``limits`` of its own. A file carrying
   ``attribute_count_limit: 2`` used to leave the SDK defaults of 128 attributes
-  and no length limit in place, and now drops every attribute past the second.
-  Metrics are unaffected.
-  A top-level ``log_level`` is applied to the ``opentelemetry`` logger, so
-  ``log_level: error`` now silences the exporter's warnings about failed
-  exports.
-  A key written with an empty value is read as an empty object rather than as
-  absent, which the specification requires: ``always_on:`` means
-  ``always_on: {}``. A detector, sampler or exporter written that way used to be
-  skipped and now runs, so a ``detection/development`` list containing
-  ``- host:`` and ``- process:`` starts adding the twelve ``host.*`` and
-  ``process.*`` attributes those detectors produce, among them
-  ``process.command`` and ``process.owner``.
+  and no length limit in place. It now keeps two attributes per span and per
+  log record, and because the SDK evicts the oldest when the limit is reached,
+  the two that survive are the two recorded last.
+  A per-signal ``logger_provider.limits`` block used to be refused with the log
+  line ``log_record_limits are specified in config but are not supported by the
+  Python SDK LoggerProvider constructor; limits will be ignored.`` and now
+  truncates log-record attributes.
+  A ``cardinality_limits`` block on a metric reader, and
+  ``aggregation_cardinality_limit`` on a view's stream, used to be refused the
+  same way and now cap the number of series per instrument, collapsing the
+  excess into a single series carrying ``otel.metric.overflow: true``.
+  A ``tracer_configurator/development``, ``logger_configurator/development`` or
+  ``meter_configurator/development`` block now applies, and ``enabled: false``
+  in one of them stops that signal for every tracer, logger or meter it
+  matches.
+  A top-level ``log_level`` is applied to the ``opentelemetry`` logger. The
+  OTLP exporter reports a failed export at ERROR, so only ``log_level: fatal``
+  silences that report; ``log_level: error`` drops everything below ERROR.
+  Two things that worked under a configuration file stop working.
+  The attribute-limit environment variables no longer reach a process
+  configured from a file: the loader now passes explicit span and log-record
+  limits whether or not the file declares any, so
+  ``OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT`` and ``OTEL_ATTRIBUTE_COUNT_LIMIT`` are
+  ignored. Move those values into a top-level ``attribute_limits`` block.
+  A ``${VAR}`` reference in a JSON configuration file must now stand where JSON
+  accepts a string, because substitution runs on the parsed document rather
+  than on the file text. ``"attribute_count_limit": ${LIMIT}`` used to load and
+  now fails the file with ``Failed to parse JSON``, and quoting it does not
+  help, because the substituted value stays a string. The same move means a
+  YAML value taken from the environment is no longer re-parsed as YAML, so a
+  value containing ``#``, a leading ``*`` or a trailing space now reaches the
+  exporter as written, and a ``${VAR}`` used as a mapping key is left alone.
 
 change_logs: [user]

@@ -33,12 +33,15 @@ subtext: |
   variable is unset now substitutes an empty value, which the parser reads as
   null, as the specification requires and as the Java and Node.js
   implementations already do. It used to fail the load, and under injection the
-  distribution deactivated itself naming the variable. A file that relied on that
-  failure now starts with the SDK default for the setting, so an
-  ``otlp_http`` ``endpoint`` left null sends to
-  ``http://localhost:4318/v1/traces``. Give every reference a default, as in
-  ``${COLLECTOR_ENDPOINT:-http://collector:4318}``, to keep a missing variable
-  from reaching that fallback.
+  distribution deactivated itself naming the variable. A file that relied on
+  that failure now starts with the setting left at its fallback, and the
+  process says nothing. An ``otlp_http`` ``endpoint`` left null falls back to
+  ``OTEL_EXPORTER_OTLP_<SIGNAL>_ENDPOINT``, then to
+  ``OTEL_EXPORTER_OTLP_ENDPOINT``, which the distribution sets from
+  ``DASH0_OTEL_COLLECTOR_BASE_URL``, so the spans the file meant to send
+  elsewhere go to the Dash0 collector instead. Give every reference a default,
+  as in ``${COLLECTOR_ENDPOINT:-http://collector:4318}``, so a missing variable
+  cannot reach a fallback.
   ``EnvSubstitutionError`` is gone from ``opentelemetry.configuration.file``,
   because nothing raises it any more.
   Several parts of a configuration file that the previous release parsed and

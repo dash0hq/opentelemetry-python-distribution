@@ -4,8 +4,11 @@ Dash0 OpenTelemetry Declarative Configuration
 Declarative (file-based) SDK configuration for the Dash0 OpenTelemetry Python
 distribution, read from ``OTEL_CONFIG_FILE``.
 
-The package is experimental, tracking a configuration format that is still at
-``1.0-rc.1``.
+The package is experimental. The vendored ``schema.json`` is the 1.1.0 release
+of https://github.com/open-telemetry/opentelemetry-configuration, and
+``_SUPPORTED_SCHEMA_MINOR`` in ``file/_loader.py`` records the highest
+``file_format`` minor the loader knows. A file declaring a higher minor still
+loads, with a warning that some settings may be ignored.
 
 Do not edit this package by hand
 --------------------------------
@@ -44,7 +47,8 @@ tag, push it under the name that tag gives it, then run::
 
 Without ``--branch`` the script keeps the branch name already in ``UPSTREAM``
 and writes the new commit beside it, leaving the file naming a branch the
-commit is not on.
+commit is not on. ``--branch`` on its own is refused, because it would record
+the other half of the same wrong pair.
 
 ``scripts/vendor_configuration.py`` stops when the fork's ``opentelemetry-api``
 or ``opentelemetry-sdk`` pin disagrees with the distribution's, which is what

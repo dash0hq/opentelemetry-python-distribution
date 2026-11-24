@@ -203,6 +203,11 @@ def main() -> int:
         help="report differences instead of writing",
     )
     arguments: Namespace = parser.parse_args()
+    if arguments.branch and not arguments.commit:
+        parser.error(
+            "--branch needs --commit: a rebase moves both, and recording a new "
+            "branch beside the old commit names a pair that is not on the fork"
+        )
 
     fields = read_upstream()
     commit: str = arguments.commit or fields["commit"]

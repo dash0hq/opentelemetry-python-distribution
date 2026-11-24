@@ -50,16 +50,44 @@ tracer_provider:
     - simple:
         exporter:
           console: {}
+  tracer_configurator/development:
+    default_config:
+      enabled: true
+    tracers:
+      - name: a.scope.this.test.never.creates.*
+        config:
+          enabled: false
 meter_provider:
   readers:
     - periodic:
         exporter:
           console: {}
+        cardinality_limits:
+          default: 100
+  views:
+    - selector:
+        instrument_name: an.instrument.this.test.never.creates
+      stream:
+        aggregation_cardinality_limit: 100
+  meter_configurator/development:
+    default_config:
+      enabled: true
+    meters:
+      - name: a.scope.this.test.never.creates.*
+        config:
+          enabled: false
 logger_provider:
   processors:
     - simple:
         exporter:
           console: {}
+  logger_configurator/development:
+    default_config:
+      enabled: true
+    loggers:
+      - name: a.scope.this.test.never.creates.*
+        config:
+          enabled: false
 propagator:
   composite:
     - tracecontext: {}

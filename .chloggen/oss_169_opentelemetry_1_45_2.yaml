@@ -95,8 +95,9 @@ subtext: |
   in one of them stops that signal for every tracer, logger or meter it
   matches.
   A top-level ``log_level`` is applied to the ``opentelemetry`` logger. The
-  OTLP exporter reports a failed export at ERROR, so only ``log_level: fatal``
-  silences that report; ``log_level: error`` drops everything below ERROR.
+  OTLP exporter reports a failed export at ERROR, so a ``log_level`` of
+  ``fatal`` or above silences that report, and ``log_level: error`` drops
+  everything below ERROR.
   Four things that worked under a configuration file stop working.
   The attribute-limit environment variables no longer reach a process
   configured from a file: the loader now passes explicit span and log-record
@@ -135,14 +136,14 @@ subtext: |
   ``PROPAGATORS`` holding ``[{tracecontext: {}}, {baggage: {}}]`` used to load
   and now fails the file with ``data.propagator.composite must be array``.
   A scalar value taken from the environment no longer carries YAML syntax with
-  it, and that part breaks nothing: a value whose ``#`` follows a space, a
-  value with a leading ``*`` and a value with a trailing space now reach the
-  exporter as written instead of being cut short, rejected as an undefined YAML
-  alias, or trimmed. A ``#`` with no space in front of it was never a comment
-  and was never cut short. A standalone unquoted reference is still typed the
-  way it always was, so ``${LIMIT}`` with
-  ``LIMIT`` holding ``100`` still reaches an integer field as the integer 100.
-  Do not quote it defensively: ``"${LIMIT}"`` fails the file in this release
-  and in the previous one alike.
+  it. The previous release re-parsed such a value, so it could be cut short at
+  a ``#``, rejected as an undefined YAML alias, trimmed, or stripped of quote
+  characters that were part of it; now it reaches the exporter exactly as the
+  environment holds it. Most of that is a repair, and one case is a break:
+  a variable whose value starts and ends with a quote keeps the quotes, so an
+  endpoint written that way now names a host nobody can resolve. A standalone
+  unquoted reference is still typed as before, so ``${LIMIT}`` holding ``100``
+  still reaches an integer field as the integer 100, and quoting it as
+  ``"${LIMIT}"`` fails the file in this release and in the previous one alike.
 
 change_logs: [user]

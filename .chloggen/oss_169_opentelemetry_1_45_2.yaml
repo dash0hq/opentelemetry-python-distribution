@@ -51,7 +51,9 @@ subtext: |
   value, as in ``${COLLECTOR_ENDPOINT:-http://collector:4318}``, so a missing
   variable
   cannot reach a fallback. An empty default does not do it: ``${VAR:-}``
-  resolves to null exactly as ``${VAR}`` does.
+  resolves to null exactly as ``${VAR}`` does. No default of any kind covers a
+  variable the environment has but holds empty, since a default applies only
+  to a name the environment does not have at all.
   ``EnvSubstitutionError`` is gone from ``opentelemetry.configuration.file``,
   because nothing raises it any more.
   Several parts of a configuration file now behave differently: some the
@@ -139,16 +141,19 @@ subtext: |
   ``PROPAGATORS`` holding ``[{tracecontext: {}}, {baggage: {}}]`` used to load
   and now fails the file with ``data.propagator.composite must be array``.
   A scalar value taken from the environment no longer carries YAML syntax with
-  it. The previous release re-parsed such a value, so it could be cut short at
-  a ``#``, rejected as an undefined YAML alias, trimmed, or stripped of quote
-  characters that were part of it; now it reaches the exporter exactly as the
-  environment holds it. Most of that is a repair, and two cases are breaks.
-  A variable whose value starts and ends with a quote keeps the quotes, so an
-  endpoint written that way now names a host nobody can resolve. A reference
-  that is only part of a value is no longer typed, so a numeric field built
-  from a reference and literal text, as in ``export_timeout: ${SECS}000``,
-  used to load and now fails the file with ``must be integer or null``: write
-  the whole value as one reference instead.
+  it. The previous release substituted into the file text and let the parser
+  read the result, so a value could be cut short at a ``#``, rejected as an
+  undefined YAML alias, stripped of quote characters, or trimmed of the spaces
+  around it. Now it arrives exactly as the environment holds it. Check every
+  variable a configuration file reads for surrounding quotes and surrounding
+  whitespace: the quotes now reach the exporter, so an endpoint written that
+  way names a host nobody can resolve, and the whitespace now fails the file
+  wherever the schema wants a number or one of a fixed set of words, as at
+  ``log_level`` or an exporter's ``encoding``.
+  A reference that is only part of a value is no longer typed either, so a
+  numeric field built from a reference and literal text, as in
+  ``export_timeout: ${SECS}000``, used to load and now fails the file with
+  ``must be integer or null``: write the whole value as one reference instead.
   A reference that is the whole value is still typed as before, so ``${LIMIT}``
   holding ``100`` still reaches an integer field as the integer 100, and
   quoting it as ``"${LIMIT}"`` fails the file in this release and in the

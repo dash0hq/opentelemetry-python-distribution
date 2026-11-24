@@ -13,9 +13,9 @@ does not carry is in fact ignored depends on where it sits, since the document
 is validated before the ``file_format`` is read. A block the schema closes
 rejects an unknown key and fails the load. A block the schema leaves open
 accepts one, and what happens next is decided by the code that reads the
-block, not by the validator: a plugin position raises ``Plugin '<name>' not
-found``, the document root ignores the key, and a processor raises an error
-of its own.
+block rather than by the validator. That code may raise, may log and carry on,
+or may drop the key in silence, and which of the three it does is a property
+of the block.
 
 Do not edit this package by hand
 --------------------------------

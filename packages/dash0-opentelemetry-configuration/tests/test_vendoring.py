@@ -6,6 +6,11 @@ agrees with ``jsonschema``. Neither runs here. What is specific to this
 repository is the packaging: that the shims resolve, that the dependency the
 whole exercise exists to avoid is really absent, and that a configuration file
 drives the distribution end to end.
+
+The two tests named for an unset variable and for a bare propagator entry are
+the exception. They pin behaviour that a re-vendor can reverse without a word,
+since the only check on the vendored tree compares it with the fork rather
+than with what the previous release did.
 """
 
 from importlib.metadata import requires

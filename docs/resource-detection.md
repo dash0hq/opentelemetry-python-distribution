@@ -84,7 +84,7 @@ A console script such as `gunicorn`, `uvicorn`, `celery` or `flask` launches som
 Running `gunicorn myapp:app` therefore does not report `service.name=gunicorn`, and never reports `gunicorn`'s version as `service.version`.
 A runner started as a module is skipped too, so `python -m gunicorn` and `python -m flask run` behave the same way, matched on the top-level package so that `python -m flask.cli` is also covered.
 Detection falls through to `pyproject.toml`, which still finds the application when the virtual environment sits inside the project directory.
-When that finds nothing either, no name is reported and the SDK's `unknown_service` stands, because an honest absence is easier to act on than a name that every deployment shares.
+When that finds nothing either, no name is reported and the SDK's own default stands, `unknown_service:<executable>` such as `unknown_service:python3`, because an honest absence is easier to act on than a name that every deployment shares.
 The Dash0 Ruby distribution skips `puma`, `unicorn` and `sidekiq` for the same reason, so the two distributions behave alike.
 Set `OTEL_SERVICE_NAME` for those deployments.
 

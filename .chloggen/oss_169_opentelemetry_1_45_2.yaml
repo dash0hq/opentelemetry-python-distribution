@@ -58,8 +58,7 @@ subtext: |
   upgrading.
   A key written with an empty value is read as an empty object rather than as
   absent, which the specification requires: ``always_on:`` means
-  ``always_on: {}``. A detector written that way used to be skipped and now
-  runs. A sampler, an exporter, an ``id_generator`` and a view's
+  ``host: {}``. A detector written that way used to be skipped and now runs. A sampler, an exporter, an ``id_generator`` and a view's
   ``aggregation`` written that way used to fail the whole file with a
   ``ConfigurationError`` such as ``No exporter type specified in span exporter
   config``, so under injection the distribution deactivated itself for that
@@ -71,8 +70,10 @@ subtext: |
   with a no-op propagator that read and wrote no trace context at all, and now
   installs the propagators it names, so the process starts taking part in
   distributed traces.
-  A top-level ``attribute_limits`` block applies to spans and to log records
-  wherever the signal declares no ``limits`` of its own. A file carrying
+  A top-level ``attribute_limits`` block applies to spans and to log records,
+  for every attribute limit the signal's own ``limits`` block leaves unset. A
+  ``tracer_provider.limits`` block that sets only ``link_count_limit`` still
+  takes both attribute limits from the top-level block. A file carrying
   ``attribute_count_limit: 2`` used to leave the SDK defaults of 128 attributes
   and no length limit in place. It now keeps two attributes per span and per
   log record, and because the SDK evicts the oldest when the limit is reached,
@@ -119,8 +120,8 @@ subtext: |
   to name whatever the variable held and now parses as the literal key
   ``${EXPORTER_NAME}``, which the entry-point lookup then fails on at startup.
   A plugin exporter, a plugin sampler, a plugin propagator, a plugin
-  ``id_generator``, a plugin processor, a plugin metric producer and a plugin
-  resource detector all take an arbitrary key, so write the key out. The
+  ``id_generator`` and a plugin resource detector all take an arbitrary key, so
+  write the key out. The
   resource detector is the position the Dash0 package's own
   ``otel-config.yaml`` uses, for ``dash0_distribution``, ``dash0_service_name``
   and ``dash0_kubernetes``.
@@ -129,9 +130,13 @@ subtext: |
   stays a string instead of being re-parsed. ``composite: ${PROPAGATORS}`` with
   ``PROPAGATORS`` holding ``[{tracecontext: {}}, {baggage: {}}]`` used to load
   and now fails the file with ``data.propagator.composite must be array``.
-  A scalar value taken from the environment is no longer re-parsed either, and
-  that part breaks nothing: a value containing ``#``, a leading ``*`` or a
-  trailing space now reaches the exporter as written instead of being cut
-  short, rejected as an undefined YAML alias, or trimmed.
+  A scalar value taken from the environment no longer carries YAML syntax with
+  it, and that part breaks nothing: a value containing ``#``, a leading ``*``
+  or a trailing space now reaches the exporter as written instead of being cut
+  short, rejected as an undefined YAML alias, or trimmed. A standalone
+  unquoted reference is still typed the way it always was, so ``${LIMIT}`` with
+  ``LIMIT`` holding ``100`` still reaches an integer field as the integer 100.
+  Do not quote it defensively: ``"${LIMIT}"`` fails the file in this release
+  and in the previous one alike.
 
 change_logs: [user]

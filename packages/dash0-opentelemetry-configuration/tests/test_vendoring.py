@@ -7,10 +7,10 @@ repository is the packaging: that the shims resolve, that the dependency the
 whole exercise exists to avoid is really absent, and that a configuration file
 drives the distribution end to end.
 
-The two tests named for an unset variable and for a bare propagator entry are
-the exception. They pin behaviour that a re-vendor can reverse without a word,
-since the only check on the vendored tree compares it with the fork rather
-than with what the previous release did.
+The three tests named for an unset variable, for a bare propagator entry and
+for a bare detector entry are the exception. They pin behaviour that a
+re-vendor can reverse without a word, since the only check on the vendored
+tree compares it with the fork rather than with what the previous release did.
 """
 
 from importlib.metadata import requires
@@ -20,6 +20,7 @@ import pytest
 from opentelemetry import configuration as public
 from opentelemetry._configuration import _generated_validator
 from opentelemetry._configuration._propagator import create_propagator
+from opentelemetry._configuration._resource import create_resource
 from opentelemetry._configuration.file._loader import _validate_schema
 from opentelemetry._logs import get_logger_provider
 from opentelemetry.configuration import (
@@ -127,6 +128,15 @@ propagator:
     - baggage:
 """
 
+_BARE_DETECTORS: str = """
+file_format: "1.0-rc.1"
+resource:
+  detection/development:
+    detectors:
+      - host:
+      - process:
+"""
+
 
 def test_the_public_path_resolves_to_the_private_tree() -> None:
     assert public.configure_sdk.__module__.startswith("opentelemetry._configuration")
@@ -224,6 +234,21 @@ def test_a_propagator_written_with_an_empty_value_is_installed(
     propagator = create_propagator(load_config_file(str(config_file)).propagator)
 
     assert sorted(propagator.fields) == ["baggage", "traceparent", "tracestate"]
+
+
+def test_a_detector_written_with_an_empty_value_runs(tmp_path: Path) -> None:
+    """``- host:`` selects the detector rather than being skipped.
+
+    The same empty-value rule as the bare propagator entry, on the path that
+    widens the resource carried by every span, metric and log record.
+    """
+    config_file: Path = tmp_path / "otel-config.yaml"
+    config_file.write_text(_BARE_DETECTORS)
+
+    resource = create_resource(load_config_file(str(config_file)).resource)
+
+    assert "host.arch" in resource.attributes
+    assert "process.pid" in resource.attributes
 
 
 def test_an_invalid_document_is_rejected_with_the_property_named() -> None:

@@ -57,8 +57,9 @@ subtext: |
   to fail the load can start succeeding. Read any file you already ship before
   upgrading.
   A key written with an empty value is read as an empty object rather than as
-  absent, which the specification requires: ``always_on:`` means
-  ``host: {}``. A detector written that way used to be skipped and now runs. A sampler, an exporter, an ``id_generator`` and a view's
+  absent, which the specification requires: ``host:`` means ``host: {}``. A
+  detector written that way used to be skipped and now runs. A sampler, an
+  exporter, an ``id_generator`` and a view's
   ``aggregation`` written that way used to fail the whole file with a
   ``ConfigurationError`` such as ``No exporter type specified in span exporter
   config``, so under injection the distribution deactivated itself for that
@@ -86,7 +87,9 @@ subtext: |
   ``aggregation_cardinality_limit`` on a view's stream, used to be ignored, the
   pull-reader case with a log line and the rest in silence. Both now cap the
   number of series per instrument, collapsing the excess into a single series
-  carrying ``otel.metric.overflow: true``.
+  carrying ``otel.metric.overflow: true``. A pull reader whose exporter is a
+  plugin is the exception: it still logs that the limits are not supported and
+  still ignores them.
   A ``tracer_configurator/development``, ``logger_configurator/development`` or
   ``meter_configurator/development`` block now applies, and ``enabled: false``
   in one of them stops that signal for every tracer, logger or meter it
@@ -120,9 +123,10 @@ subtext: |
   to name whatever the variable held and now parses as the literal key
   ``${EXPORTER_NAME}``, which the entry-point lookup then fails on at startup.
   A plugin exporter, a plugin sampler, a plugin propagator, a plugin
-  ``id_generator`` and a plugin resource detector all take an arbitrary key, so
-  write the key out. The
-  resource detector is the position the Dash0 package's own
+  ``id_generator``, a plugin resource detector and an instrumentation name
+  under ``instrumentation/development.python`` all take an arbitrary key, so
+  write the key out. The resource detector is the position the Dash0 package's
+  own
   ``otel-config.yaml`` uses, for ``dash0_distribution``, ``dash0_service_name``
   and ``dash0_kubernetes``.
   A ``${VAR}`` whose value supplied YAML structure stops supplying it, for the
@@ -131,10 +135,12 @@ subtext: |
   ``PROPAGATORS`` holding ``[{tracecontext: {}}, {baggage: {}}]`` used to load
   and now fails the file with ``data.propagator.composite must be array``.
   A scalar value taken from the environment no longer carries YAML syntax with
-  it, and that part breaks nothing: a value containing ``#``, a leading ``*``
-  or a trailing space now reaches the exporter as written instead of being cut
-  short, rejected as an undefined YAML alias, or trimmed. A standalone
-  unquoted reference is still typed the way it always was, so ``${LIMIT}`` with
+  it, and that part breaks nothing: a value whose ``#`` follows a space, a
+  value with a leading ``*`` and a value with a trailing space now reach the
+  exporter as written instead of being cut short, rejected as an undefined YAML
+  alias, or trimmed. A ``#`` with no space in front of it was never a comment
+  and was never cut short. A standalone unquoted reference is still typed the
+  way it always was, so ``${LIMIT}`` with
   ``LIMIT`` holding ``100`` still reaches an integer field as the integer 100.
   Do not quote it defensively: ``"${LIMIT}"`` fails the file in this release
   and in the previous one alike.

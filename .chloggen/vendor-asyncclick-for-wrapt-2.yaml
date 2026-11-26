@@ -2,32 +2,18 @@ change_type: bug_fix
 
 component: distro
 
-note: Auto-instrumentation no longer stands down on an application that has wrapt 2.x installed
+note: Instrument applications where wrapt 2.x is installed
 
 issues: [124]
 
 subtext: |
   ``all-dependencies.txt`` carried ``wrapt<3.0.0,>=1.0.0,>=1.11.2,>=1.12.1,~=1.0``,
-  and the ``~=1.0`` term made the bootstrap deactivate the whole distribution for
-  any application on wrapt 2.x, which arrives transitively through Delta Lake,
-  s3fs and other common libraries and cannot easily be downgraded. The affected
-  workloads reported no telemetry at all.
+  the ``~=1.0`` term made the bootstrap deactivate the whole distribution for
+  any application on wrapt 2.x.
 
-  Exactly one package in the injected tree declared that term:
-  ``opentelemetry-instrumentation-asyncclick`` 0.66b2. Upstream widened it to
-  ``wrapt >= 1.0.0, < 3.0.0`` in open-telemetry/opentelemetry-python-contrib#5117,
-  merged after the 0.66 patch branch split, so no 0.66 release carries the fix
-  and 0.67b0 has no release date.
+  ``opentelemetry-instrumentation-asyncclick`` 0.66b2 is the component with ~=1.0.
 
-  Rather than drop the instrumentation and lose asyncclick spans, its source is
-  now carried inside ``dash0-opentelemetry``, verbatim from the upstream v0.66b2
-  tag, and the upstream distribution is no longer a dependency. The entry point
-  keeps its name and target, and the ``instruments`` extra keeps the loader
-  skipping the instrumentor when the application has no asyncclick. The manifest
-  line is now ``wrapt<3.0.0,>=1.0.0,>=1.11.2,>=1.12.1``.
-
-  The same line lost the ``typing-extensions ~= 4.12`` term, which only
-  asyncclick declared. The remaining floor is ``>=4.5.0``, which covers the two
-  names the vendored module imports, ``ParamSpec`` and ``Unpack``.
+  This change vendors the asyncclick instrumentation to avoid affecting customers
+  who use this instrumentation.
 
 change_logs: [user]

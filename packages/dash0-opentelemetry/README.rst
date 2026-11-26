@@ -88,9 +88,9 @@ Instrumentations
 The distribution ships the full upstream auto-instrumentation set, every
 package enumerated by the ``bootstrap_gen`` module of
 ``opentelemetry-instrumentation`` (the list behind ``opentelemetry-bootstrap``),
-pinned to a single contrib version, so injected processes need no bootstrap
-step. Instrumentations only activate when their target library is present,
-which makes carrying all of them safe.
+pinned to one validated set of versions, so injected processes need no
+bootstrap step. Instrumentations only activate when their target library is
+present, which makes carrying all of them safe.
 
 Deviations from the upstream list:
 

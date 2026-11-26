@@ -27,7 +27,8 @@ removal = Every step, because none of them fails on its own if it is missed and
     packages/dash0-opentelemetry/tests/test_instrumentations.py. Delete
     packages/dash0-opentelemetry/tests/test_vendored_asyncclick.py. Drop the
     asyncclick paragraph from docs/auto-instrumentation.md, the asyncclick row
-    and the paragraph under it from docs/kubernetes-injection.md, the fourth
+    and the paragraph under it from docs/kubernetes-injection.md, the asyncclick
     deviation bullet from packages/dash0-opentelemetry/README.rst, and the
-    second derivation command from the root CLAUDE.md. Then regenerate
-    all-dependencies.txt.
+    second derivation command and the asyncclick sentence of the project
+    overview from the root CLAUDE.md. Then run uv lock, which the uv lock
+    --check job requires, and regenerate all-dependencies.txt.

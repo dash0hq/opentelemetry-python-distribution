@@ -8,11 +8,13 @@ open-telemetry/opentelemetry-python-contrib#5117 exists; ``UPSTREAM`` beside it
 records where it came from.
 
 These tests cover what the swap has to preserve: the entry point keeps its
-upstream name and target, the dependency gate still skips the instrumentor when
-the application has no asyncclick, and the instrumentor still records a span.
+upstream name and target, the source stays the source the ``UPSTREAM`` file
+names, the dependency gate still skips the instrumentor when the application
+has no asyncclick, and the instrumentor still records a span.
 """
 
 from asyncio import run as asyncio_run
+from hashlib import sha256
 from importlib.metadata import distribution, entry_points
 from pathlib import Path
 from re import match as re_match
@@ -28,6 +30,8 @@ VENDORED: Path = (
     Path(__file__).resolve().parents[1] / "src/opentelemetry/instrumentation/asyncclick"
 )
 
+PROVENANCE_FILES: frozenset[str] = frozenset({"UPSTREAM", "SHA256SUMS"})
+
 
 def upstream_fields() -> dict[str, str]:
     """The ``key = value`` lines of ``UPSTREAM``, ignoring continuation lines."""
@@ -37,6 +41,16 @@ def upstream_fields() -> dict[str, str]:
         if matched:
             fields[matched.group(1)] = matched.group(2)
     return fields
+
+
+def recorded_digests() -> dict[str, str]:
+    """The ``<sha256>  <name>`` lines of ``SHA256SUMS``, as ``{name: digest}``."""
+    digests: dict[str, str] = {}
+    for line in (VENDORED / "SHA256SUMS").read_text(encoding="utf-8").splitlines():
+        matched = re_match(r"^([0-9a-f]{64})  (\S+)$", line)
+        if matched:
+            digests[matched.group(2)] = matched.group(1)
+    return digests
 
 
 def test_the_entry_point_keeps_its_upstream_name_and_target():
@@ -66,6 +80,42 @@ def test_upstream_records_where_the_source_came_from():
     assert fields["tag"] == "v0.66b2"
     assert len(fields["commit"]) == 40
     assert fields["supersedes"].startswith("opentelemetry-instrumentation-asyncclick")
+
+
+def test_every_vendored_file_still_hashes_to_what_sha256sums_records():
+    """``UPSTREAM`` calls this source verbatim, and ruff excludes the directory.
+
+    Without this, a local edit to the vendored source passes every check while
+    three places in the repository say the source is unmodified, and editing
+    ``version.py`` alone turns the contrib-drift test in
+    ``test_instrumentations.py`` green with the old source still in the tree.
+    """
+    recorded = recorded_digests()
+    present = {
+        path.name
+        for path in VENDORED.iterdir()
+        if path.is_file() and path.name not in PROVENANCE_FILES
+    }
+
+    assert present == set(recorded), (
+        f"SHA256SUMS does not cover the vendored tree: it records "
+        f"{sorted(recorded)} and the directory holds {sorted(present)}. Rebuild "
+        f"it with 'sha256sum {' '.join(sorted(present))} > SHA256SUMS' from "
+        f"inside the vendored directory."
+    )
+
+    changed = sorted(
+        name
+        for name, digest in recorded.items()
+        if sha256((VENDORED / name).read_bytes()).hexdigest() != digest
+    )
+
+    assert not changed, (
+        f"vendored files no longer hash to what SHA256SUMS records: {changed}. "
+        f"The source has to stay the source UPSTREAM names, so revert the edit, "
+        f"or re-vendor from the new tag and rewrite UPSTREAM and SHA256SUMS "
+        f"together."
+    )
 
 
 def test_the_instruments_extra_gates_the_instrumentor():

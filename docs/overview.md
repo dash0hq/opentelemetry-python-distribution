@@ -17,7 +17,7 @@ This is the Python counterpart of the [Dash0 OpenTelemetry distribution for Node
 **Zero-code instrumentation.** `Dash0Distro` and `Dash0Configurator` are discovered through standard OpenTelemetry entry points and wire up the SDK before your application starts.
 No `import opentelemetry` anywhere in your application code.
 
-**The full contrib instrumentation set, built in.** Every upstream auto-instrumentation package ships as a pinned dependency.
+**The full contrib instrumentation set, built in.** Every upstream auto-instrumentation package ships with the distribution, pinned to a single contrib version.
 No `opentelemetry-bootstrap` step is needed.
 Instrumentations activate only when their target library is installed, so carrying all 40+ of them is safe.
 

@@ -85,10 +85,10 @@ Resource detectors (``opentelemetry_resource_detector``)
 Instrumentations
 ================
 
-The distribution depends on the full upstream auto-instrumentation set — every
+The distribution ships the full upstream auto-instrumentation set, every
 package enumerated by the ``bootstrap_gen`` module of
-``opentelemetry-instrumentation`` (the list behind ``opentelemetry-bootstrap``)
-— pinned to a single contrib version, so injected processes need no bootstrap
+``opentelemetry-instrumentation`` (the list behind ``opentelemetry-bootstrap``),
+pinned to a single contrib version, so injected processes need no bootstrap
 step. Instrumentations only activate when their target library is present,
 which makes carrying all of them safe.
 
@@ -100,6 +100,13 @@ Deviations from the upstream list:
 * ``opentelemetry-exporter-prometheus``,
   ``opentelemetry-propagator-ot-trace``, and
   ``opentelemetry-instrumentation-aws-lambda`` are deliberately not shipped.
+* ``opentelemetry-instrumentation-asyncclick`` is carried as source under
+  ``src/opentelemetry/instrumentation/asyncclick`` rather than depended on.
+  0.66b2 declares ``wrapt ~= 1.0``, and that one requirement stands the whole
+  distribution down on an application that has wrapt 2.x installed. The
+  dependency returns once a contrib release carrying
+  open-telemetry/opentelemetry-python-contrib#5117 exists. ``UPSTREAM`` and
+  ``SHA256SUMS`` beside the source record where it came from.
 
 ``tests/test_instrumentations.py`` cross-checks the dependency block against
 the installed upstream list, so a contrib version bump that adds or removes

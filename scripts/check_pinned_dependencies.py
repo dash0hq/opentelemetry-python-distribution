@@ -39,6 +39,19 @@ ROOT = Path(__file__).resolve().parent.parent
 DISTRO_PYPROJECT = ROOT / "packages" / "dash0-opentelemetry" / "pyproject.toml"
 
 EXEMPT_FROM_EXACT_PIN = {
+    "asyncclick": (
+        "~=8.0",
+        "declared only under the 'instruments' extra, which is how "
+        "opentelemetry-instrumentation decides whether to load the vendored "
+        "asyncclick instrumentor: get_dist_dependency_conflicts reads that "
+        "extra off dash0-opentelemetry and skips the instrumentor when the "
+        "application has no asyncclick, instead of letting the import fail "
+        "and logging a traceback on every process start. The range is the one "
+        "opentelemetry-instrumentation-asyncclick 0.66b2 declares, so the "
+        "gate behaves as it did when that distribution owned the entry point. "
+        "Nothing is installed from this entry, and the requirement carries an "
+        "extra marker, so it never reaches all-dependencies.txt.",
+    ),
     "pyyaml": (
         ">=5.1",
         "read by dash0-opentelemetry-configuration to parse OTEL_CONFIG_FILE. "

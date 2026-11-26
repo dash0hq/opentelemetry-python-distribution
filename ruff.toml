@@ -14,6 +14,7 @@ extend-exclude = [
   # together with its upstream tests.
   "packages/dash0-opentelemetry/src/dash0/opentelemetry/injector/_packaging",
   "packages/dash0-opentelemetry/tests/test_packaging_*.py",
+  "packages/dash0-opentelemetry/src/opentelemetry/instrumentation/asyncclick",
   "packages/dash0-opentelemetry-pyproto",
   "packages/dash0-opentelemetry-exporter-otlp-pyproto-common",
   "packages/dash0-opentelemetry-exporter-otlp-pyproto-http",

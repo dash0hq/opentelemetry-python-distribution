@@ -1,0 +1,12 @@
+repository = https://github.com/open-telemetry/opentelemetry-python-contrib
+tag = v0.66b2
+commit = a34b6fa56948bebb539cfece22adf5d022cc3c19
+source = instrumentation/opentelemetry-instrumentation-asyncclick/src/opentelemetry/instrumentation/asyncclick
+supersedes = opentelemetry-instrumentation-asyncclick == 0.66b2
+remove_at = opentelemetry-instrumentation-asyncclick 0.67b0
+reason = 0.66b2 declares wrapt ~= 1.0, which is the only term in the injected
+    tree that rejects wrapt 2.x, and one rejected line stands the whole
+    distribution down. open-telemetry/opentelemetry-python-contrib#5117 widened
+    the requirement to wrapt >= 1.0.0, < 3.0.0 on 2026-10-01, after the 0.66
+    patch branch had split, so no 0.66 release carries it. The source here is
+    the v0.66b2 source verbatim; only the requirement changes.

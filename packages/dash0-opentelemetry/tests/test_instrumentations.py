@@ -6,14 +6,26 @@ Upstream enumerates every auto-instrumentation package in the
 regular dependencies (see pyproject.toml) so injected processes need no
 bootstrap step. These tests fail when a contrib version bump adds, removes, or
 re-pins instrumentations upstream and the dependency block was not re-synced.
+
+An instrumentation listed in ``VENDORED_INSTRUMENTATIONS`` is carried as source
+inside ``dash0-opentelemetry`` rather than depended on, so the upstream
+distribution is absent from the tree and the two tests that read its metadata
+skip it. The ``UPSTREAM`` file beside each vendored tree records where the
+source came from and what has to happen before it goes away.
 """
 
-from importlib.metadata import requires, version
+from importlib.metadata import PackageNotFoundError, distribution, requires, version
 
 from dash0.opentelemetry.injector._packaging.requirements import Requirement
 from opentelemetry.instrumentation import bootstrap_gen
 
 _DISTRO = "dash0-opentelemetry"
+
+VENDORED_INSTRUMENTATIONS: dict[str, str] = {
+    "opentelemetry-instrumentation-asyncclick": (
+        "opentelemetry.instrumentation.asyncclick"
+    ),
+}
 
 
 def _declared():
@@ -30,7 +42,9 @@ def _upstream():
 
 
 def test_every_upstream_instrumentation_is_shipped():
-    missing = sorted(set(_upstream()) - set(_declared()))
+    missing = sorted(
+        set(_upstream()) - set(_declared()) - set(VENDORED_INSTRUMENTATIONS)
+    )
 
     assert not missing, (
         f"upstream added instrumentations not declared in pyproject.toml: {missing}"
@@ -57,9 +71,25 @@ def test_installed_versions_satisfy_upstream_pins():
     mismatched = [
         f"{name}{requirement.specifier} (installed: {version(name)})"
         for name, requirement in _upstream().items()
-        if not requirement.specifier.contains(version(name), prereleases=True)
+        if name not in VENDORED_INSTRUMENTATIONS
+        and not requirement.specifier.contains(version(name), prereleases=True)
     ]
 
     assert not mismatched, (
         f"installed instrumentations do not satisfy upstream pins: {mismatched}"
+    )
+
+
+def test_vendored_instrumentations_are_not_also_installed():
+    """Two distributions owning one import path is what vendoring has to avoid."""
+    installed = []
+    for name in sorted(VENDORED_INSTRUMENTATIONS):
+        try:
+            installed.append(f"{name} {distribution(name).version}")
+        except PackageNotFoundError:
+            continue
+
+    assert not installed, (
+        f"vendored instrumentations are also installed as distributions, so the "
+        f"import path and the entry point have two owners: {installed}"
     )

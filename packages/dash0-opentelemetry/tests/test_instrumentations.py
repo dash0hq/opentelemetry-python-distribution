@@ -7,8 +7,8 @@ regular dependencies (see pyproject.toml) so injected processes need no
 bootstrap step. These tests fail when a contrib version bump adds, removes, or
 re-pins instrumentations upstream and the dependency block was not re-synced.
 
-An instrumentation keyed in ``VENDORED_INSTRUMENTATIONS`` is carried as source
-inside ``dash0-opentelemetry`` rather than depended on, so the upstream
+An instrumentation keyed in ``VENDORED_INSTRUMENTATIONS`` is vendored
+inside ``dash0-opentelemetry``, so the upstream
 distribution is absent from the tree and the two tests that read its metadata
 skip it. Its value is the contrib release the source was taken from, which has
 to stay equal to the pinned ``opentelemetry-instrumentation``. The ``UPSTREAM``

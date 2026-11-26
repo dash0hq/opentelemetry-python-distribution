@@ -7,24 +7,27 @@ regular dependencies (see pyproject.toml) so injected processes need no
 bootstrap step. These tests fail when a contrib version bump adds, removes, or
 re-pins instrumentations upstream and the dependency block was not re-synced.
 
-An instrumentation listed in ``VENDORED_INSTRUMENTATIONS`` is carried as source
+An instrumentation keyed in ``VENDORED_INSTRUMENTATIONS`` is carried as source
 inside ``dash0-opentelemetry`` rather than depended on, so the upstream
 distribution is absent from the tree and the two tests that read its metadata
-skip it. The ``UPSTREAM`` file beside each vendored tree records where the
-source came from and what has to happen before it goes away.
+skip it. Its value is the contrib release the source was taken from, which has
+to stay equal to the pinned ``opentelemetry-instrumentation``. The ``UPSTREAM``
+file beside each vendored tree records where the source came from and what has
+to happen before it goes away.
 """
 
 from importlib.metadata import PackageNotFoundError, distribution, requires, version
 
 from dash0.opentelemetry.injector._packaging.requirements import Requirement
 from opentelemetry.instrumentation import bootstrap_gen
+from opentelemetry.instrumentation.asyncclick.version import (
+    __version__ as asyncclick_instrumentation_version,
+)
 
 _DISTRO = "dash0-opentelemetry"
 
 VENDORED_INSTRUMENTATIONS: dict[str, str] = {
-    "opentelemetry-instrumentation-asyncclick": (
-        "opentelemetry.instrumentation.asyncclick"
-    ),
+    "opentelemetry-instrumentation-asyncclick": asyncclick_instrumentation_version,
 }
 
 
@@ -92,4 +95,28 @@ def test_vendored_instrumentations_are_not_also_installed():
     assert not installed, (
         f"vendored instrumentations are also installed as distributions, so the "
         f"import path and the entry point have two owners: {installed}"
+    )
+
+
+def test_vendored_instrumentations_match_the_pinned_contrib_release():
+    """A contrib bump past the vendored copy has to fail here.
+
+    Every other test subtracts a vendored instrumentation before comparing, so
+    nothing else notices when the pinned ``opentelemetry-instrumentation``
+    moves on. A vendored copy left behind runs against a ``BaseInstrumentor``
+    and an ``opentelemetry.instrumentation.utils`` it was never validated with,
+    and the ``remove_at`` field of its ``UPSTREAM`` file never fires.
+    """
+    pinned = version("opentelemetry-instrumentation")
+    behind = {
+        name: vendored
+        for name, vendored in sorted(VENDORED_INSTRUMENTATIONS.items())
+        if vendored != pinned
+    }
+
+    assert not behind, (
+        f"opentelemetry-instrumentation is pinned at {pinned} and these vendored "
+        f"instrumentations were taken from another release: {behind}. Re-vendor "
+        f"them, or restore the upstream dependency and delete the vendored tree "
+        f"as the UPSTREAM file beside it describes."
     )

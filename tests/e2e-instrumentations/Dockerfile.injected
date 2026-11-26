@@ -1,0 +1,24 @@
+FROM python:3.15-slim AS build
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1
+RUN pip install --no-cache-dir uv
+WORKDIR /src
+COPY . /src
+RUN uv build --all-packages --out-dir /wheels
+RUN pip install --no-cache-dir --target /dash0 /wheels/*.whl
+RUN cp /dash0/dash0/opentelemetry/injector/sitecustomize.py /dash0/sitecustomize.py \
+ && cp /dash0/dash0/opentelemetry/injector/all-dependencies.txt /dash0/all-dependencies.txt
+
+FROM python:3.15-slim
+ARG case
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1
+ENV PYTHONUNBUFFERED=1
+COPY --from=build /dash0 /dash0
+COPY tests/e2e-instrumentations/assert_local_install.py /assert_local_install.py
+RUN python /assert_local_install.py /dash0
+COPY tests/e2e-instrumentations/cases/${case}/requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
+COPY tests/e2e-instrumentations/sink_gate.py /sink_gate.py
+COPY tests/e2e-instrumentations/run_injected_case.py /run_injected_case.py
+COPY tests/e2e-instrumentations/cases/${case}/app.py /app/app.py
+WORKDIR /app
+CMD ["python", "/run_injected_case.py"]

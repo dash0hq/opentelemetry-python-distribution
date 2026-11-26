@@ -14,6 +14,7 @@ COPY tests/e2e-instrumentations/cases/${case}/requirements.txt /tmp/requirements
 RUN pip install --no-cache-dir /wheels/*.whl -r /tmp/requirements.txt
 COPY tests/e2e-instrumentations/assert_local_install.py /assert_local_install.py
 RUN python /assert_local_install.py
+COPY tests/e2e-instrumentations/sink_gate.py /sink_gate.py
 COPY tests/e2e-instrumentations/run_case.py /run_case.py
 COPY tests/e2e-instrumentations/cases/${case}/app.py /app/app.py
 WORKDIR /app

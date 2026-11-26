@@ -39,6 +39,19 @@ ROOT = Path(__file__).resolve().parent.parent
 DISTRO_PYPROJECT = ROOT / "packages" / "dash0-opentelemetry" / "pyproject.toml"
 
 EXEMPT_FROM_EXACT_PIN = {
+    "asyncclick": (
+        "~=8.0",
+        "declared only under the 'instruments' extra, which is how "
+        "opentelemetry-instrumentation decides whether to load the vendored "
+        "asyncclick instrumentor: get_dist_dependency_conflicts reads that "
+        "extra off dash0-opentelemetry and skips the instrumentor when the "
+        "application has no asyncclick, instead of letting the import fail "
+        "and logging a traceback on every process start. The range is the one "
+        "opentelemetry-instrumentation-asyncclick 0.66b2 declares, so the "
+        "gate behaves as it did when that distribution owned the entry point. "
+        "Nothing is installed from this entry, and the requirement carries an "
+        "extra marker, so it never reaches all-dependencies.txt.",
+    ),
     "pyyaml": (
         ">=5.1",
         "read by dash0-opentelemetry-configuration to parse OTEL_CONFIG_FILE. "
@@ -125,6 +138,23 @@ def _is_exact_pin(specifier):
     return _EXACT_PIN.match(specifier) is not None and not specifier.endswith(".*")
 
 
+def _exemption_violation(context, requirement, name, specifier):
+    """The message for an exempt name declared with the wrong specifier.
+
+    ``context`` names the table the requirement came from, so it reads either
+    ``dependencies`` or ``[<extra>]``. Returns ``None`` when the declaration
+    matches the specifier ``EXEMPT_FROM_EXACT_PIN`` records for ``name``.
+    """
+    required, reason = EXEMPT_FROM_EXACT_PIN[name]
+    if re.sub(r"\s+", "", specifier) == required:
+        return None
+    expected = f"{name} {required}".strip()
+    return (
+        f"{context}: {requirement!r} must be declared as '{expected}' and "
+        f"carry no other version specifier ({reason})"
+    )
+
+
 def policy_violations(project, workspace_members, closure):
     """Every way ``project`` breaks the dependency policy, as a list of strings.
 
@@ -145,14 +175,11 @@ def policy_violations(project, workspace_members, closure):
             continue
         elif name in EXEMPT_FROM_EXACT_PIN:
             exempt_from_exact_pin.add(name)
-            required, reason = EXEMPT_FROM_EXACT_PIN[name]
-            if re.sub(r"\s+", "", specifier) != required:
-                expected = f"{name} {required}".strip()
-                violations.append(
-                    f"dependencies: {requirement!r} must be declared as "
-                    f"'{expected}' and carry no other version specifier "
-                    f"({reason})"
-                )
+            violation = _exemption_violation(
+                "dependencies", requirement, name, specifier
+            )
+            if violation is not None:
+                violations.append(violation)
         elif _is_exact_pin(specifier):
             pinned_in_base[name] = specifier.removeprefix("==").strip()
         else:
@@ -166,12 +193,15 @@ def policy_violations(project, workspace_members, closure):
             name, specifier = _parse(requirement)
             if name is None:
                 violations.append(f"[{extra}]: cannot parse {requirement!r}")
-            elif (
-                name in workspace_members
-                or name in pinned_in_base
-                or name in EXEMPT_FROM_EXACT_PIN
-                or _is_exact_pin(specifier)
-            ):
+            elif name in workspace_members or name in pinned_in_base:
+                continue
+            elif name in EXEMPT_FROM_EXACT_PIN:
+                violation = _exemption_violation(
+                    f"[{extra}]", requirement, name, specifier
+                )
+                if violation is not None:
+                    violations.append(violation)
+            elif _is_exact_pin(specifier):
                 continue
             else:
                 violations.append(

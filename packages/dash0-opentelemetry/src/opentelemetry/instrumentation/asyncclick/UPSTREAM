@@ -1,0 +1,69 @@
+repository = https://github.com/open-telemetry/opentelemetry-python-contrib
+tag = v0.66b2
+commit = a34b6fa56948bebb539cfece22adf5d022cc3c19
+source = instrumentation/opentelemetry-instrumentation-asyncclick/src/opentelemetry/instrumentation/asyncclick
+supersedes = opentelemetry-instrumentation-asyncclick == 0.66b2
+remove_at = opentelemetry-instrumentation-asyncclick 0.67b0
+reason = 0.66b2 declares wrapt ~= 1.0, which is the only term in the injected
+    tree that rejects wrapt 2.x, and one rejected line stands the whole
+    distribution down. open-telemetry/opentelemetry-python-contrib#5117 widened
+    the requirement to wrapt >= 1.0.0, < 3.0.0 on 2026-10-01, after the 0.66
+    patch branch had split, so no 0.66 release carries it. The source here is
+    the v0.66b2 source verbatim; only the requirement changes.
+removal = Every step. Only two of them fail CI on their own, the wheel-contents
+    step and uv lock --check; the rest leave dead code or stale prose that
+    nothing catches. Grep the repository for asyncclick afterwards. The hits
+    left should be CHANGELOG.rst, .chloggen, uv.lock, tests/e2e-instrumentations
+    as described below, and the docstring of
+    test_wrapt_accepts_what_opentelemetry_instrumentation_declares in
+    packages/dash0-opentelemetry/tests/test_all_dependencies_manifest.py, which
+    records why that line asserts what it does and stays true afterwards.
+
+    Delete this directory. In packages/dash0-opentelemetry/pyproject.toml,
+    restore opentelemetry-instrumentation-asyncclick to [project].dependencies,
+    drop the [project.optional-dependencies] instruments table, drop the
+    asyncclick entry under [project.entry-points.opentelemetry_instrumentor],
+    drop the asyncclick and anyio entries of the dev dependency group, and set
+    [tool.hatch.build.targets.wheel] packages back to ["src/dash0"].
+
+    Drop the three asyncclick paths from the wheel-contents step of
+    .github/workflows/ci.yml, keeping the test-against-wrapt-2 job, which is not
+    asyncclick-specific and keeps its value once the dependency returns. Drop
+    the asyncclick exclusion from ruff.toml, and the asyncclick entry of
+    EXEMPT_FROM_EXACT_PIN in scripts/check_pinned_dependencies.py together with
+    the tests naming asyncclick in scripts/tests/test_check_pinned_dependencies.py.
+
+    Drop the dash0-opentelemetry key of
+    upstream_packages_shadowed_by_shipped_packages in sitecustomize.py, and in
+    packages/dash0-opentelemetry/tests/test_sitecustomize.py both the
+    opentelemetry-instrumentation-asyncclick entry of the shadowed list and the
+    make_dist("dash0-opentelemetry", ...) entry of
+    shipped_distributions_that_shadow_upstream. Drop the
+    VENDORED_INSTRUMENTATIONS entry and the import it is built from in
+    packages/dash0-opentelemetry/tests/test_instrumentations.py, which leaves
+    the dict empty and makes every test in that module compare whole sets again.
+    Delete packages/dash0-opentelemetry/tests/test_vendored_asyncclick.py.
+
+    Drop the asyncclick paragraph from docs/auto-instrumentation.md, the
+    asyncclick row and the paragraph under it from docs/kubernetes-injection.md,
+    the asyncclick deviation bullet from packages/dash0-opentelemetry/README.rst,
+    asyncclick's name from the project-layout bullet of CONTRIBUTING.rst, and
+    from the root CLAUDE.md the second
+    derivation command with the paragraph under it, the clause about
+    instrumentations carried as source, and asyncclick's name in the list of
+    vendored paths.
+
+    Delete no case under tests/e2e-instrumentations. The asyncclick case covers
+    the instrumentation whichever way it is supplied, and injected-wrapt2
+    covers the injected tree against wrapt 2.x, which was never
+    asyncclick-specific. Four places there call the instrumentor vendored and
+    stop being true: the docstring of
+    tests/e2e-instrumentations/cases/asyncclick/app.py, the TestAsyncClick doc
+    comment and the package doc comment of
+    tests/e2e-instrumentations/instrumentations_test.go, and in
+    tests/e2e-instrumentations/README.rst both the asyncclick row of the case
+    table and the paragraph of "Why the injected case pins wrapt 2.5.2" that
+    names the vendored span.
+
+    Then run uv lock, which the uv lock --check job requires, and regenerate
+    all-dependencies.txt.

@@ -56,13 +56,18 @@ def test_wrapt_accepts_what_opentelemetry_instrumentation_declares():
 
     Consumers wrote one exact pin per installed package, so an application on
     ``wrapt`` 1.16 lost all telemetry even though
-    ``opentelemetry-instrumentation`` declares ``<3.0.0,>=1.0.0``.
+    ``opentelemetry-instrumentation`` declares ``<3.0.0,>=1.0.0``. The 2.x
+    cases are the same failure from the other end: wrapt 2.x arrives through
+    Delta Lake and s3fs and cannot be downgraded, and until the asyncclick
+    instrumentation was vendored its ``~=1.0`` capped this line at 1.x.
     """
     specifier = requirement_for("wrapt").specifier
 
     assert specifier.contains(Version("1.16.0"))
     assert specifier.contains(Version("1.17.3"))
-    assert not specifier.contains(Version("2.0.0"))
+    assert specifier.contains(Version("2.3.0"))
+    assert specifier.contains(Version("2.5.2"))
+    assert not specifier.contains(Version("3.0.0"))
 
 
 def test_pyyaml_carries_its_floor_and_no_ceiling():

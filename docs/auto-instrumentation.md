@@ -2,7 +2,7 @@
 
 ## How it works
 
-The distribution depends on the full set of upstream auto-instrumentation packages, all pinned to a single contrib version.
+The distribution depends on the full set of upstream auto-instrumentation packages, except for some vendored components.
 When `opentelemetry-instrument` starts your application, each installed instrumentor is activated automatically.
 Instrumentors whose target library is not installed are silently skipped.
 **No `opentelemetry-bootstrap` step is required.**
@@ -120,6 +120,11 @@ A single broken instrumentor does not abort the entire auto-instrumentation proc
 | asyncclick | [`opentelemetry-instrumentation-asyncclick`](https://pypi.org/project/opentelemetry-instrumentation-asyncclick/) |
 
 </div>
+
+The asyncclick instrumentation is the only one that is vendored in `dash0-opentelemetry`.
+Release 0.66b2 of [`opentelemetry-instrumentation-asyncclick`](https://pypi.org/project/opentelemetry-instrumentation-asyncclick/) requires `wrapt ~= 1.0`, which
+disables all auto-instrumentation for an application that has wrapt 2.x installed.
+The source is the upstream `v0.66b2` tag, unmodified, and the dependency returns once a release carrying [contrib#5117](https://github.com/open-telemetry/opentelemetry-python-contrib/pull/5117) exists.
 
 ### AI and cloud
 

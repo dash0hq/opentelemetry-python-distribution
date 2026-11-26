@@ -53,6 +53,22 @@ jobs:
           --python ${{ matrix.python-version }}
           python -m pytest packages/dash0-opentelemetry-configuration/tests -v
 
+  test-against-wrapt-2:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          python-version: "3.13"
+      - name: Run the distribution unit tests against wrapt 2.x
+        run: |
+          set -euo pipefail
+          uv sync --package dash0-opentelemetry --python 3.13
+          uv pip install --python .venv wrapt==2.5.2
+          .venv/bin/python -c "from wrapt import __version__; print(__version__)"
+          .venv/bin/python -m pytest packages/dash0-opentelemetry/tests -v
+
   sitecustomize-python27:
     runs-on: ubuntu-latest
     steps:
@@ -148,13 +164,17 @@ jobs:
           uv build --all-packages --out-dir dist \
             --build-constraints scripts/build-constraints.txt
           ls -l dist
-      - name: Check the distro wheel ships the injector files
+      - name: Check the distro wheel ships the injector files and the vendored instrumentations
         run: |
           set -euo pipefail
           wheel=$(ls dist/dash0_opentelemetry-*.whl)
           contents=$(unzip -Z1 "$wheel")
-          for name in sitecustomize.py all-dependencies.txt; do
-            path="dash0/opentelemetry/injector/$name"
+          for path in \
+            dash0/opentelemetry/injector/sitecustomize.py \
+            dash0/opentelemetry/injector/all-dependencies.txt \
+            opentelemetry/instrumentation/asyncclick/__init__.py \
+            opentelemetry/instrumentation/asyncclick/package.py \
+            opentelemetry/instrumentation/asyncclick/version.py; do
             if ! grep -qxF "$path" <<<"$contents"; then
               echo "::error::$wheel does not ship $path"
               exit 1

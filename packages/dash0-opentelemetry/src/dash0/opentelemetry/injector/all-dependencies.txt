@@ -13,7 +13,6 @@ opentelemetry-instrumentation-aiohttp-server
 opentelemetry-instrumentation-aiokafka
 opentelemetry-instrumentation-aiopg
 opentelemetry-instrumentation-asgi==0.66b2
-opentelemetry-instrumentation-asyncclick
 opentelemetry-instrumentation-asyncio
 opentelemetry-instrumentation-asyncpg
 opentelemetry-instrumentation-boto3sqs
@@ -67,6 +66,6 @@ opentelemetry-util-http==0.66b2
 packaging>=18.0,>=20.0,>=21.0
 psutil<8,>=5.9.0
 pyyaml>=5.1
-typing-extensions>=4.5.0,~=4.1,~=4.12
+typing-extensions>=4.5.0,~=4.1
 typing-extensions>=4; python_version < "3.11"
-wrapt<3.0.0,>=1.0.0,>=1.11.2,>=1.12.1,~=1.0
+wrapt<3.0.0,>=1.0.0,>=1.11.2,>=1.12.1

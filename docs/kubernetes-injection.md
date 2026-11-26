@@ -32,16 +32,19 @@ Packages report the name they declared, verbatim, and non-canonical spellings ar
 The OpenTelemetry API layer is excluded from this check, because applications legitimately depend on it for manual instrumentation without being auto-instrumented.
 
 The check looks for import-path overlap, not just name overlap.
-The pure-Python (pyproto) exporters ship under Dash0-owned distribution names while keeping the upstream import paths and entry points, so an application holding the upstream distribution has a different name and the same import path:
+Some shipped distributions keep an upstream import path and an upstream entry point under a Dash0-owned distribution name, so an application holding the upstream distribution has a different name and the same import path:
 
 | Shipped distribution | Import path it owns | Upstream distribution it shadows |
 |---|---|---|
+| `dash0-opentelemetry` | `opentelemetry.instrumentation.asyncclick` | `opentelemetry-instrumentation-asyncclick` |
 | `dash0-opentelemetry-pyproto` | `opentelemetry.proto` | `opentelemetry-proto` |
 | `dash0-opentelemetry-exporter-otlp-pyproto-common` | `opentelemetry.exporter.otlp.proto.common` | `opentelemetry-exporter-otlp-proto-common` |
 | `dash0-opentelemetry-exporter-otlp-pyproto-grpc` | `opentelemetry.exporter.otlp.proto.grpc` | `opentelemetry-exporter-otlp-proto-grpc`, `opentelemetry-exporter-otlp` |
 | `dash0-opentelemetry-exporter-otlp-pyproto-http` | `opentelemetry.exporter.otlp.proto.http` | `opentelemetry-exporter-otlp-proto-http`, `opentelemetry-exporter-otlp` |
 
-Finding any of the upstream names in the application counts as double instrumentation, because two distributions would then provide the same modules and register the same exporter entry points.
+The `dash0-opentelemetry` row holds while the asyncclick instrumentation is now vendored, which will be until a contrib release carrying open-telemetry/opentelemetry-python-contrib#5117 exists.
+
+Finding any of the upstream names in the application counts as double instrumentation, because two distributions would then provide the same modules and register the same entry points.
 
 ### Unreadable input
 

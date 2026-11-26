@@ -7,10 +7,10 @@
 // A case is a directory under cases/ holding an app.py that exercises exactly
 // one instrumented library and then exits, plus a requirements.txt naming the
 // library to install. The harness builds that app into an image from this
-// checkout, runs it under opentelemetry-instrument against an OTLP sink, and
-// waits for the signals to arrive. Everything a test asserts is therefore
-// observed at the sink, so a case cannot pass unless the distribution really
-// emitted it.
+// checkout, runs it against an OTLP sink either under opentelemetry-instrument
+// or with the distribution injected onto PYTHONPATH, and waits for the signals
+// to arrive. Everything a test asserts is therefore observed at the sink, so a
+// case cannot pass unless the distribution really emitted it.
 //
 // The sink and its query API are upstream's, imported rather than copied. The
 // container plumbing is local because upstream's RunPackageTest derives the
@@ -60,13 +60,29 @@ const ServiceName = "instrumentation-case"
 // blocks until the tunnel answers.
 const readyMarker = "instrumentation-case-runner-ready"
 
-// Run builds the named case from this checkout, runs it to completion, and
-// returns the sink its telemetry was exported to.
+// Run builds the named case from this checkout and runs it under
+// opentelemetry-instrument, which is how an application that installed the
+// distribution itself starts.
+func Run(t *testing.T, ctx context.Context, name string) *otelsink.Sink {
+	t.Helper()
+	return runCase(t, ctx, name, "Dockerfile")
+}
+
+// RunInjected builds the named case and runs it with the distribution on
+// PYTHONPATH instead, which is how the operator starts an application it
+// injected into.
+func RunInjected(t *testing.T, ctx context.Context, name string) *otelsink.Sink {
+	t.Helper()
+	return runCase(t, ctx, name, "Dockerfile.injected")
+}
+
+// runCase builds the named case with the given Dockerfile, runs it to
+// completion, and returns the sink its telemetry was exported to.
 //
 // The case is expected to exit zero on its own. A non-zero exit fails the test
 // and prints the container output, which is where an instrumentation that
 // raised on import says so.
-func Run(t *testing.T, ctx context.Context, name string) *otelsink.Sink {
+func runCase(t *testing.T, ctx context.Context, name string, dockerfile string) *otelsink.Sink {
 	t.Helper()
 
 	sink := otelsink.Start(t)
@@ -80,7 +96,7 @@ func Run(t *testing.T, ctx context.Context, name string) *otelsink.Sink {
 	req := testcontainers.ContainerRequest{
 		FromDockerfile: testcontainers.FromDockerfile{
 			Context:    repoRoot(t),
-			Dockerfile: filepath.Join("tests", "e2e-instrumentations", "Dockerfile"),
+			Dockerfile: filepath.Join("tests", "e2e-instrumentations", dockerfile),
 			BuildArgs: map[string]*string{
 				"case": &caseName,
 			},

@@ -10,15 +10,23 @@ with nothing to signal it.
 pip records where each distribution came from in ``direct_url.json``, which it
 writes only for an install from a path or a URL, so a ``file://`` origin is
 what proves the checkout supplied it.
+
+The directories to search are the arguments, defaulting to ``sys.path``. An
+injected image passes the tree it built, which is not on ``sys.path`` at build
+time.
 """
 
 from importlib.metadata import distributions
 from json import loads
+from sys import argv
+from sys import path as sys_path
 
 INDEX: str = "the package index"
 
+search_path: list[str] = argv[1:] or sys_path
+
 origins: dict[str, str] = {}
-for distribution in distributions():
+for distribution in distributions(path=search_path):
     name: str | None = distribution.metadata["Name"]
     if name is None or not name.startswith("dash0-"):
         continue
@@ -27,8 +35,8 @@ for distribution in distributions():
 
 if not origins:
     raise SystemExit(
-        "no dash0 distribution is installed, so the image does not carry the "
-        "distribution under test at all"
+        f"no dash0 distribution is installed under {search_path}, so the image "
+        f"does not carry the distribution under test at all"
     )
 
 from_index: list[str] = sorted(

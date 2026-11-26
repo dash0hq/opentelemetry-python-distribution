@@ -6,14 +6,29 @@ Upstream enumerates every auto-instrumentation package in the
 regular dependencies (see pyproject.toml) so injected processes need no
 bootstrap step. These tests fail when a contrib version bump adds, removes, or
 re-pins instrumentations upstream and the dependency block was not re-synced.
+
+An instrumentation keyed in ``VENDORED_INSTRUMENTATIONS`` is vendored
+inside ``dash0-opentelemetry``, so the upstream
+distribution is absent from the tree and the two tests that read its metadata
+skip it. Its value is the contrib release the source was taken from, which has
+to stay equal to the pinned ``opentelemetry-instrumentation``. The ``UPSTREAM``
+file beside each vendored tree records where the source came from and what has
+to happen before it goes away.
 """
 
-from importlib.metadata import requires, version
+from importlib.metadata import PackageNotFoundError, distribution, requires, version
 
 from dash0.opentelemetry.injector._packaging.requirements import Requirement
 from opentelemetry.instrumentation import bootstrap_gen
+from opentelemetry.instrumentation.asyncclick.version import (
+    __version__ as asyncclick_instrumentation_version,
+)
 
 _DISTRO = "dash0-opentelemetry"
+
+VENDORED_INSTRUMENTATIONS: dict[str, str] = {
+    "opentelemetry-instrumentation-asyncclick": asyncclick_instrumentation_version,
+}
 
 
 def _declared():
@@ -30,7 +45,9 @@ def _upstream():
 
 
 def test_every_upstream_instrumentation_is_shipped():
-    missing = sorted(set(_upstream()) - set(_declared()))
+    missing = sorted(
+        set(_upstream()) - set(_declared()) - set(VENDORED_INSTRUMENTATIONS)
+    )
 
     assert not missing, (
         f"upstream added instrumentations not declared in pyproject.toml: {missing}"
@@ -57,9 +74,49 @@ def test_installed_versions_satisfy_upstream_pins():
     mismatched = [
         f"{name}{requirement.specifier} (installed: {version(name)})"
         for name, requirement in _upstream().items()
-        if not requirement.specifier.contains(version(name), prereleases=True)
+        if name not in VENDORED_INSTRUMENTATIONS
+        and not requirement.specifier.contains(version(name), prereleases=True)
     ]
 
     assert not mismatched, (
         f"installed instrumentations do not satisfy upstream pins: {mismatched}"
+    )
+
+
+def test_vendored_instrumentations_are_not_also_installed():
+    """Two distributions owning one import path is what vendoring has to avoid."""
+    installed = []
+    for name in sorted(VENDORED_INSTRUMENTATIONS):
+        try:
+            installed.append(f"{name} {distribution(name).version}")
+        except PackageNotFoundError:
+            continue
+
+    assert not installed, (
+        f"vendored instrumentations are also installed as distributions, so the "
+        f"import path and the entry point have two owners: {installed}"
+    )
+
+
+def test_vendored_instrumentations_match_the_pinned_contrib_release():
+    """A contrib bump past the vendored copy has to fail here.
+
+    Every other test subtracts a vendored instrumentation before comparing, so
+    nothing else notices when the pinned ``opentelemetry-instrumentation``
+    moves on. A vendored copy left behind runs against a ``BaseInstrumentor``
+    and an ``opentelemetry.instrumentation.utils`` it was never validated with,
+    and the ``remove_at`` field of its ``UPSTREAM`` file never fires.
+    """
+    pinned = version("opentelemetry-instrumentation")
+    behind = {
+        name: vendored
+        for name, vendored in sorted(VENDORED_INSTRUMENTATIONS.items())
+        if vendored != pinned
+    }
+
+    assert not behind, (
+        f"opentelemetry-instrumentation is pinned at {pinned} and these vendored "
+        f"instrumentations were taken from another release: {behind}. Re-vendor "
+        f"them, or restore the upstream dependency and delete the vendored tree "
+        f"as the UPSTREAM file beside it describes."
     )

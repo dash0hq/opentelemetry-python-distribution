@@ -146,7 +146,7 @@ asyncclick = "opentelemetry.instrumentation.asyncclick:AsyncClickInstrumentor"
 [dependency-groups]
 dev = [
   "anyio>=4.0",
-  "asyncclick>=8.0",
+  "asyncclick~=8.0",
   "pytest>=9.2.0",
 ]
 

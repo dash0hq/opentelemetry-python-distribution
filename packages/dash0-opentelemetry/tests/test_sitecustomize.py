@@ -1309,9 +1309,11 @@ WORKSPACE_ROOT = os.path.normpath(os.path.join(TESTS_DIR, "..", "..", ".."))
 
 
 class TestShadowedUpstreamPackagesAreDetected(unittest.TestCase):
-    """The pyproto packages ship under Dash0-owned distribution names while
-    keeping the upstream import paths, so the application's copy of the
-    upstream distribution has a different name and the same import path."""
+    """Some shipped packages keep an upstream import path under a Dash0-owned
+    distribution name, so the application's copy of the upstream distribution
+    has a different name and the same import path. The pyproto packages do it
+    for the exporters, and dash0-opentelemetry does it for the vendored
+    asyncclick instrumentation."""
 
     def setUp(self):
         self.original_env = os.environ.copy()
@@ -1328,8 +1330,12 @@ class TestShadowedUpstreamPackagesAreDetected(unittest.TestCase):
         os.environ.update(self.original_env)
         sys.path = self.original_sys_path.copy()
 
-    def shipped_pyproto_distributions(self):
+    def shipped_distributions_that_shadow_upstream(self):
         return [
+            make_dist(
+                "dash0-opentelemetry",
+                "/mock/site-packages/dash0_opentelemetry.dist-info",
+            ),
             make_dist(
                 "dash0-opentelemetry-pyproto",
                 "/mock/site-packages/dash0_opentelemetry_pyproto.dist-info",
@@ -1369,7 +1375,7 @@ class TestShadowedUpstreamPackagesAreDetected(unittest.TestCase):
                         with patch(
                             "importlib.metadata.distributions",
                             side_effect=create_distributions_side_effect(
-                                self.shipped_pyproto_distributions(), app
+                                self.shipped_distributions_that_shadow_upstream(), app
                             ),
                         ):
                             with patch(
@@ -1387,10 +1393,11 @@ class TestShadowedUpstreamPackagesAreDetected(unittest.TestCase):
                                         spec.loader.exec_module(module)
         return stream.getvalue(), expected_report
 
-    def test_upstream_exporters_shadowed_by_pyproto_are_detected(self):
+    def test_shadowed_upstream_distributions_are_detected(self):
         """Each of these owns an import path one of the shipped packages also
         owns, so both in one process is double instrumentation."""
         shadowed = [
+            "opentelemetry-instrumentation-asyncclick",
             "opentelemetry-proto",
             "opentelemetry-exporter-otlp-proto-common",
             "opentelemetry-exporter-otlp-proto-grpc",

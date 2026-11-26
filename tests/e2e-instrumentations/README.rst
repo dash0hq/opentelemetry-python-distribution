@@ -12,9 +12,9 @@ actually emits, so an upstream release that renames a span, drops an attribute
 or stops wiring up a handler passes every test that runs today.
 
 Each test here installs the distribution into a container, runs a real
-application under ``opentelemetry-instrument``, and asserts on the spans and
-log records that reach an OTLP sink. A case cannot pass unless the
-distribution really produced the telemetry.
+application against it, and asserts on the spans and log records that reach an
+OTLP sink. A case cannot pass unless the distribution really produced the
+telemetry.
 
 The suite is Go because the sink and its query API come from
 ``github.com/open-telemetry/opentelemetry-packaging/testutil/otelsink``, which
@@ -32,22 +32,33 @@ that reaches the sink got there through auto-instrumentation.
 ``requirements.txt`` names the library to install, pinned. It is empty for a
 case that exercises the standard library.
 
-Four cases run today, one per distinct telemetry shape rather than one per
+Six cases run today, one per distinct telemetry shape rather than one per
 shipped package:
 
 .. list-table::
    :header-rows: 1
 
    * - Case
+     - Started as
      - What it covers
    * - ``flask``
+     - ``opentelemetry-instrument``
      - a web framework producing a ``SERVER`` span named after the route template
    * - ``requests``
+     - ``opentelemetry-instrument``
      - an HTTP client producing a ``CLIENT`` span
    * - ``sqlite3``
+     - ``opentelemetry-instrument``
      - the ``opentelemetry-instrumentation-dbapi`` machinery every SQL driver in the distribution goes through
    * - ``logging``
+     - ``opentelemetry-instrument``
      - the log pipeline, and the trace context a record picks up from the span it was emitted inside
+   * - ``asyncclick``
+     - ``opentelemetry-instrument``
+     - the one instrumentor the distribution carries as source instead of installing
+   * - ``injected-wrapt2``
+     - injected
+     - an application holding wrapt 2.x, instrumented through the injected tree
 
 How a case runs
 ===============
@@ -72,22 +83,72 @@ no such choice. Every distribution the workspace builds is installed from
 ``packages/``; the upstream ``opentelemetry-*`` dependencies and the per-case
 pins in ``requirements.txt`` still resolve from the index, which is intended.
 
+The two ways a case is started
+==============================
+
+``harness.Run`` builds ``Dockerfile`` and starts the case under
+``opentelemetry-instrument``. That is how an application which installed the
+distribution itself runs.
+
+``harness.RunInjected`` builds ``Dockerfile.injected`` and starts the case with
+plain ``python``, with the distribution on ``PYTHONPATH``. That is how the
+dash0-operator runs an application it injected into. The image installs the
+distribution with ``pip install --target /dash0`` and copies
+``sitecustomize.py`` and ``all-dependencies.txt`` to the root of that tree,
+which are the two copies a consumer makes. The case requirements go into the
+ordinary site-packages instead, so the application's own dependencies sit
+where an application's dependencies really sit.
+
+Only the injected mode runs ``sitecustomize.py``, so only the injected mode
+reaches the safety checks: the Python version gate, the double-instrumentation
+check, and the dependency-conflict check against ``all-dependencies.txt``. A
+case started under ``opentelemetry-instrument`` never reads that manifest.
+
+``run_injected_case.py`` sets ``PYTHONPATH`` itself rather than the image
+setting it, which keeps the runner process out of the tree. Set in the image,
+``sitecustomize.py`` would run twice: once in the runner, initializing an SDK
+that the following ``exec`` discards, and once in the application.
+
+Why the injected case pins wrapt 2.5.2
+======================================
+
+``injected-wrapt2`` is the regression test for issue 189. The injected tree
+ships ``wrapt == 1.17.3``, the application installs ``wrapt == 2.5.2``, and
+``sitecustomize.py`` puts the tree last on ``sys.path``, so the wrapt the
+instrumentations import is the application's.
+
+Two things have to hold, and the case fails differently for each. The
+dependency-conflict check has to accept 2.5.2, or the distribution deactivates
+and nothing reaches the sink at all. The instrumentations then have to work
+against wrapt 2.x at runtime, which is what the spans the test asserts show.
+The ``CREATE``, ``INSERT`` and ``SELECT`` spans come from an instrumentation
+installed as a dependency and the ``checkout`` span from the vendored one, and
+both wrap through the application's wrapt.
+
+The first of the two failed before the fix. ``all-dependencies.txt`` carried a
+``wrapt ~= 1.0`` term that ``opentelemetry-instrumentation-asyncclick`` 0.66b2
+contributed, the case exited zero having emitted nothing, and stderr carried
+``cannot auto-instrument Python process: dependency conflicts: wrapt (requires
+<3.0.0,>=1.0.0,>=1.11.2,>=1.12.1,~=1.0, found 2.5.2)``.
+
 Why the container does not start the application directly
 =========================================================
 
-``CMD`` runs ``run_case.py``, not the case. The sink listens on the host, and
+``CMD`` runs a runner script, not the case. The sink listens on the host, and
 the container reaches it over a reverse SSH tunnel that testcontainers only
 establishes in a ``PostReadies`` hook, meaning after the container reports
 ready. An application that exported at startup would export into a tunnel that
 does not exist yet, the connection would be refused, and the test would time
 out waiting for telemetry that was emitted and dropped.
 
-So ``run_case.py`` writes a marker line, which is the wait strategy the harness
-uses, then blocks until the sink's port accepts a connection, then replaces
-itself with ``opentelemetry-instrument python /app/app.py``. The harness waits
-for the container to exit separately, with ``wait.ForExit``.
+So ``sink_gate.py`` writes a marker line, which is the wait strategy the
+harness uses, then blocks until the sink's port accepts a connection. Both
+runners call it and then replace themselves with the case:
+``run_case.py`` with ``opentelemetry-instrument python /app/app.py``, and
+``run_injected_case.py`` with ``python /app/app.py``. The harness waits for
+the container to exit separately, with ``wait.ForExit``.
 
-The marker string is duplicated: ``READY_MARKER`` in ``run_case.py`` and
+The marker string is duplicated: ``READY_MARKER`` in ``sink_gate.py`` and
 ``readyMarker`` in ``harness/harness.go``. They have to stay equal.
 
 Why every query is filtered by a resource attribute
@@ -143,8 +204,9 @@ Adding a case
 
 Write ``cases/<name>/app.py`` and ``cases/<name>/requirements.txt``, then add a
 function to ``instrumentations_test.go`` that calls ``harness.Run`` with
-``<name>`` and asserts on what the sink received. Nothing else needs changing,
-as long as the case runs self-contained.
+``<name>`` and asserts on what the sink received. Call ``harness.RunInjected``
+instead for a case about the injected tree. Nothing else needs changing, as
+long as the case runs self-contained.
 
 Keep the application deterministic and short. It has to exit on its own, since
 a clean interpreter exit is what flushes the batch processors, and a case that

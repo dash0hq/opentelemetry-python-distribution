@@ -38,7 +38,7 @@ dependencies = [
   "dash0-opentelemetry-exporter-otlp-pyproto-http == 1.44.0.post2",
   "dash0-opentelemetry-exporter-otlp-pyproto-grpc == 1.44.0.post2",
   "dash0-opentelemetry-configuration == 0.66b2.post1",
-  "pyyaml >=5.1",
+  "pyyaml>=6.0.4",
 
   # --- Curated instrumentation set ---
   # The full upstream auto-instrumentation list (the bootstrap_gen module of

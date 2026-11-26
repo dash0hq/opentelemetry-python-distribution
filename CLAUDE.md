@@ -51,14 +51,24 @@ Update the relevant doc file whenever a PR:
 
 **Never maintain `docs/auto-instrumentation.md` by hand.** Always derive the
 library table from the actual dependency block in
-`packages/dash0-opentelemetry/pyproject.toml`.
+`packages/dash0-opentelemetry/pyproject.toml`, plus the instrumentations the
+distribution carries as source rather than as a dependency.
 
 To regenerate the list:
 
 ```bash
 grep 'opentelemetry-instrumentation-' packages/dash0-opentelemetry/pyproject.toml \
   | sed 's/.*"\(opentelemetry-instrumentation-[a-z0-9_-]*\).*/\1/'
+ls packages/dash0-opentelemetry/src/opentelemetry/instrumentation/ \
+  | sed 's/^/opentelemetry-instrumentation-/'
 ```
+
+The second command is what the first one cannot see.
+A vendored instrumentation is absent from the dependency block and its import
+path spells the name with dots, so the grep misses it and regenerating from the
+grep alone deletes its row.
+Each directory it prints has an `UPSTREAM` file recording where the source came
+from and when the dependency returns.
 
 Map each package name to its target library using the
 [opentelemetry-python-contrib instrumentation index](https://github.com/open-telemetry/opentelemetry-python-contrib/tree/main/instrumentation)

@@ -4,10 +4,16 @@ Coding conventions and agentic guidelines for the Dash0 OpenTelemetry Python dis
 
 ## Project overview
 
-A `uv` workspace. The Dash0-authored code lives entirely in
+A `uv` workspace. The Dash0-authored code lives in
 `packages/dash0-opentelemetry/`. The vendored pyproto exporter packages
 (`packages/opentelemetry-*/`) are kept close to upstream; do not apply local
 style changes to them (they are excluded from linting).
+
+`packages/dash0-opentelemetry/src/opentelemetry/instrumentation/asyncclick/` is
+the one part of `packages/dash0-opentelemetry/` that is not Dash0-authored. It
+is upstream contrib source carried verbatim, excluded from linting by
+`ruff.toml`, and pinned by a `SHA256SUMS` digest a test recomputes, so do not
+edit it. Its `UPSTREAM` file records where it came from and how to remove it.
 
 ## Coding conventions
 

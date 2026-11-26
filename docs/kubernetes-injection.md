@@ -42,7 +42,7 @@ Some shipped distributions keep an upstream import path and an upstream entry po
 | `dash0-opentelemetry-exporter-otlp-pyproto-grpc` | `opentelemetry.exporter.otlp.proto.grpc` | `opentelemetry-exporter-otlp-proto-grpc`, `opentelemetry-exporter-otlp` |
 | `dash0-opentelemetry-exporter-otlp-pyproto-http` | `opentelemetry.exporter.otlp.proto.http` | `opentelemetry-exporter-otlp-proto-http`, `opentelemetry-exporter-otlp` |
 
-The `dash0-opentelemetry` row holds while the asyncclick instrumentation is carried as source instead of as a dependency, which lasts until a contrib release carrying open-telemetry/opentelemetry-python-contrib#5117 exists.
+The `dash0-opentelemetry` row holds while the asyncclick instrumentation is now vendored, which will be until a contrib release carrying open-telemetry/opentelemetry-python-contrib#5117 exists.
 
 Finding any of the upstream names in the application counts as double instrumentation, because two distributions would then provide the same modules and register the same entry points.
 

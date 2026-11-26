@@ -18,6 +18,11 @@
 // attributes, the log pipeline, and the command span of the one instrumentor
 // this distribution carries as source.
 //
+// One further case runs the distribution the way the operator does, injected
+// onto PYTHONPATH rather than through opentelemetry-instrument, in an
+// application that holds a dependency version the injected tree also ships.
+// harness.RunInjected selects that mode.
+//
 // Adding an instrumentation that runs self-contained is a cases/<name>/app.py,
 // a cases/<name>/requirements.txt, and a function here. An instrumentation
 // that needs a backing service takes more than that: harness.Run starts one
@@ -33,6 +38,7 @@ import (
 
 	"github.com/open-telemetry/opentelemetry-packaging/testutil/otelsink"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
@@ -174,6 +180,41 @@ func TestAsyncClick(t *testing.T) {
 		invocation.WithSpanAttributeValue("process.executable.name", "/app/app.py").Len(),
 		"the command span carries no process.executable.name")
 	assertIntSpanAttribute(t, invocation.Spans(), "process.exit.code", 0)
+	assertServiceName(t, sink)
+}
+
+// TestInjectedTreeWithWrapt2 asserts that an application holding wrapt 2.x is
+// still instrumented when the distribution is injected onto its PYTHONPATH.
+//
+// This is the case open-telemetry/opentelemetry-python-contrib#5117 and issue
+// 189 are about. Before the fix, the wrapt ~= 1.0 term that
+// opentelemetry-instrumentation-asyncclick 0.66b2 contributed to
+// all-dependencies.txt made sitecustomize.py deactivate the whole
+// distribution, and this case would reach the sink with nothing at all.
+func TestInjectedTreeWithWrapt2(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	sink := harness.RunInjected(t, ctx, "injected-wrapt2")
+
+	traces := sink.WaitForTraces(t, harness.ExportTimeout, func(tr *otelsink.Traces) bool {
+		return tr.WithName("checkout").Len() > 0 &&
+			tr.WithKind(tracepb.Span_SPAN_KIND_CLIENT).Len() >= 3
+	})
+
+	invocation := traces.WithName("checkout").Spans()
+	require.Len(t, invocation, 1, "the asyncclick command span did not reach the sink")
+
+	statements := traces.WithKind(tracepb.Span_SPAN_KIND_CLIENT)
+	assert.ElementsMatch(t, []string{"CREATE", "INSERT", "SELECT"}, statements.Names(),
+		"the statement spans are not named after the operation")
+	assert.Equal(t, 3, statements.WithSpanAttributeValue("db.system", "sqlite").Len(),
+		"not every statement span carries db.system=sqlite")
+
+	for _, statement := range statements.Spans() {
+		assert.Equal(t, invocation[0].Span.GetSpanId(), statement.Span.GetParentSpanId(),
+			"the %s span is not a child of the command span", statement.Span.GetName())
+	}
 	assertServiceName(t, sink)
 }
 

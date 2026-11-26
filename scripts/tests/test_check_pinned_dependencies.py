@@ -17,6 +17,17 @@ def violations_for(dependencies, closure=None):
     return policy_violations({"dependencies": dependencies}, WORKSPACE, closure or {})
 
 
+def violations_for_extra(requirements, dependencies=None, closure=None):
+    return policy_violations(
+        {
+            "dependencies": dependencies or [],
+            "optional-dependencies": {"instruments": requirements},
+        },
+        WORKSPACE,
+        closure or {},
+    )
+
+
 def test_an_exact_pin_satisfies_the_policy():
     assert violations_for(["psutil == 7.2.2"]) == []
 
@@ -60,6 +71,43 @@ def test_the_rejection_message_carries_the_reason_from_the_table():
 
 def test_an_exempt_name_is_skipped_by_the_closure_check():
     assert violations_for(["pyyaml >=5.1"], {"pyyaml": "6.0.3"}) == []
+
+
+def test_an_exempt_name_in_an_extra_must_also_carry_the_table_specifier():
+    required, _ = EXEMPT_FROM_EXACT_PIN["asyncclick"]
+    assert violations_for_extra([f"asyncclick {required}"]) == []
+
+
+def test_an_exempt_name_in_an_extra_with_a_different_specifier_is_rejected():
+    problems = violations_for_extra(["asyncclick ~= 9.0"])
+    assert len(problems) == 1
+    assert problems[0].startswith("[instruments]:")
+    assert "must be declared as 'asyncclick ~=8.0'" in problems[0]
+
+
+def test_an_exempt_name_in_an_extra_without_its_specifier_is_rejected():
+    problems = violations_for_extra(["asyncclick"])
+    assert len(problems) == 1
+    assert "must be declared as 'asyncclick ~=8.0'" in problems[0]
+
+
+def test_an_exact_pin_in_an_extra_still_satisfies_the_policy():
+    assert violations_for_extra(["psutil == 7.2.2"]) == []
+
+
+def test_a_range_in_an_extra_for_a_name_with_no_exemption_is_rejected():
+    problems = violations_for_extra(["psutil >= 7.2.2"])
+    assert len(problems) == 1
+    assert "neither pinned to an exact version" in problems[0]
+
+
+def test_an_extra_re_referencing_a_base_pin_needs_no_pin_of_its_own():
+    assert (
+        violations_for_extra(
+            ["psutil"], dependencies=["psutil == 7.2.2"], closure={"psutil": "7.2.2"}
+        )
+        == []
+    )
 
 
 def test_a_closure_entry_missing_from_dependencies_is_a_violation():

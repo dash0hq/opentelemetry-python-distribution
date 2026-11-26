@@ -15,6 +15,25 @@ are compiled.
 
 .. <!-- next version -->
 
+0.4.1 - 2026-11-26
+========================================
+
+Bug Fixes
+---------
+
+- ``distro``: Percent-decode headers_list in a declarative configuration file, so Authorization=Bearer%20<token> sends Bearer <token> as it does from OTEL_EXPORTER_OTLP_HEADERS (`#125 <https://github.com/dash0hq/opentelemetry-python-distribution/issues/125>`__, `#126 <https://github.com/dash0hq/opentelemetry-python-distribution/issues/126>`__)
+- ``distro``: Instrument applications where wrapt 2.x is installed (`#124 <https://github.com/dash0hq/opentelemetry-python-distribution/issues/124>`__)
+
+  ``all-dependencies.txt`` carried ``wrapt<3.0.0,>=1.0.0,>=1.11.2,>=1.12.1,~=1.0``,
+  the ``~=1.0`` term made the bootstrap deactivate the whole distribution for
+  any application on wrapt 2.x.
+  
+  ``opentelemetry-instrumentation-asyncclick`` 0.66b2 is the component with ~=1.0.
+  
+  This change vendors the asyncclick instrumentation to avoid affecting customers
+  who use this instrumentation.
+  
+
 0.4.0 - 2026-11-24
 ========================================
 

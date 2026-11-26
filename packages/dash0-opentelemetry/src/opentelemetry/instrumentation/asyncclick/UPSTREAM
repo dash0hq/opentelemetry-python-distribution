@@ -46,8 +46,8 @@ removal = Every step. Only two of them fail CI on their own, the wheel-contents
     Drop the asyncclick paragraph from docs/auto-instrumentation.md, the
     asyncclick row and the paragraph under it from docs/kubernetes-injection.md,
     the asyncclick deviation bullet from packages/dash0-opentelemetry/README.rst,
-    the asyncclick clauses from the project-layout bullet and the linting
-    sentence of CONTRIBUTING.rst, and from the root CLAUDE.md the second
+    asyncclick's name from the project-layout bullet of CONTRIBUTING.rst, and
+    from the root CLAUDE.md the second
     derivation command with the paragraph under it, the clause about
     instrumentations carried as source, and asyncclick's name in the list of
     vendored paths.

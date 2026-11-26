@@ -15,7 +15,8 @@
 // One case per distinct telemetry shape is covered here rather than one per
 // shipped package: a web framework producing a server span, an HTTP client
 // producing a client span, a DB-API driver producing a client span with db
-// attributes, and the log pipeline.
+// attributes, the log pipeline, and the command span of the one instrumentor
+// this distribution carries as source.
 //
 // Adding an instrumentation that runs self-contained is a cases/<name>/app.py,
 // a cases/<name>/requirements.txt, and a function here. An instrumentation
@@ -146,6 +147,34 @@ func TestLogging(t *testing.T) {
 		assert.Equal(t, spans[0].Span.GetTraceId(), record.Record.GetTraceId(),
 			"the log record does not carry the trace id of the span it was emitted inside")
 	}
+}
+
+// TestAsyncClick asserts the span an instrumented asyncclick command produces.
+//
+// The instrumentor comes from the source this distribution carries in
+// packages/dash0-opentelemetry/src/opentelemetry/instrumentation/asyncclick,
+// so this is the only case whose span no installed
+// opentelemetry-instrumentation-* package could have produced.
+func TestAsyncClick(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	sink := harness.Run(t, ctx, "asyncclick")
+
+	traces := sink.WaitForTraces(t, harness.ExportTimeout, func(tr *otelsink.Traces) bool {
+		return tr.WithName("checkout").Len() > 0
+	})
+	invocation := traces.WithName("checkout")
+
+	assert.Equal(t, 1, invocation.WithKind(tracepb.Span_SPAN_KIND_INTERNAL).Len(),
+		"the command span is not a single INTERNAL span")
+	assert.Positive(t, invocation.WithSpanAttribute("process.command_args").Len(),
+		"the command span carries no process.command_args")
+	assert.Positive(t,
+		invocation.WithSpanAttributeValue("process.executable.name", "/app/app.py").Len(),
+		"the command span carries no process.executable.name")
+	assertIntSpanAttribute(t, invocation.Spans(), "process.exit.code", 0)
+	assertServiceName(t, sink)
 }
 
 // assertIntSpanAttribute checks that the named attribute is carried as an

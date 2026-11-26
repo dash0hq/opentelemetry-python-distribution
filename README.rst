@@ -27,7 +27,7 @@ What you get
   application starts.
 - **The full contrib instrumentation set built in**: every upstream
   auto-instrumentation package (plus the X-Ray propagator) ships with the
-  distribution, pinned to a single contrib version, so no
+  distribution, pinned to one validated set of versions, so no
   ``opentelemetry-bootstrap`` step is needed and only instrumentations whose
   target library is installed activate.
 - **Pure-Python OTLP export** with no ``google.protobuf``/``grpcio``

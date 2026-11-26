@@ -148,13 +148,17 @@ jobs:
           uv build --all-packages --out-dir dist \
             --build-constraints scripts/build-constraints.txt
           ls -l dist
-      - name: Check the distro wheel ships the injector files
+      - name: Check the distro wheel ships the injector files and the vendored instrumentations
         run: |
           set -euo pipefail
           wheel=$(ls dist/dash0_opentelemetry-*.whl)
           contents=$(unzip -Z1 "$wheel")
-          for name in sitecustomize.py all-dependencies.txt; do
-            path="dash0/opentelemetry/injector/$name"
+          for path in \
+            dash0/opentelemetry/injector/sitecustomize.py \
+            dash0/opentelemetry/injector/all-dependencies.txt \
+            opentelemetry/instrumentation/asyncclick/__init__.py \
+            opentelemetry/instrumentation/asyncclick/package.py \
+            opentelemetry/instrumentation/asyncclick/version.py; do
             if ! grep -qxF "$path" <<<"$contents"; then
               echo "::error::$wheel does not ship $path"
               exit 1

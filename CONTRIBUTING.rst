@@ -17,12 +17,14 @@ Project layout
 
 - ``packages/dash0-opentelemetry`` — the distribution: ``Dash0Distro``
   and ``Dash0Configurator`` plus resource detection and settings. **This is the
-  Dash0-authored code**, apart from
-  ``src/opentelemetry/instrumentation/asyncclick``, which is upstream contrib
-  source carried verbatim. Treat that directory as vendored: it is excluded
-  from linting and a ``SHA256SUMS`` digest beside it is checked by a test, so
-  it takes no local style changes. Its ``UPSTREAM`` file records where it came
-  from and how to remove it.
+  Dash0-authored code**, apart from three paths that carry upstream source
+  verbatim and are excluded from linting:
+  ``src/opentelemetry/instrumentation/asyncclick``,
+  ``src/dash0/opentelemetry/injector/_packaging`` and the
+  ``tests/test_packaging_*.py`` that come with it. Treat all three as vendored
+  and apply no local style changes. The asyncclick directory also carries a
+  ``SHA256SUMS`` digest a test recomputes, and an ``UPSTREAM`` file recording
+  where the source came from and how to remove it.
 - ``packages/opentelemetry-*`` — the pure-Python (pyproto) OTLP exporter
   packages, vendored from ``packaging/common/python/vendor`` in
   `open-telemetry/opentelemetry-packaging
@@ -70,9 +72,8 @@ Both suites run in CI (see ``.github/workflows/``).
 Linting and formatting
 =====================
 
-Lint and format checks apply to the Dash0-authored code only (the vendored
-pyproto packages and the vendored asyncclick instrumentation are excluded via
-``ruff.toml``):
+Lint and format checks apply to the Dash0-authored code only (every vendored
+tree is excluded via ``ruff.toml``):
 
 .. code-block:: bash
 

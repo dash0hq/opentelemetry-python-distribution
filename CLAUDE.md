@@ -9,11 +9,14 @@ A `uv` workspace. The Dash0-authored code lives in
 (`packages/opentelemetry-*/`) are kept close to upstream; do not apply local
 style changes to them (they are excluded from linting).
 
-`packages/dash0-opentelemetry/src/opentelemetry/instrumentation/asyncclick/` is
-the one part of `packages/dash0-opentelemetry/` that is not Dash0-authored. It
-is upstream contrib source carried verbatim, excluded from linting by
-`ruff.toml`, and pinned by a `SHA256SUMS` digest a test recomputes, so do not
-edit it. Its `UPSTREAM` file records where it came from and how to remove it.
+Three paths inside `packages/dash0-opentelemetry/` are upstream source carried
+verbatim rather than Dash0-authored, and `ruff.toml` excludes all three:
+`src/opentelemetry/instrumentation/asyncclick/`,
+`src/dash0/opentelemetry/injector/_packaging/`, and the
+`tests/test_packaging_*.py` that come with it. Do not apply the conventions
+below to any of them, and do not edit them at all except to re-vendor. The
+asyncclick tree also carries a `SHA256SUMS` digest that a test recomputes, and
+an `UPSTREAM` file recording where the source came from and how to remove it.
 
 ## Coding conventions
 

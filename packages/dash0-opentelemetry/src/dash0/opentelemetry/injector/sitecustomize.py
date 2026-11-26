@@ -57,6 +57,9 @@ double_instrumentation_check_excluded_packages = [
 # Keyed by the shipped distribution name, listing the upstream distributions it
 # stands in for. Keep this in step with the packages/ directory.
 upstream_packages_shadowed_by_shipped_packages = {
+    "dash0-opentelemetry": [
+        "opentelemetry-instrumentation-asyncclick",
+    ],
     "dash0-opentelemetry-pyproto": [
         "opentelemetry-proto",
     ],

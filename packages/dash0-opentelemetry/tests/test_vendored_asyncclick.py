@@ -21,7 +21,9 @@ from re import match as re_match
 
 from asyncclick import command, echo
 from asyncclick.testing import CliRunner
+from dash0.opentelemetry.injector._packaging.requirements import Requirement
 from opentelemetry.instrumentation.asyncclick import AsyncClickInstrumentor
+from opentelemetry.instrumentation.asyncclick.package import _instruments
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
@@ -135,6 +137,17 @@ def test_the_instruments_extra_gates_the_instrumentor():
     assert len(gating) == 1, (
         f"dash0-opentelemetry must declare asyncclick under the 'instruments' "
         f"extra exactly once: {gating}"
+    )
+
+    declared = Requirement(gating[0].split(";", 1)[0])
+    vendored = Requirement(_instruments[0])
+
+    assert (declared.name, declared.specifier) == (vendored.name, vendored.specifier), (
+        f"the 'instruments' extra admits {declared} while the vendored "
+        f"instrumentor declares {vendored}. The extra is the only gate "
+        f"_load_instrumentors consults, and it then loads with "
+        f"skip_dep_check=True, so a wider extra runs the instrumentor against "
+        f"an asyncclick its own _instruments rejects."
     )
 
 

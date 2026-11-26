@@ -13,7 +13,8 @@ reason = 0.66b2 declares wrapt ~= 1.0, which is the only term in the injected
 removal = Every step. Only two of them fail CI on their own, the wheel-contents
     step and uv lock --check; the rest leave dead code or stale prose that
     nothing catches. Grep the repository for asyncclick afterwards. The hits
-    left should be CHANGELOG.rst, .chloggen, uv.lock, and the docstring of
+    left should be CHANGELOG.rst, .chloggen, uv.lock, tests/e2e-instrumentations
+    as described below, and the docstring of
     test_wrapt_accepts_what_opentelemetry_instrumentation_declares in
     packages/dash0-opentelemetry/tests/test_all_dependencies_manifest.py, which
     records why that line asserts what it does and stays true afterwards.
@@ -51,6 +52,18 @@ removal = Every step. Only two of them fail CI on their own, the wheel-contents
     derivation command with the paragraph under it, the clause about
     instrumentations carried as source, and asyncclick's name in the list of
     vendored paths.
+
+    Delete no case under tests/e2e-instrumentations. The asyncclick case covers
+    the instrumentation whichever way it is supplied, and injected-wrapt2
+    covers the injected tree against wrapt 2.x, which was never
+    asyncclick-specific. Four places there call the instrumentor vendored and
+    stop being true: the docstring of
+    tests/e2e-instrumentations/cases/asyncclick/app.py, the TestAsyncClick doc
+    comment and the package doc comment of
+    tests/e2e-instrumentations/instrumentations_test.go, and in
+    tests/e2e-instrumentations/README.rst both the asyncclick row of the case
+    table and the paragraph of "Why the injected case pins wrapt 2.5.2" that
+    names the vendored span.
 
     Then run uv lock, which the uv lock --check job requires, and regenerate
     all-dependencies.txt.

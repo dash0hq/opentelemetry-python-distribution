@@ -21,7 +21,8 @@ subtext: |
   ``OTEL_EXPORTER_OTLP_LOGS_ENDPOINT`` as well, whenever the user set them and
   the signal exports over OTLP. A signal whose exporter is ``none``, ``console``
   or anything else that is not an OTLP exporter never parses its endpoint, so
-  that endpoint is left alone.
+  that endpoint is left alone, and when no signal at all exports over OTLP the
+  shared endpoint is left alone too.
 
   Declarative configuration builds its exporters from the configuration file and
   reads none of these variables, so under ``OTEL_CONFIG_FILE``, or under the

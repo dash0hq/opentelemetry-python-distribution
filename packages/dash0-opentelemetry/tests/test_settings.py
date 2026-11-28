@@ -8,6 +8,8 @@ from dash0.opentelemetry._environment_variables import (
     OTEL_EXPORTER_OTLP_METRICS_ENDPOINT,
     OTEL_EXPORTER_OTLP_TRACES_ENDPOINT,
     OTEL_LOGS_EXPORTER,
+    OTEL_METRICS_EXPORTER,
+    OTEL_TRACES_EXPORTER,
 )
 from dash0.opentelemetry.settings import evaluate_gate, is_false, is_true
 from opentelemetry.sdk.environment_variables import OTEL_CONFIG_FILE
@@ -23,6 +25,8 @@ def _clean_env(monkeypatch):
     monkeypatch.delenv(OTEL_EXPORTER_OTLP_METRICS_ENDPOINT, raising=False)
     monkeypatch.delenv(OTEL_EXPORTER_OTLP_LOGS_ENDPOINT, raising=False)
     monkeypatch.delenv(OTEL_LOGS_EXPORTER, raising=False)
+    monkeypatch.delenv(OTEL_METRICS_EXPORTER, raising=False)
+    monkeypatch.delenv(OTEL_TRACES_EXPORTER, raising=False)
 
 
 @pytest.mark.parametrize(
@@ -241,6 +245,35 @@ def test_gate_disabled_by_a_rejected_endpoint_when_the_config_file_variable_is_e
 
     assert enabled is False
     assert OTEL_EXPORTER_OTLP_TRACES_ENDPOINT in reason
+
+
+@pytest.mark.parametrize("exporter", ["console", "none"])
+def test_gate_enabled_by_a_rejected_base_url_when_no_signal_uses_otlp(
+    monkeypatch, exporter
+):
+    monkeypatch.setenv(DASH0_OTEL_COLLECTOR_BASE_URL, "http://[::1:4318")
+    monkeypatch.setenv(OTEL_TRACES_EXPORTER, exporter)
+    monkeypatch.setenv(OTEL_METRICS_EXPORTER, exporter)
+    monkeypatch.setenv(OTEL_LOGS_EXPORTER, exporter)
+
+    enabled, reason = evaluate_gate()
+
+    assert enabled is True
+    assert reason is None
+
+
+def test_gate_disabled_by_a_rejected_base_url_when_one_signal_still_uses_otlp(
+    monkeypatch,
+):
+    monkeypatch.setenv(DASH0_OTEL_COLLECTOR_BASE_URL, "http://[::1:4318")
+    monkeypatch.setenv(OTEL_TRACES_EXPORTER, "console")
+    monkeypatch.setenv(OTEL_METRICS_EXPORTER, "console")
+    monkeypatch.setenv(OTEL_LOGS_EXPORTER, "otlp")
+
+    enabled, reason = evaluate_gate()
+
+    assert enabled is False
+    assert DASH0_OTEL_COLLECTOR_BASE_URL in reason
 
 
 def test_gate_enabled_by_per_signal_endpoints_that_parse(monkeypatch):

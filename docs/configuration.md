@@ -4,7 +4,7 @@
 
 | Variable | Effect |
 |---|---|
-| `DASH0_OTEL_COLLECTOR_BASE_URL` | **Required.** OTLP endpoint to export to. If unset, the distribution disables itself entirely and sets `OTEL_SDK_DISABLED=true`. A value `urlparse` rejects, such as `http://[::1:4318` with its closing bracket missing, disables the distribution the same way and is named in the warning, unless `OTEL_EXPORTER_OTLP_ENDPOINT` holds a value that parses, which is then the endpoint the gate checks. |
+| `DASH0_OTEL_COLLECTOR_BASE_URL` | **Required.** OTLP endpoint to export to. If unset, the distribution disables itself entirely and sets `OTEL_SDK_DISABLED=true`. A value `urlparse` rejects, such as `http://[::1:4318` with its closing bracket missing, disables the distribution the same way and is named in the warning, unless `OTEL_EXPORTER_OTLP_ENDPOINT` holds a value that parses, which is then the endpoint the gate checks, or unless no signal exports over OTLP, in which case nothing reads the value. |
 | `DASH0_DISABLE` | Set to `true` to disable the distribution entirely. The SDK becomes a no-op. |
 | `DASH0_AUTOMATIC_SERVICE_NAME` | Set to `false` to opt out of detected `service.name` and `service.version`. |
 | `DASH0_BOOTSTRAP_SPAN` | Name of a single span to emit once at startup. Useful for confirming the distribution is active. |

@@ -413,6 +413,42 @@ def test_a_django_manage_script_supplies_no_fallback_name(monkeypatch):
     assert detect_fallback_service_name() is None
 
 
+@pytest.mark.parametrize("script", ["uvicorn.exe", "gunicorn.exe", "fastapi.exe"])
+def test_a_runner_installed_as_a_windows_executable_supplies_no_fallback_name(
+    monkeypatch, script
+):
+    """``uvicorn.exe`` used to become the service name, defeating the list."""
+    monkeypatch.setattr(resource_module.sys, "argv", [f"/opt/venv/Scripts/{script}"])
+
+    assert detect_fallback_service_name() is None
+
+
+def test_a_windows_console_script_still_names_the_distribution(monkeypatch):
+    """The entry point is declared as ``checkout``, so ``.exe`` has to come off."""
+    monkeypatch.setattr(resource_module.sys, "argv", ["/opt/venv/Scripts/checkout.exe"])
+    monkeypatch.setattr(
+        resource_module,
+        "distributions",
+        lambda: [_FakeDistribution("checkout-service", "2.4.0", ("checkout",))],
+    )
+
+    assert detect_service_metadata() == ("checkout-service", "2.4.0")
+
+
+def test_a_windowed_source_script_keeps_its_name_and_claims_no_distribution(
+    monkeypatch,
+):
+    monkeypatch.setattr(resource_module.sys, "argv", ["/opt/app/server.pyw"])
+    monkeypatch.setattr(
+        resource_module,
+        "distributions",
+        lambda: [_FakeDistribution("server", "1.0.0", ("server",))],
+    )
+
+    assert detect_fallback_service_name() == "server"
+    assert distribution_of_running_program() is None
+
+
 def test_a_generic_runner_leaves_the_service_name_unset(monkeypatch):
     """Nothing identifies the service, so ``unknown_service`` has to stand."""
     monkeypatch.setattr(resource_module.sys, "argv", ["/usr/local/bin/gunicorn"])

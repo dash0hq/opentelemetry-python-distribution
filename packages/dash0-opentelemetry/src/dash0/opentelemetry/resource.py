@@ -88,6 +88,9 @@ _RUNNER_PROGRAMS = frozenset(
     }
 )
 
+_SOURCE_SCRIPT_SUFFIXES = (".py", ".pyw")
+_WINDOWS_EXECUTABLE_SUFFIX = ".exe"
+
 _ETC_HOSTS = "/etc/hosts"
 _K8S_HOSTS_MARKER = "# Kubernetes-managed hosts file"
 _CGROUP_V1_MOUNTINFO = "/proc/self/mountinfo"
@@ -218,6 +221,9 @@ def detect_fallback_service_name():
     ``python -m gunicorn``, so both are checked. The ``-m`` route is checked
     against the top-level package, since ``python -m flask.cli`` names the same
     runner as ``python -m flask``.
+
+    Any of ``.py``, ``.pyw`` and ``.exe`` comes off the basename before the
+    runner check, which is what a Windows entrypoint carries.
     """
     module = module_run_with_dash_m()
     if module:
@@ -230,11 +236,33 @@ def detect_fallback_service_name():
     if not argv0:
         return None
     name = path.basename(argv0)
-    if name.endswith(".py"):
-        name = name[: -len(".py")]
+    for suffix in (*_SOURCE_SCRIPT_SUFFIXES, _WINDOWS_EXECUTABLE_SUFFIX):
+        if name.endswith(suffix):
+            name = name[: -len(suffix)]
+            break
     if not name or name.startswith("-") or name in _RUNNER_PROGRAMS:
         return None
     return name
+
+
+def running_console_script_name():
+    """The name of the console script this process was started as, if it was one.
+
+    Returns ``None`` for ``python -m package``, for a source script such as
+    ``app.py`` or ``app.pyw``, and for a generic runner. The ``.exe`` of a
+    Windows console script comes off, leaving the name its ``console_scripts``
+    entry point declares.
+    """
+    if module_run_with_dash_m() is not None:
+        return None
+    script = path.basename(sys.argv[0] if sys.argv else "")
+    if script.endswith(_SOURCE_SCRIPT_SUFFIXES):
+        return None
+    if script.endswith(_WINDOWS_EXECUTABLE_SUFFIX):
+        script = script[: -len(_WINDOWS_EXECUTABLE_SUFFIX)]
+    if not script or script in _RUNNER_PROGRAMS:
+        return None
+    return script
 
 
 def distribution_of_running_program():
@@ -257,8 +285,8 @@ def distribution_of_running_program():
     """
     module = module_run_with_dash_m()
     if module is None:
-        script = path.basename(sys.argv[0] if sys.argv else "")
-        if script and not script.endswith(".py") and script not in _RUNNER_PROGRAMS:
+        script = running_console_script_name()
+        if script:
             for distribution in distributions():
                 for entry_point in distribution.entry_points:
                     if (

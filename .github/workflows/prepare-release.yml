@@ -42,18 +42,24 @@ jobs:
           go-version: stable
 
       - name: Bump versions
-        run: python3 scripts/bump_for_release.py "${{ inputs.version }}"
+        env:
+          VERSION: ${{ inputs.version }}
+        run: python3 scripts/bump_for_release.py "$VERSION"
 
       - name: Update changelog
+        env:
+          VERSION: ${{ inputs.version }}
+          DATE: ${{ inputs.date }}
         run: |
-          DATE="${{ inputs.date }}"
           [ -z "$DATE" ] && DATE=$(date +%Y-%m-%d)
-          make chlog-update VERSION="${{ inputs.version }} - $DATE"
+          make chlog-update VERSION="$VERSION - $DATE"
 
       - name: Relock
         run: uv lock
 
       - name: Commit and push
+        env:
+          VERSION: ${{ inputs.version }}
         run: |
           git config user.name d0etu
           git config user.email d0etu@users.noreply.github.com
@@ -62,5 +68,5 @@ jobs:
             echo "::error::Nothing to commit — version may already be set or changelog entries missing"
             exit 1
           fi
-          git commit -m "docs: update changelog to prepare release v${{ inputs.version }}"
+          git commit -m "docs: update changelog to prepare release v$VERSION"
           git push origin main

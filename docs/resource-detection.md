@@ -62,6 +62,15 @@ Steps 3 and 4 also supply `service.version`, from `Version` and `[project].versi
 Steps 1, 2 and 5 do not.
 No version is ever invented, because an absent version is more useful than a wrong one.
 Steps 3 and 5 both decline to name a generic runner, so a process launched by one can finish with no detected name at all.
+A `.py`, `.pyw` or `.exe` suffix comes off the basename before step 5 reports it and before the runner check reads it.
+A console script installed on Windows as `uvicorn.exe` is therefore recognised as the runner `uvicorn`.
+
+Step 4 moves ahead of step 3 when the console script that started the process carries a name different from the distribution that declared it.
+`circus` declares `circusd` and `pyramid` declares `pserve`, which is the shape of a launcher rather than of an application.
+An application packaged from its own `pyproject.toml` usually declares a script named after itself, so the two names agree and step 3 keeps its place.
+The installed distribution still supplies the name when no `pyproject.toml` above the script names a project, which is the usual case in a deployed container.
+The reordering covers the console-script route only.
+A top-level package name differs from its distribution name too often for the same comparison to carry any signal on the `python -m package` route.
 
 **How the installed distribution is identified.**
 A process started by a console script is owned by the distribution that declared that script, which is the common shape of a `pip install .` deployment.
@@ -82,6 +91,8 @@ This step needs `tomllib` and is therefore skipped on Python 3.10, which predate
 **Generic runners are skipped.**
 A console script such as `gunicorn`, `uvicorn`, `celery` or `flask` launches someone else's application, so its name describes the launcher and its version describes the launcher's release.
 Running `gunicorn myapp:app` therefore does not report `service.name=gunicorn`, and never reports `gunicorn`'s version as `service.version`.
+`fastapi`, `streamlit`, `scrapy`, `airflow`, `uwsgi`, `chalice`, `pserve`, `twistd`, `dagster` and `prefect` are skipped for the same reason, since each one loads and runs the customer's own code in its own process.
+`mlflow` is deliberately not skipped: it runs projects and models in child processes, and `mlflow server` serves MLflow's own API, so a process named `mlflow` really is MLflow.
 A runner started as a module is skipped too, so `python -m gunicorn` and `python -m flask run` behave the same way, matched on the top-level package so that `python -m flask.cli` is also covered.
 Detection falls through to `pyproject.toml`, which still finds the application when the virtual environment sits inside the project directory.
 When that finds nothing either, no name is reported and the SDK's own default stands, `unknown_service:<executable>` such as `unknown_service:python3`, because an honest absence is easier to act on than a name that every deployment shares.

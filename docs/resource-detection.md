@@ -33,11 +33,15 @@ cgroup v1 is tried first; cgroup v2 is the fallback.
 
 Both standard cgroup path formats and Kubernetes slice naming conventions are handled.
 
-Both readers decode with `errors="replace"`, so a mount path holding bytes that are not valid UTF-8 no longer stops detection.
-A path segment after `/pods/` that is not a UUID is skipped rather than reported, so a `hostPath` volume mounted under a directory named `pods` cannot be mistaken for the pod.
+Both files are decoded with `errors="replace"`, so bytes that are not valid UTF-8 in a mount path no longer stop detection.
+Only a path segment that is a lowercase hyphenated UUID is accepted as a pod UID, so a malformed segment is skipped and the search carries on.
+A pod whose UID is not in that form reports no `k8s.pod.uid`.
+
+The first accepted UUID in the file wins, and the detector has no way to tell which pod it belongs to.
+A container that can see other pods' mounts, such as a DaemonSet that mounts `/var/lib/kubelet`, can therefore report another pod's UID.
 
 If the detector cannot confirm it is inside a Kubernetes pod, or cannot extract the pod UID, it returns an empty resource without failing.
-A detection error is logged and also returns an empty resource.
+It also returns an empty resource when detection raises, and logs the error.
 
 **Other `k8s.*` attributes** — such as `k8s.namespace.name`, `k8s.node.name`, `k8s.deployment.name`, and similar — cannot be read from the cgroup filesystem and are not set by this detector.
 They require access to the Kubernetes API and should be added via the [OpenTelemetry Collector's `k8sattributesprocessor`](https://opentelemetry.io/docs/kubernetes/collector/components/#kubernetes-attributes-processor).

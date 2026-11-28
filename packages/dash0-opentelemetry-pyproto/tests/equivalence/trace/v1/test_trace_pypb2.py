@@ -107,6 +107,19 @@ def test_span_empty_matches_proto() -> None:
     assert Span().SerializeToString() == ProtoSpan().SerializeToString()
 
 
+def test_span_every_unset_scalar_matches_proto() -> None:
+    our = Span(
+        flags=None,
+        kind=None,
+        start_time_unix_nano=None,
+        end_time_unix_nano=None,
+        dropped_attributes_count=None,
+        dropped_events_count=None,
+        dropped_links_count=None,
+    )
+    assert our.SerializeToString() == ProtoSpan().SerializeToString()
+
+
 def test_span_basic() -> None:
     trace_id = b"\x01" * 16
     span_id = b"\x02" * 8

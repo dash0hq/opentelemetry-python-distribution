@@ -155,6 +155,11 @@ def test_sum_empty_matches_proto() -> None:
     assert Sum().SerializeToString() == ProtoSum().SerializeToString()
 
 
+def test_sum_unset_aggregation_temporality_matches_proto() -> None:
+    our = Sum(aggregation_temporality=None)
+    assert our.SerializeToString() == ProtoSum().SerializeToString()
+
+
 def test_sum_with_data_and_temporality() -> None:
     our = Sum(
         data_points=[NumberDataPoint(as_int=10)],
@@ -214,6 +219,11 @@ def test_histogram_empty() -> None:
 
 def test_histogram_empty_matches_proto() -> None:
     assert Histogram().SerializeToString() == ProtoHistogram().SerializeToString()
+
+
+def test_histogram_unset_aggregation_temporality_matches_proto() -> None:
+    our = Histogram(aggregation_temporality=None)
+    assert our.SerializeToString() == ProtoHistogram().SerializeToString()
 
 
 def test_histogram_with_data_and_temporality() -> None:
@@ -305,6 +315,14 @@ def test_exp_histogram_empty() -> None:
 def test_exp_histogram_empty_matches_proto() -> None:
     assert (
         ExponentialHistogram().SerializeToString()
+        == ProtoExponentialHistogram().SerializeToString()
+    )
+
+
+def test_exp_histogram_unset_aggregation_temporality_matches_proto() -> None:
+    our = ExponentialHistogram(aggregation_temporality=None)
+    assert (
+        our.SerializeToString()
         == ProtoExponentialHistogram().SerializeToString()
     )
 

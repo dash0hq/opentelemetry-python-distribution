@@ -41,6 +41,30 @@ def test_log_record_with_body() -> None:
     assert our.SerializeToString() == proto.SerializeToString()
 
 
+def test_log_record_unset_time_unix_nano_matches_proto() -> None:
+    our = LogRecord(
+        time_unix_nano=None,
+        observed_time_unix_nano=1_795_822_453_803_801_800,
+        body=AnyValue(string_value="order placed"),
+    )
+    proto = ProtoLogRecord(
+        observed_time_unix_nano=1_795_822_453_803_801_800,
+        body=ProtoAnyValue(string_value="order placed"),
+    )
+    assert our.SerializeToString() == proto.SerializeToString()
+
+
+def test_log_record_every_unset_scalar_matches_proto() -> None:
+    our = LogRecord(
+        time_unix_nano=None,
+        observed_time_unix_nano=None,
+        severity_number=None,
+        flags=None,
+        dropped_attributes_count=None,
+    )
+    assert our.SerializeToString() == ProtoLogRecord().SerializeToString()
+
+
 def test_log_record_with_trace_context() -> None:
     trace_id = b"\x01" * 16
     span_id = b"\x02" * 8

@@ -7,10 +7,11 @@ repository is the packaging: that the shims resolve, that the dependency the
 whole exercise exists to avoid is really absent, and that a configuration file
 drives the distribution end to end.
 
-The three tests named for an unset variable, for a bare propagator entry and
-for a bare detector entry are the exception. They pin behaviour that a
-re-vendor can reverse without a word, since the only check on the vendored
-tree compares it with the fork rather than with what the previous release did.
+The tests named for an environment variable substitution, for a bare
+propagator entry and for a bare detector entry are the exception. They pin
+behaviour that a re-vendor can reverse without a word, since the only check on
+the vendored tree compares it with the fork rather than with what the previous
+release did.
 """
 
 from importlib.metadata import requires
@@ -120,6 +121,18 @@ tracer_provider:
             endpoint: ${DASH0_TEST_ENDPOINT_THAT_IS_NEVER_SET}
 """
 
+_SUBSTITUTED_ATTRIBUTES: str = """
+file_format: "1.0-rc.1"
+resource:
+  attributes:
+    - name: bare
+      value: ${DASH0_TEST_SUBSTITUTION}
+    - name: with_default
+      value: ${DASH0_TEST_SUBSTITUTION:-fallback}
+    - name: with_empty_default
+      value: ${DASH0_TEST_SUBSTITUTION:-}
+"""
+
 _BARE_PROPAGATORS: str = """
 file_format: "1.0-rc.1"
 propagator:
@@ -217,6 +230,86 @@ def test_an_unset_variable_with_no_default_leaves_the_setting_null(
 
     exporter = config.tracer_provider.processors[0].simple.exporter
     assert exporter.otlp_http.endpoint is None
+
+
+def _substituted_attributes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, value: str | None
+) -> dict[str, object]:
+    if value is None:
+        monkeypatch.delenv("DASH0_TEST_SUBSTITUTION", raising=False)
+    else:
+        monkeypatch.setenv("DASH0_TEST_SUBSTITUTION", value)
+    config_file: Path = tmp_path / "otel-config.yaml"
+    config_file.write_text(_SUBSTITUTED_ATTRIBUTES)
+
+    config = load_config_file(str(config_file))
+
+    return {attribute.name: attribute.value for attribute in config.resource.attributes}
+
+
+def test_an_empty_variable_with_a_default_substitutes_the_default(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A variable present with an empty value reaches its fallback.
+
+    The specification substitutes the default when the variable is null, empty
+    or undefined, so a Kubernetes manifest written with ``value: ""`` keeps the
+    fallback the configuration file declares.
+    """
+    attributes = _substituted_attributes(tmp_path, monkeypatch, "")
+
+    assert attributes["with_default"] == "fallback"
+
+
+def test_an_empty_variable_without_a_default_leaves_the_setting_null(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """With nothing to fall back to, an empty variable still reads as null."""
+    attributes = _substituted_attributes(tmp_path, monkeypatch, "")
+
+    assert attributes["bare"] is None
+
+
+def test_an_empty_default_leaves_the_setting_null_for_an_unset_and_an_empty_variable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``${VAR:-}`` resolves to null for an unset and for an empty variable.
+
+    An empty default is still empty, so it reaches the same null a reference
+    with no default reaches. A fork change that started returning the matched
+    text for a present but empty default would pass the vendoring check.
+    """
+    assert (
+        _substituted_attributes(tmp_path, monkeypatch, None)["with_empty_default"]
+        is None
+    )
+    assert (
+        _substituted_attributes(tmp_path, monkeypatch, "")["with_empty_default"] is None
+    )
+
+
+def test_an_unset_variable_with_a_default_substitutes_the_default(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    attributes = _substituted_attributes(tmp_path, monkeypatch, None)
+
+    assert attributes["with_default"] == "fallback"
+
+
+def test_a_variable_holding_a_value_is_substituted_without_a_default(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    attributes = _substituted_attributes(tmp_path, monkeypatch, "checkout")
+
+    assert attributes["bare"] == "checkout"
+
+
+def test_a_variable_holding_a_value_wins_over_its_default(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    attributes = _substituted_attributes(tmp_path, monkeypatch, "checkout")
+
+    assert attributes["with_default"] == "checkout"
 
 
 def test_a_propagator_written_with_an_empty_value_is_installed(

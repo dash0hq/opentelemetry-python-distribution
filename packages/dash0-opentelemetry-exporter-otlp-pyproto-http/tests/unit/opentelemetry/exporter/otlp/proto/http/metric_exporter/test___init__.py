@@ -5,6 +5,7 @@
 
 import unittest
 from http.client import BadStatusLine, InvalidURL, RemoteDisconnected
+from os import environ
 from socket import AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR, socket
 from threading import Thread
 from time import sleep
@@ -45,14 +46,15 @@ def _server_that_closes_after_reading_the_request():
     server.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
     server.bind(("127.0.0.1", 0))
     server.listen(16)
+    server.settimeout(0.1)
     served = []
 
     def close_every_connection_without_answering():
-        while True:
+        while server.fileno() != -1:
             try:
                 connection, _ = server.accept()
             except OSError:
-                return
+                continue
             served.append(connection)
             request = b""
             while b"\r\n\r\n" not in request:
@@ -300,9 +302,12 @@ class TestOTLPMetricExporter(unittest.TestCase):
         self.addCleanup(server.close)
         endpoint = f"http://127.0.0.1:{server.getsockname()[1]}/v1/metrics"
         exporter = OTLPMetricExporter(endpoint=endpoint, timeout=100)
-        with patch(_UNIFORM, return_value=0.0001):
-            with patch.object(exporter._shutdown_in_progress, "wait", return_value=False):
-                result = exporter.export(_empty_metrics_data())
+        with patch.dict(environ, {"no_proxy": "*"}):
+            with patch(_UNIFORM, return_value=0.0001):
+                with patch.object(
+                    exporter._shutdown_in_progress, "wait", return_value=False
+                ):
+                    result = exporter.export(_empty_metrics_data())
         self.assertEqual(result, MetricExportResult.FAILURE)
         self.assertEqual(len(served), _MAX_RETRYS)
         exporter.shutdown()

@@ -7,10 +7,11 @@ repository is the packaging: that the shims resolve, that the dependency the
 whole exercise exists to avoid is really absent, and that a configuration file
 drives the distribution end to end.
 
-The tests named for an unset or empty variable, for a bare propagator entry and
-for a bare detector entry are the exception. They pin behaviour that a
-re-vendor can reverse without a word, since the only check on the vendored
-tree compares it with the fork rather than with what the previous release did.
+The tests named for an environment variable substitution, for a bare
+propagator entry and for a bare detector entry are the exception. They pin
+behaviour that a re-vendor can reverse without a word, since the only check on
+the vendored tree compares it with the fork rather than with what the previous
+release did.
 """
 
 from importlib.metadata import requires

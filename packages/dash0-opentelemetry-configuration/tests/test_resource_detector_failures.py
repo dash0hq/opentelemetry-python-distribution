@@ -126,19 +126,16 @@ def test_a_detector_that_raises_inside_detect_still_yields_a_resource(
     assert "'container'" in caplog.records[0].getMessage()
 
 
-def test_a_detector_that_is_not_installed_does_not_stop_the_detectors_after_it(
-    caplog: pytest.LogCaptureFixture,
-) -> None:
+def test_a_detector_that_is_not_installed_does_not_stop_later_detectors() -> None:
     """The handler wraps one detector, so a later one still contributes attributes."""
-    with caplog.at_level("WARNING", logger="opentelemetry._configuration._resource"):
-        resource = create_resource(_config_listing(container={}, host={}))
+    resource = create_resource(_config_listing(container={}, host={}))
 
     assert CONTAINER_ID not in resource.attributes
     assert resource.attributes[HOST_NAME] == gethostname()
 
 
-def test_a_detector_that_raises_inside_detect_does_not_stop_the_detectors_after_it(
-    caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
+def test_a_detector_that_raises_inside_detect_does_not_stop_later_detectors(
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """The second failure route has to be contained per detector too."""
     detector = MagicMock()
@@ -150,8 +147,7 @@ def test_a_detector_that_raises_inside_detect_does_not_stop_the_detectors_after_
         lambda *args, **kwargs: [entry_point],
     )
 
-    with caplog.at_level("ERROR", logger="opentelemetry._configuration._resource"):
-        resource = create_resource(_config_listing(container={}, host={}))
+    resource = create_resource(_config_listing(container={}, host={}))
 
     assert CONTAINER_ID not in resource.attributes
     assert resource.attributes[HOST_NAME] == gethostname()

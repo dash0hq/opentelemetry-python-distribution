@@ -2,7 +2,7 @@ change_type: bug_fix
 
 component: distro
 
-note: Disable the distribution with one warning when ``DASH0_OTEL_COLLECTOR_BASE_URL`` cannot be parsed, instead of raising out of auto-instrumentation
+note: Disable the distribution with one warning when the collector endpoint cannot be parsed, instead of raising out of auto-instrumentation
 
 issues: [130, 153]
 
@@ -17,5 +17,11 @@ subtext: |
   Such a value is now treated the same way as an unset
   ``DASH0_OTEL_COLLECTOR_BASE_URL``: the SDK is turned off, a warning names the
   variable and the parse error, and startup continues.
+
+  The value checked is the endpoint the SDK exports to, which is
+  ``OTEL_EXPORTER_OTLP_ENDPOINT`` when it is set and
+  ``DASH0_OTEL_COLLECTOR_BASE_URL`` otherwise. A base URL that cannot be parsed
+  therefore changes nothing when ``OTEL_EXPORTER_OTLP_ENDPOINT`` overrides it
+  with a value that can.
 
 change_logs: [user]

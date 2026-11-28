@@ -424,6 +424,18 @@ def test_a_runner_installed_as_a_windows_executable_supplies_no_fallback_name(
     assert detect_fallback_service_name() is None
 
 
+def test_a_runner_installed_as_a_windows_executable_claims_no_distribution(monkeypatch):
+    """The ``.exe`` comes off before the runner check, or the scan matches uvicorn."""
+    monkeypatch.setattr(resource_module.sys, "argv", ["/opt/venv/Scripts/uvicorn.exe"])
+    monkeypatch.setattr(
+        resource_module,
+        "distributions",
+        lambda: [_FakeDistribution("uvicorn", "0.54.0", ("uvicorn",))],
+    )
+
+    assert distribution_of_running_program() is None
+
+
 def test_a_windows_console_script_still_names_the_distribution(monkeypatch):
     """The entry point is declared as ``checkout``, so ``.exe`` has to come off."""
     monkeypatch.setattr(resource_module.sys, "argv", ["/opt/venv/Scripts/checkout.exe"])

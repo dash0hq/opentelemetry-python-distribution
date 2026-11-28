@@ -4,7 +4,7 @@
 # pylint: disable=protected-access
 
 import unittest
-from http.client import BadStatusLine, RemoteDisconnected
+from http.client import BadStatusLine, InvalidURL, RemoteDisconnected
 from unittest.mock import patch
 
 from opentelemetry.exporter.otlp.proto.common._internal.metrics_encoder import (
@@ -257,6 +257,13 @@ class TestOTLPMetricExporter(unittest.TestCase):
         )
         self.assertEqual(result, MetricExportResult.FAILURE)
         self.assertEqual(attempts, _MAX_RETRYS)
+
+    def test_malformed_endpoint_is_not_retried(self):
+        result, attempts = self._export_with_each_attempt_raising(
+            InvalidURL("nonnumeric port: 'abc'")
+        )
+        self.assertEqual(result, MetricExportResult.FAILURE)
+        self.assertEqual(attempts, 1)
 
     def test_export_with_batch_size_sends_multiple_requests(self):
         # 3 data points with batch_size=1 → 3 separate HTTP requests

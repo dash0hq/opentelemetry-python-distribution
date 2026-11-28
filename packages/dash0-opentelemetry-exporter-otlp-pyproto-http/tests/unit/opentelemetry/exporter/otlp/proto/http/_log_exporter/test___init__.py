@@ -4,7 +4,7 @@
 # pylint: disable=protected-access
 
 import unittest
-from http.client import BadStatusLine, RemoteDisconnected
+from http.client import BadStatusLine, InvalidURL, RemoteDisconnected
 from unittest.mock import patch
 from urllib.error import URLError
 
@@ -223,6 +223,13 @@ class TestOTLPLogExporter(unittest.TestCase):
         )
         self.assertEqual(result, LogRecordExportResult.FAILURE)
         self.assertEqual(attempts, _MAX_RETRYS)
+
+    def test_malformed_endpoint_is_not_retried(self):
+        result, attempts = self._export_with_each_attempt_raising(
+            InvalidURL("nonnumeric port: 'abc'")
+        )
+        self.assertEqual(result, LogRecordExportResult.FAILURE)
+        self.assertEqual(attempts, 1)
 
     # ── shutdown ──────────────────────────────────────────────────────────────
 

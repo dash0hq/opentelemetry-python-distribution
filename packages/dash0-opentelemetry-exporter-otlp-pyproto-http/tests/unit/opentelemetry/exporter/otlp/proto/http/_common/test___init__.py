@@ -1,7 +1,12 @@
 # Copyright The OpenTelemetry Authors
 # SPDX-License-Identifier: Apache-2.0
 
-from http.client import BadStatusLine, IncompleteRead, RemoteDisconnected
+from http.client import (
+    BadStatusLine,
+    IncompleteRead,
+    InvalidURL,
+    RemoteDisconnected,
+)
 from unittest.mock import Mock, patch
 from urllib.error import URLError
 
@@ -10,6 +15,7 @@ import pytest
 from opentelemetry.exporter.otlp.proto.http._common import (
     _RETRYABLE_EXPORT_ERRORS,
     _is_retryable,
+    _is_retryable_error,
     _load_session_from_envvar,
 )
 
@@ -46,29 +52,39 @@ def test_is_retryable_400():
 
 def test_connection_refused_is_retryable():
     assert isinstance(URLError("refused"), _RETRYABLE_EXPORT_ERRORS)
+    assert _is_retryable_error(URLError("refused")) is True
 
 
 def test_read_timeout_is_retryable():
     assert isinstance(TimeoutError("timed out"), _RETRYABLE_EXPORT_ERRORS)
+    assert _is_retryable_error(TimeoutError("timed out")) is True
 
 
 def test_remote_disconnected_is_retryable():
     assert isinstance(RemoteDisconnected("closed"), _RETRYABLE_EXPORT_ERRORS)
+    assert _is_retryable_error(RemoteDisconnected("closed")) is True
 
 
 def test_connection_reset_is_retryable():
-    assert isinstance(
-        ConnectionResetError(104, "Connection reset by peer"),
-        _RETRYABLE_EXPORT_ERRORS,
-    )
+    error = ConnectionResetError(104, "Connection reset by peer")
+    assert isinstance(error, _RETRYABLE_EXPORT_ERRORS)
+    assert _is_retryable_error(error) is True
 
 
 def test_bad_status_line_is_retryable():
     assert isinstance(BadStatusLine("garbage"), _RETRYABLE_EXPORT_ERRORS)
+    assert _is_retryable_error(BadStatusLine("garbage")) is True
 
 
 def test_incomplete_read_is_retryable():
     assert isinstance(IncompleteRead(b"partial"), _RETRYABLE_EXPORT_ERRORS)
+    assert _is_retryable_error(IncompleteRead(b"partial")) is True
+
+
+def test_a_malformed_endpoint_is_caught_but_not_retryable():
+    error = InvalidURL("nonnumeric port: 'abc'")
+    assert isinstance(error, _RETRYABLE_EXPORT_ERRORS)
+    assert _is_retryable_error(error) is False
 
 
 def test_a_bug_in_the_exporter_is_not_retryable():

@@ -23,6 +23,16 @@ subtext: |
   The classification now covers ``OSError`` and ``http.client.HTTPException``,
   which together hold every transport failure
   ``requests.exceptions.RequestException`` covered before the exporters were
-  rewritten onto ``urllib``.
+  rewritten onto ``urllib``. One of them is excluded from the retries:
+  ``http.client.InvalidURL``, raised when the configured endpoint carries
+  something like a non-numeric port, is logged as an error and fails the batch
+  at once rather than spending the export deadline on an endpoint that cannot
+  become valid.
+
+  A read timeout is the one failure that still sends a single POST. The first
+  attempt is given the whole remaining deadline, so a collector that accepts
+  the body and never answers consumes it before a retry becomes possible. What
+  changes there is that ``export`` returns FAILURE and records the error
+  instead of raising through the SDK.
 
 change_logs: [user]

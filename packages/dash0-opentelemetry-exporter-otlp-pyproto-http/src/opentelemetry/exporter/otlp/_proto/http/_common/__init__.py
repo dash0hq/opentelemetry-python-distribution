@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import ssl
-from http.client import HTTPException
+from http.client import HTTPException, InvalidURL
 from os import environ
 from typing import Literal
 from urllib.error import HTTPError
@@ -14,6 +14,12 @@ from opentelemetry.sdk.environment_variables import (
 from opentelemetry.util._importlib_metadata import entry_points
 
 _RETRYABLE_EXPORT_ERRORS = (OSError, HTTPException)
+
+
+def _is_retryable_error(error: BaseException) -> bool:
+    if isinstance(error, InvalidURL):
+        return False
+    return True
 
 
 def _is_retryable(status_code: int) -> bool:

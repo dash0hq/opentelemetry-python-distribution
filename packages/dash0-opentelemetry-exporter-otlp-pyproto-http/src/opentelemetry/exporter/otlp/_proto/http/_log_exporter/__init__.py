@@ -28,6 +28,7 @@ from opentelemetry.exporter.otlp._proto.http._common import (
     _RETRYABLE_EXPORT_ERRORS,
     _build_ssl_context,
     _is_retryable,
+    _is_retryable_error,
     _post,
 )
 from opentelemetry.metrics import MeterProvider
@@ -195,7 +196,7 @@ class OTLPLogExporter(LogRecordExporter):
                 except _RETRYABLE_EXPORT_ERRORS as error:
                     reason = getattr(error, "reason", error)
                     export_error = error
-                    retryable = True
+                    retryable = _is_retryable_error(error)
                     status_code = None
 
                 if not retryable:

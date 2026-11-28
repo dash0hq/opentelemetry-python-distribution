@@ -269,7 +269,7 @@ def test_an_empty_variable_without_a_default_leaves_the_setting_null(
     assert attributes["bare"] is None
 
 
-def test_an_empty_default_leaves_the_setting_null_whatever_the_variable_holds(
+def test_an_empty_default_leaves_the_setting_null_for_an_unset_and_an_empty_variable(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """``${VAR:-}`` resolves to null for an unset and for an empty variable.

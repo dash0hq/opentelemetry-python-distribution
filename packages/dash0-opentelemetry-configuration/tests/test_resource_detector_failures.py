@@ -80,13 +80,10 @@ def _tracer_provider_after_configure_sdk(tmp_path: Path, preamble: str) -> str:
     program = _PROGRAM.format(preamble=preamble, path=str(config_file))
 
     completed = run(
-        [executable, "-c", program],
-        capture_output=True,
-        text=True,
-        check=True,
-        timeout=60,
+        [executable, "-c", program], capture_output=True, text=True, timeout=60
     )
 
+    assert completed.returncode == 0, completed.stderr
     return completed.stdout.strip().splitlines()[-1]
 
 
@@ -99,9 +96,11 @@ def test_a_detector_that_is_not_installed_still_yields_a_resource(
 
     assert resource.attributes[TELEMETRY_SDK_LANGUAGE] == "python"
     assert CONTAINER_ID not in resource.attributes
-    assert "container" in caplog.text
     assert [record.levelname for record in caplog.records] == ["WARNING"]
     assert caplog.records[0].exc_info is None
+    message = caplog.records[0].getMessage()
+    assert message.startswith("Skipping resource detector 'container' in ")
+    assert "Make sure the package providing this plugin is installed." in message
 
 
 def test_a_detector_that_raises_inside_detect_still_yields_a_resource(
@@ -122,9 +121,9 @@ def test_a_detector_that_raises_inside_detect_still_yields_a_resource(
 
     assert resource.attributes[TELEMETRY_SDK_LANGUAGE] == "python"
     assert CONTAINER_ID not in resource.attributes
-    assert "container" in caplog.text
     assert [record.levelname for record in caplog.records] == ["ERROR"]
     assert caplog.records[0].exc_info is not None
+    assert "'container'" in caplog.records[0].getMessage()
 
 
 def test_a_detector_that_is_not_installed_does_not_stop_the_detectors_after_it(
@@ -132,6 +131,26 @@ def test_a_detector_that_is_not_installed_does_not_stop_the_detectors_after_it(
 ) -> None:
     """The handler wraps one detector, so a later one still contributes attributes."""
     with caplog.at_level("WARNING", logger="opentelemetry._configuration._resource"):
+        resource = create_resource(_config_listing(container={}, host={}))
+
+    assert CONTAINER_ID not in resource.attributes
+    assert resource.attributes[HOST_NAME] == gethostname()
+
+
+def test_a_detector_that_raises_inside_detect_does_not_stop_the_detectors_after_it(
+    caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The second failure route has to be contained per detector too."""
+    detector = MagicMock()
+    detector.return_value.detect.side_effect = RuntimeError("no cgroup here")
+    entry_point = MagicMock()
+    entry_point.load.return_value = detector
+    monkeypatch.setattr(
+        "opentelemetry._configuration._common.entry_points",
+        lambda *args, **kwargs: [entry_point],
+    )
+
+    with caplog.at_level("ERROR", logger="opentelemetry._configuration._resource"):
         resource = create_resource(_config_listing(container={}, host={}))
 
     assert CONTAINER_ID not in resource.attributes

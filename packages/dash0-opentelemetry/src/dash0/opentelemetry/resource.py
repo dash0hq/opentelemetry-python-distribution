@@ -100,8 +100,13 @@ def distribution_resource_attributes(version):
 
 
 def _read_candidate_lines(filename, minimum_length):
+    """The stripped lines of ``filename`` longer than ``minimum_length``.
+
+    A byte that UTF-8 cannot decode becomes a replacement character, and an
+    unreadable file yields no lines.
+    """
     try:
-        with open(filename, encoding="utf8") as file:
+        with open(filename, encoding="utf8", errors="replace") as file:
             content = file.read()
     except OSError:
         return []
@@ -113,8 +118,13 @@ def _read_candidate_lines(filename, minimum_length):
 
 
 def running_in_kubernetes():
+    """Whether the first line of ``/etc/hosts`` carries the kubelet marker.
+
+    A byte that UTF-8 cannot decode becomes a replacement character, and an
+    unreadable file answers ``False``.
+    """
     try:
-        with open(_ETC_HOSTS, encoding="utf8") as file:
+        with open(_ETC_HOSTS, encoding="utf8", errors="replace") as file:
             first_line = file.readline()
     except OSError:
         return False

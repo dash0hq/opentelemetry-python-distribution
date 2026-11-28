@@ -19,6 +19,7 @@ from dash0.opentelemetry.resource import (
     module_run_with_dash_m,
     pod_uid_from_cgroup_v1,
     pod_uid_from_cgroup_v2,
+    running_in_kubernetes,
     service_metadata_from_pyproject,
 )
 from dash0.opentelemetry.version import __version__
@@ -64,6 +65,29 @@ def test_pod_uid_from_cgroup_v2(monkeypatch):
         resource_module, "_read_candidate_lines", lambda *a, **k: [line]
     )
     assert pod_uid_from_cgroup_v2() == _POD_UID
+
+
+def test_a_mountinfo_carrying_an_undecodable_byte_still_yields_the_pod_uid(
+    monkeypatch, tmp_path
+):
+    mountinfo = tmp_path / "mountinfo"
+    mountinfo.write_bytes(
+        b"1234 1234 0:42 / /mnt/caf\xe9 rw\n"
+        + f"1235 1235 0:43 / /var/lib/kubelet/pods/{_POD_UID}/etc-hosts rw\n".encode()
+    )
+    monkeypatch.setattr(resource_module, "_CGROUP_V1_MOUNTINFO", str(mountinfo))
+
+    assert pod_uid_from_cgroup_v1() == _POD_UID
+
+
+def test_an_etc_hosts_carrying_an_undecodable_byte_still_reports_kubernetes(
+    monkeypatch, tmp_path
+):
+    hosts = tmp_path / "hosts"
+    hosts.write_bytes(b"# Kubernetes-managed hosts file\n127.0.0.1\tcaf\xe9\n")
+    monkeypatch.setattr(resource_module, "_ETC_HOSTS", str(hosts))
+
+    assert running_in_kubernetes() is True
 
 
 def test_detect_fallback_service_name(monkeypatch):

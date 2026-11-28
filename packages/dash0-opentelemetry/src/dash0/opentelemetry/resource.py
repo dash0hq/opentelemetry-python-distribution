@@ -252,26 +252,6 @@ def detect_fallback_service_name():
     return name
 
 
-def running_console_script_name():
-    """The name of the console script this process was started as, if it was one.
-
-    Returns ``None`` for ``python -m package``, for a source script such as
-    ``app.py`` or ``app.pyw``, and for a generic runner. The ``.exe`` of a
-    Windows console script comes off, leaving the name its ``console_scripts``
-    entry point declares.
-    """
-    if module_run_with_dash_m() is not None:
-        return None
-    script = path.basename(sys.argv[0] if sys.argv else "")
-    if script.endswith(_SOURCE_SCRIPT_SUFFIXES):
-        return None
-    if script.endswith(_WINDOWS_EXECUTABLE_SUFFIX):
-        script = script[: -len(_WINDOWS_EXECUTABLE_SUFFIX)]
-    if not script or script in _RUNNER_PROGRAMS:
-        return None
-    return script
-
-
 def distribution_of_running_program():
     """The installed distribution this process was started from, if any.
 
@@ -288,19 +268,27 @@ def distribution_of_running_program():
     ``python -m gunicorn``, the latter against its top-level package.
 
     Returns ``None`` for a process started as a plain script, which no
-    installed distribution claims.
+    installed distribution claims, and for one started from a source script
+    ending in ``.py`` or ``.pyw``. The ``.exe`` of a Windows console script
+    comes off first, leaving the name its ``console_scripts`` entry point
+    declares.
     """
     module = module_run_with_dash_m()
     if module is None:
-        script = running_console_script_name()
-        if script:
-            for distribution in distributions():
-                for entry_point in distribution.entry_points:
-                    if (
-                        entry_point.group == "console_scripts"
-                        and entry_point.name == script
-                    ):
-                        return distribution
+        script = path.basename(sys.argv[0] if sys.argv else "")
+        if script.endswith(_SOURCE_SCRIPT_SUFFIXES):
+            return None
+        if script.endswith(_WINDOWS_EXECUTABLE_SUFFIX):
+            script = script[: -len(_WINDOWS_EXECUTABLE_SUFFIX)]
+        if not script or script in _RUNNER_PROGRAMS:
+            return None
+        for distribution in distributions():
+            for entry_point in distribution.entry_points:
+                if (
+                    entry_point.group == "console_scripts"
+                    and entry_point.name == script
+                ):
+                    return distribution
         return None
 
     package = module.partition(".")[0]

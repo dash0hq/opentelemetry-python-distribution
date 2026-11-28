@@ -1,4 +1,4 @@
-change_type: bug_fix
+change_type: breaking
 
 component: configuration
 
@@ -19,6 +19,12 @@ subtext: |
   A reference with no default still resolves to an empty value, which the
   parser reads as null. That part of the specification is unchanged, so
   ``${VAR:-}`` still resolves to null exactly as ``${VAR}`` does.
+
+  A file nobody has edited can therefore change what the process exports. A
+  ``${VAR:-fallback}`` whose variable is present and empty resolved to null
+  before and takes the fallback now, so an endpoint that fell through to
+  ``OTEL_EXPORTER_OTLP_ENDPOINT`` now goes wherever the file says. Read any
+  file you already ship before upgrading.
 
   The 0.4.0 section of this changelog says "No default of any kind covers a
   variable the environment has but holds empty, since a default applies only

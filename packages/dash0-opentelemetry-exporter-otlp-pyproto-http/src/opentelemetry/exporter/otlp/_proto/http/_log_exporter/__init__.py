@@ -25,6 +25,7 @@ from opentelemetry.exporter.otlp._proto.http import (
     Compression,
 )
 from opentelemetry.exporter.otlp._proto.http._common import (
+    _RETRYABLE_EXPORT_ERRORS,
     _build_ssl_context,
     _is_retryable,
     _post,
@@ -191,8 +192,8 @@ class OTLPLogExporter(LogRecordExporter):
                     if status_code < 400:
                         return LogRecordExportResult.SUCCESS
                     retryable = _is_retryable(status_code)
-                except URLError as error:
-                    reason = error.reason
+                except _RETRYABLE_EXPORT_ERRORS as error:
+                    reason = getattr(error, "reason", error)
                     export_error = error
                     retryable = True
                     status_code = None

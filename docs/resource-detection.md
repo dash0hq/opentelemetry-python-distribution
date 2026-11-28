@@ -130,6 +130,8 @@ A file without it installs a noop propagator, so no trace context is read from i
 
 Each detector is independent, so list only the ones you want.
 Attributes you declare under `resource.attributes` take precedence over anything a detector reports.
+A detector whose package is not installed is skipped with a warning, and the rest of the file still applies.
+That matters for `container`, which the schema accepts but which needs `opentelemetry-resource-detector-container`, a package this distribution does not ship.
 The Python, Ruby and JavaScript distributions handle the `dash0_*` detectors the same way, though the complete resource still differs between them because the SDKs ship different built-in detectors.
 
 `OTEL_EXPERIMENTAL_RESOURCE_DETECTORS` has no effect here.

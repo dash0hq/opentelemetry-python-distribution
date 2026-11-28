@@ -60,7 +60,7 @@ docker compose -f docker-compose.yml -f docker-compose.dash0.yml up
 When `opentelemetry-instrument` runs:
 
 1. `Dash0Distro` is discovered via the `opentelemetry_distro` entry point.
-   It checks `DASH0_DISABLE`, `DASH0_OTEL_COLLECTOR_BASE_URL`, and every OTLP endpoint variable you set.
+   It checks `DASH0_DISABLE`, `DASH0_OTEL_COLLECTOR_BASE_URL`, and every endpoint the SDK will export to.
    An endpoint `urlparse` rejects counts as no endpoint.
    If any gate fails, it sets `OTEL_SDK_DISABLED=true` and skips all instrumentation.
 2. The distro selects the pure-Python OTLP/HTTP exporter, sets `OTEL_EXPORTER_OTLP_ENDPOINT`, and injects detected resource attributes into the environment.

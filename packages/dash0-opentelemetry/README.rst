@@ -15,8 +15,8 @@ Entry points
 
     * **Gates** the distribution: does nothing if ``DASH0_DISABLE=true``, if
       ``DASH0_OTEL_COLLECTOR_BASE_URL`` is unset (nowhere to send telemetry), or
-      if an OTLP endpoint variable the user set holds a value ``urlparse``
-      rejects. In every case it sets ``OTEL_SDK_DISABLED=true`` and skips
+      if an endpoint the SDK will export to holds a value ``urlparse`` rejects.
+      In every case it sets ``OTEL_SDK_DISABLED=true`` and skips
       instrumentation.
     * Defaults all three signals to the pure-Python OTLP/HTTP exporter
       (``otlp_proto_http``, ``http/protobuf``) and points

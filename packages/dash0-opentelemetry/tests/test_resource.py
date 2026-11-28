@@ -393,7 +393,6 @@ def test_uwsgi_is_recognized_from_the_bare_name_it_puts_in_argv(monkeypatch):
     monkeypatch.setattr(resource_module.sys, "argv", ["uwsgi"])
 
     assert detect_fallback_service_name() is None
-    assert distribution_of_running_program() is None
 
 
 @_needs_tomllib

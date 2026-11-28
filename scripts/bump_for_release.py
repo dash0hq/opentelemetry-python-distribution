@@ -123,7 +123,7 @@ def write_pin(pyproject: Path, dep: str, new_version: str) -> None:
     content = pyproject.read_text()
     new_content = re.sub(
         rf'("{dep}\s*==\s*)[^"]+"',
-        rf"\g<1>{new_version}\"",
+        f'\\g<1>{new_version}"',
         content,
     )
     assert new_content != content, f"No == pin for {dep!r} found in {pyproject}"

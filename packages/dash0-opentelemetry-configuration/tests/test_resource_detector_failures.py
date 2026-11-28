@@ -126,6 +126,18 @@ def test_a_detector_that_raises_inside_detect_still_yields_a_resource(
     assert "'container'" in caplog.records[0].getMessage()
 
 
+def test_a_detector_the_schema_does_not_declare_still_yields_a_resource(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A name outside the four schema fields arrives through ``additional_properties``."""
+    with caplog.at_level("WARNING", logger="opentelemetry._configuration._resource"):
+        resource = create_resource(_config_listing(**{"aws_ecs": {}}))
+
+    assert resource.attributes[TELEMETRY_SDK_LANGUAGE] == "python"
+    assert [record.levelname for record in caplog.records] == ["WARNING"]
+    assert "'aws_ecs'" in caplog.records[0].getMessage()
+
+
 def test_a_detector_that_is_not_installed_does_not_stop_later_detectors() -> None:
     """The handler wraps one detector, so a later one still contributes attributes."""
     resource = create_resource(_config_listing(container={}, host={}))

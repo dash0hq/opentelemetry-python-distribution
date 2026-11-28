@@ -1,0 +1,24 @@
+change_type: bug_fix
+
+component: resource
+
+note: Keep auto-instrumentation working when ``/etc/hosts`` or ``/proc/self/mountinfo`` holds a byte that UTF-8 cannot decode
+
+issues: [130]
+
+subtext: |
+  Resource detection read both files with the strict UTF-8 codec and handled
+  only ``OSError``. A byte that UTF-8 cannot decode raised ``UnicodeDecodeError``
+  out of the distribution's ``_configure``, which runs before the configurators
+  and the instrumentors load, so the process sent no traces, no metrics and no
+  logs. An injected process additionally deactivated the distribution.
+
+  ``/proc/self/mountinfo`` escapes only space, tab, newline and backslash, so a
+  CIFS, SMB, NFS or ``hostPath`` volume whose path carries latin-1 or Shift-JIS
+  bytes was enough to trigger it.
+
+  Both files are now decoded with ``errors="replace"``, which leaves the pod UID
+  and the kubelet marker readable, and a failure anywhere in resource detection
+  is logged and no longer stops instrumentation.
+
+change_logs: [user]

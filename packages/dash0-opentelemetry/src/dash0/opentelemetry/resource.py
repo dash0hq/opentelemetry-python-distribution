@@ -93,8 +93,10 @@ _POD_UID_IN_CGROUP = re.compile(
     r"^[a-z_-]*pod(?P<uid>[0-9a-f]{8}[-_][0-9a-f]{4}[-_][0-9a-f]{4}"
     r"[-_][0-9a-f]{4}[-_][0-9a-f]{12})\.slice$"
 )
+_POD_UID_PATTERN = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+_POD_UID_EXACT = re.compile(_POD_UID_PATTERN)
 _POD_UID_IN_MOUNTINFO = re.compile(
-    r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+    rf".{re.escape(_POD_MOUNT_MARKER)}(?P<uid>{_POD_UID_PATTERN})(?![0-9a-f-])"
 )
 
 
@@ -144,17 +146,9 @@ def pod_uid_from_cgroup_v1():
     search carries on through the rest of the file.
     """
     for line in _read_candidate_lines(_CGROUP_V1_MOUNTINFO, _POD_UID_LEN):
-        search_from = 0
-        while True:
-            marker_index = line.find(_POD_MOUNT_MARKER, search_from)
-            if marker_index < 0:
-                break
-            search_from = marker_index + len(_POD_MOUNT_MARKER)
-            if marker_index == 0:
-                continue
-            candidate = line[search_from : search_from + _POD_UID_LEN]
-            if _POD_UID_IN_MOUNTINFO.fullmatch(candidate):
-                return candidate
+        match = _POD_UID_IN_MOUNTINFO.search(line)
+        if match:
+            return match.group("uid")
     return None
 
 
@@ -166,7 +160,9 @@ def pod_uid_from_cgroup_v2():
         penultimate = segments[-2]
         expected_length = _POD_UID_LEN + len(_POD_LABEL)
         if penultimate.startswith(_POD_LABEL) and len(penultimate) == expected_length:
-            return penultimate[len(_POD_LABEL) :]
+            candidate = penultimate[len(_POD_LABEL) :]
+            if _POD_UID_EXACT.fullmatch(candidate):
+                return candidate
         match = _POD_UID_IN_CGROUP.match(penultimate)
         if match:
             return match.group("uid").replace("_", "-")

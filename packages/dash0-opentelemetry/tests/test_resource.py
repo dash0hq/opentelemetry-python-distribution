@@ -82,7 +82,7 @@ def test_a_mountinfo_carrying_an_undecodable_byte_still_yields_the_pod_uid(
     assert pod_uid_from_cgroup_v1() == _POD_UID
 
 
-def test_a_hostpath_volume_under_pods_never_becomes_the_pod_uid(monkeypatch, tmp_path):
+def test_a_non_uuid_segment_under_pods_is_skipped(monkeypatch, tmp_path):
     mountinfo = tmp_path / "mountinfo"
     mountinfo.write_bytes(
         b"900 800 0:50 /srv/pods/"
@@ -102,6 +102,33 @@ def test_a_second_pods_marker_on_one_line_is_searched_too(monkeypatch):
     )
 
     assert pod_uid_from_cgroup_v1() == _POD_UID
+
+
+def test_a_pods_marker_overlapping_the_previous_one_is_searched_too(monkeypatch):
+    line = f"111 222 0:1 /mnt/pods/pods/{_POD_UID}/x /y rw - ext4 /dev/x rw"
+    monkeypatch.setattr(
+        resource_module, "_read_candidate_lines", lambda *a, **k: [line]
+    )
+
+    assert pod_uid_from_cgroup_v1() == _POD_UID
+
+
+def test_a_longer_hex_segment_under_pods_is_not_truncated_into_a_uuid(monkeypatch):
+    line = f"111 222 0:1 / /var/lib/kubelet/pods/{_POD_UID}abcd/etc-hosts rw"
+    monkeypatch.setattr(
+        resource_module, "_read_candidate_lines", lambda *a, **k: [line]
+    )
+
+    assert pod_uid_from_cgroup_v1() is None
+
+
+def test_a_non_uuid_slice_is_never_reported_as_the_pod_uid(monkeypatch):
+    line = "12:devices:/some/pod" + ("Z" * 36) + "/" + ("a" * 64)
+    monkeypatch.setattr(
+        resource_module, "_read_candidate_lines", lambda *a, **k: [line]
+    )
+
+    assert pod_uid_from_cgroup_v2() is None
 
 
 def test_an_etc_hosts_carrying_an_undecodable_byte_still_reports_kubernetes(

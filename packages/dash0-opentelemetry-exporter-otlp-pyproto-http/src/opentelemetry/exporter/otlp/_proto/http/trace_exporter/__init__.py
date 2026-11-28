@@ -184,6 +184,10 @@ class OTLPSpanExporter(SpanExporter):
                 backoff_seconds = 2**retry_num * uniform(0.8, 1.2)
                 timeout_sec = deadline_sec - time()
                 if timeout_sec <= 0:
+                    if export_error is None and status_code is None:
+                        export_error = TimeoutError(
+                            "the export deadline expired before an attempt was made"
+                        )
                     break
                 try:
                     export_error = None

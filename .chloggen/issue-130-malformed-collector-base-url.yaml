@@ -1,0 +1,21 @@
+change_type: bug_fix
+
+component: distro
+
+note: Disable the distribution with one warning when ``DASH0_OTEL_COLLECTOR_BASE_URL`` cannot be parsed, instead of raising out of auto-instrumentation
+
+issues: [130, 153]
+
+subtext: |
+  A value ``urlparse`` rejects, such as the IPv6 literal
+  ``http://[::1:4318`` with its closing bracket missing, raised
+  ``ValueError: Invalid IPv6 URL`` while the distribution configured itself.
+  That happened before the instrumentors were loaded, so the process reported
+  nothing at all, and an injected process deactivated the distribution on top
+  of it.
+
+  Such a value is now treated the same way as an unset
+  ``DASH0_OTEL_COLLECTOR_BASE_URL``: the SDK is turned off, a warning names the
+  variable and the parse error, and startup continues.
+
+change_logs: [user]

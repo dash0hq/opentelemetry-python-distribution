@@ -33,7 +33,11 @@ cgroup v1 is tried first; cgroup v2 is the fallback.
 
 Both standard cgroup path formats and Kubernetes slice naming conventions are handled.
 
+Both readers decode with `errors="replace"`, so a mount path holding bytes that are not valid UTF-8 no longer stops detection.
+A path segment after `/pods/` that is not a UUID is skipped rather than reported, so a `hostPath` volume mounted under a directory named `pods` cannot be mistaken for the pod.
+
 If the detector cannot confirm it is inside a Kubernetes pod, or cannot extract the pod UID, it returns an empty resource without failing.
+A detection error is logged and also returns an empty resource.
 
 **Other `k8s.*` attributes** — such as `k8s.namespace.name`, `k8s.node.name`, `k8s.deployment.name`, and similar — cannot be read from the cgroup filesystem and are not set by this detector.
 They require access to the Kubernetes API and should be added via the [OpenTelemetry Collector's `k8sattributesprocessor`](https://opentelemetry.io/docs/kubernetes/collector/components/#kubernetes-attributes-processor).
@@ -62,6 +66,8 @@ Steps 3 and 4 also supply `service.version`, from `Version` and `[project].versi
 Steps 1, 2 and 5 do not.
 No version is ever invented, because an absent version is more useful than a wrong one.
 Steps 3 and 5 both decline to name a generic runner, so a process launched by one can finish with no detected name at all.
+When a step cannot read the metadata it needs, the error is logged and the detector reports `service.instance.id` alone, leaving `service.name` and `service.version` unset.
+One case that reaches this is a non-UTF-8 byte in the `.dist-info/METADATA` or `entry_points.txt` of any installed package.
 
 **How the installed distribution is identified.**
 A process started by a console script is owned by the distribution that declared that script, which is the common shape of a `pip install .` deployment.

@@ -54,6 +54,10 @@ The distribution does not fall back to the default file in that case, because a 
 
 In file mode the SDK ignores the `OTEL_*` variables in the table above unless the file interpolates them, for example `${OTEL_SERVICE_NAME:-}`.
 
+A `${VAR:-default}` reference takes the default whenever `VAR` is undefined or holds an empty string.
+Setting a variable to the empty string, as a Kubernetes manifest does with `value: ""`, therefore reaches the default rather than clearing the setting.
+A `${VAR}` reference with no default resolves to an empty value, which the parser reads as null, so the setting falls back to whatever the SDK uses when the file omits it.
+
 ## Sampling
 
 The distribution sets `OTEL_TRACES_SAMPLER` to `always_on`.

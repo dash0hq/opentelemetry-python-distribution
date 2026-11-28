@@ -47,10 +47,15 @@ _DISTRO_VERSION = "telemetry.distro.version"
 
 _RUNNER_PROGRAMS = frozenset(
     {
+        "airflow",
+        "apache-airflow",
         "celery",
+        "chalice",
+        "dagster",
         "daphne",
         "django-admin",
         "dramatiq",
+        "fastapi",
         "flask",
         "granian",
         "gunicorn",
@@ -63,16 +68,22 @@ _RUNNER_PROGRAMS = frozenset(
         "pipenv",
         "pipx",
         "poetry",
+        "prefect",
+        "pserve",
         "pytest",
         "python",
         "python3",
         "rq",
         "rqworker",
+        "scrapy",
+        "streamlit",
         "supervisord",
         "tox",
+        "twistd",
         "uv",
         "uvicorn",
         "uvx",
+        "uwsgi",
         "waitress-serve",
     }
 )

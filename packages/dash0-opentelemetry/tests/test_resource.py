@@ -339,6 +339,66 @@ def test_a_generic_runner_run_as_a_module_supplies_no_fallback_name(
     assert detect_fallback_service_name() is None
 
 
+_LAUNCHERS_ADDED_FOR_ISSUE_138 = [
+    "airflow",
+    "apache-airflow",
+    "chalice",
+    "dagster",
+    "fastapi",
+    "prefect",
+    "pserve",
+    "scrapy",
+    "streamlit",
+    "twistd",
+    "uwsgi",
+]
+
+
+@pytest.mark.parametrize("launcher", _LAUNCHERS_ADDED_FOR_ISSUE_138)
+def test_a_launcher_console_script_supplies_no_fallback_name(monkeypatch, launcher):
+    monkeypatch.setattr(resource_module.sys, "argv", [f"/usr/local/bin/{launcher}"])
+
+    assert detect_fallback_service_name() is None
+
+
+@pytest.mark.parametrize(
+    "launcher", ["airflow", "chalice", "dagster", "fastapi", "prefect", "streamlit"]
+)
+def test_a_launcher_run_as_a_module_supplies_no_fallback_name(monkeypatch, launcher):
+    monkeypatch.setattr(resource_module.sys, "orig_argv", [_PYTHON, "-m", launcher])
+    monkeypatch.setattr(resource_module.sys, "argv", ["-m"])
+
+    assert detect_fallback_service_name() is None
+
+
+def test_uwsgi_is_recognized_from_the_bare_name_it_puts_in_argv(monkeypatch):
+    """uWSGI sets ``sys.argv[0]`` to the literal ``uwsgi``, with no directory."""
+    monkeypatch.setattr(resource_module.sys, "argv", ["uwsgi"])
+
+    assert detect_fallback_service_name() is None
+    assert distribution_of_running_program() is None
+
+
+@_needs_tomllib
+def test_fastapi_run_names_the_application_and_not_fastapi(monkeypatch, tmp_path):
+    """``fastapi run main.py`` named the service after FastAPI's own release."""
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "checkout-service"\nversion = "2.4.0"\n', encoding="utf8"
+    )
+    binaries = tmp_path / ".venv" / "bin"
+    binaries.mkdir(parents=True)
+    monkeypatch.setattr(
+        resource_module.sys, "argv", [str(binaries / "fastapi"), "run", "main.py"]
+    )
+    monkeypatch.setattr(
+        resource_module,
+        "distributions",
+        lambda: [_FakeDistribution("fastapi", "0.115.0", ("fastapi",))],
+    )
+
+    assert detect_service_metadata() == ("checkout-service", "2.4.0")
+
+
 def test_a_module_that_is_not_a_runner_still_names_itself(monkeypatch):
     monkeypatch.setattr(resource_module.sys, "orig_argv", [_PYTHON, "-m", "checkout"])
     monkeypatch.setattr(resource_module.sys, "argv", ["-m"])

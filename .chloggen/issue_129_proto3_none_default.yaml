@@ -18,11 +18,12 @@ subtext: |
   stdlib ``logging`` bridge always fills in a timestamp, which is why
   ``logging.info(...)`` was unaffected.
 
-  ``u64``, ``fix32``, ``fix64``, ``dbl`` and ``sint32`` now treat ``None`` as
-  the proto3 default and omit the field, and ``Sum``, ``Histogram`` and
-  ``ExponentialHistogram`` no longer coerce an unset ``aggregation_temporality``
-  with ``int()``. A sweep over every constructor parameter of every message
-  class confirms that passing ``None`` now produces the same bytes
-  ``google.protobuf`` produces for an unset field, for all 129 of them.
+  ``u64``, ``fix32``, ``fix64``, ``dbl``, ``sint32`` and ``_sfixed64`` now treat
+  ``None`` as the proto3 default and omit the field, and ``Sum``, ``Histogram``
+  and ``ExponentialHistogram`` no longer coerce an unset
+  ``aggregation_temporality`` with ``int()``. A sweep over all 143 constructor
+  parameters of all 36 message classes, nested ones included, confirms that
+  passing ``None`` now produces the same bytes ``google.protobuf`` produces for
+  an unset field. 45 of the 143 raised before.
 
 change_logs: [user]

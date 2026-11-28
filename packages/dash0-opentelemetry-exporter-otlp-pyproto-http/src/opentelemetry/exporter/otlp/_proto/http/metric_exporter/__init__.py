@@ -206,13 +206,16 @@ class OTLPMetricExporter(MetricExporter, OTLPMetricExporterMixin):
     ) -> MetricExportResult:
         with self._metrics.export_operation(num_items) as result:
             serialized_data = export_request.SerializeToString()
+            export_error: Exception | None = None
+            status_code: int | None = None
             for retry_num in range(_MAX_RETRYS):
                 backoff_seconds = 2**retry_num * uniform(0.8, 1.2)
-                export_error: Exception | None = None
+                timeout_sec = deadline_sec - time()
+                if timeout_sec <= 0:
+                    break
                 try:
-                    status_code, reason = self._export(
-                        serialized_data, max(0.0, deadline_sec - time())
-                    )
+                    export_error = None
+                    status_code, reason = self._export(serialized_data, timeout_sec)
                     if status_code < 400:
                         return MetricExportResult.SUCCESS
                     retryable = _is_retryable(status_code)
@@ -242,17 +245,7 @@ class OTLPMetricExporter(MetricExporter, OTLPMetricExporterMixin):
                     or backoff_seconds > (deadline_sec - time())
                     or self._shutdown
                 ):
-                    _logger.error(
-                        "Failed to export metrics batch due to timeout, max retries or shutdown."
-                    )
-                    error_attrs = (
-                        {HTTP_RESPONSE_STATUS_CODE: status_code}
-                        if status_code is not None
-                        else None
-                    )
-                    result.error = export_error
-                    result.error_attrs = error_attrs
-                    return MetricExportResult.FAILURE
+                    break
 
                 _logger.warning(
                     "Transient error %s encountered while exporting metrics batch, retrying in %.2fs.",
@@ -262,6 +255,17 @@ class OTLPMetricExporter(MetricExporter, OTLPMetricExporterMixin):
                 if self._shutdown_in_progress.wait(backoff_seconds):
                     _logger.warning("Shutdown in progress, aborting retry.")
                     break
+
+            _logger.error(
+                "Failed to export metrics batch due to timeout, max retries or shutdown."
+            )
+            error_attrs = (
+                {HTTP_RESPONSE_STATUS_CODE: status_code}
+                if status_code is not None
+                else None
+            )
+            result.error = export_error
+            result.error_attrs = error_attrs
             return MetricExportResult.FAILURE
 
     def export(

@@ -312,7 +312,7 @@ class TestOTLPMetricExporter(unittest.TestCase):
         self.assertEqual(len(served), _MAX_RETRYS)
         exporter.shutdown()
 
-    def test_a_backoff_that_overshoots_never_hands_export_a_negative_timeout(self):
+    def test_a_backoff_that_overshoots_the_deadline_makes_no_further_attempt(self):
         exporter = OTLPMetricExporter(timeout=0.5)
         budgets = []
 
@@ -331,8 +331,8 @@ class TestOTLPMetricExporter(unittest.TestCase):
                 ):
                     result = exporter.export(_empty_metrics_data())
         self.assertEqual(result, MetricExportResult.FAILURE)
-        self.assertGreater(len(budgets), 1)
-        self.assertTrue(all(budget >= 0 for budget in budgets))
+        self.assertEqual(len(budgets), 1)
+        self.assertTrue(all(budget > 0 for budget in budgets))
         exporter.shutdown()
 
     def test_export_with_batch_size_sends_multiple_requests(self):

@@ -279,7 +279,7 @@ class TestOTLPSpanExporter(unittest.TestCase):
         self.assertEqual(len(served), _MAX_RETRYS)
         exporter.shutdown()
 
-    def test_a_backoff_that_overshoots_never_hands_export_a_negative_timeout(self):
+    def test_a_backoff_that_overshoots_the_deadline_makes_no_further_attempt(self):
         exporter = OTLPSpanExporter(timeout=0.5)
         budgets = []
 
@@ -298,8 +298,8 @@ class TestOTLPSpanExporter(unittest.TestCase):
                 ):
                     result = exporter.export([])
         self.assertEqual(result, SpanExportResult.FAILURE)
-        self.assertGreater(len(budgets), 1)
-        self.assertTrue(all(budget >= 0 for budget in budgets))
+        self.assertEqual(len(budgets), 1)
+        self.assertTrue(all(budget > 0 for budget in budgets))
         exporter.shutdown()
 
     # ── shutdown ──────────────────────────────────────────────────────────────

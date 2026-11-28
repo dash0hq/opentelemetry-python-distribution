@@ -109,7 +109,12 @@ def test_span_empty_matches_proto() -> None:
 
 def test_span_every_unset_scalar_matches_proto() -> None:
     our = Span(
+        trace_id=None,
+        span_id=None,
+        trace_state=None,
+        parent_span_id=None,
         flags=None,
+        name=None,
         kind=None,
         start_time_unix_nano=None,
         end_time_unix_nano=None,

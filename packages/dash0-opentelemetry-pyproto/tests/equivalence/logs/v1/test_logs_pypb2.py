@@ -59,7 +59,11 @@ def test_log_record_every_unset_scalar_matches_proto() -> None:
         time_unix_nano=None,
         observed_time_unix_nano=None,
         severity_number=None,
+        severity_text=None,
         flags=None,
+        trace_id=None,
+        span_id=None,
+        event_name=None,
         dropped_attributes_count=None,
     )
     assert our.SerializeToString() == ProtoLogRecord().SerializeToString()

@@ -56,7 +56,9 @@ In file mode the SDK ignores the `OTEL_*` variables in the table above unless th
 
 A `${VAR:-default}` reference takes the default whenever `VAR` is undefined or holds an empty string.
 Setting a variable to the empty string, as a Kubernetes manifest does with `value: ""`, therefore reaches the default rather than clearing the setting.
-A `${VAR}` reference with no default resolves to an empty value, which the parser reads as null, so the setting falls back to whatever the SDK uses when the file omits it.
+A `${VAR}` reference with no default resolves to an empty value, which the parser reads as null, and so does `${VAR:-}` with an empty default.
+The setting then falls back to whatever the SDK uses when the file omits it, wherever the schema admits a null in that position.
+Where it does not, as for `log_level`, an exporter's `encoding` and a resource attribute's `name`, the load fails with a schema message that does not name the variable.
 
 ## Sampling
 

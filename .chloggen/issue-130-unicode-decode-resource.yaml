@@ -18,7 +18,11 @@ subtext: |
   bytes was enough to trigger it.
 
   Both files are now decoded with ``errors="replace"``, which leaves the pod UID
-  and the kubelet marker readable, and a failure anywhere in resource detection
-  is logged and no longer stops instrumentation.
+  and the kubelet marker readable. Resource detection that fails for any other
+  reason is now logged instead of stopping the process from being instrumented,
+  on the ``opentelemetry-instrument`` path and on the declarative
+  ``OTEL_CONFIG_FILE`` path alike. One case that reaches the second path is a
+  non-UTF-8 byte in a ``.dist-info/METADATA`` or ``entry_points.txt`` belonging
+  to any installed package.
 
 change_logs: [user]

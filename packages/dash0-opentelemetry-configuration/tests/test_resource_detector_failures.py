@@ -11,19 +11,26 @@ global providers that a process accepts only once, and the claim they make is
 about what the global tracer provider is afterwards.
 """
 
+from pathlib import Path
+from socket import gethostname
 from subprocess import run
 from sys import executable
 from unittest.mock import MagicMock
 
+import pytest
 from opentelemetry._configuration._resource import create_resource
 from opentelemetry._configuration.models import (
     ExperimentalResourceDetection,
     ExperimentalResourceDetector,
 )
 from opentelemetry._configuration.models import Resource as ResourceConfig
-from opentelemetry.sdk.resources import CONTAINER_ID, TELEMETRY_SDK_LANGUAGE
+from opentelemetry.sdk.resources import (
+    CONTAINER_ID,
+    HOST_NAME,
+    TELEMETRY_SDK_LANGUAGE,
+)
 
-_CONFIG_FILE = """\
+_CONFIG_FILE: str = """\
 file_format: "1.0"
 tracer_provider:
   processors:
@@ -36,7 +43,7 @@ resource:
       - container: {}
 """
 
-_MAKE_THE_DETECTOR_RAISE = """\
+_MAKE_THE_DETECTOR_RAISE: str = """\
 from unittest.mock import MagicMock, patch
 
 detector = MagicMock()
@@ -49,7 +56,7 @@ patch(
 ).start()
 """
 
-_PROGRAM = """\
+_PROGRAM: str = """\
 {preamble}
 from opentelemetry.configuration import configure_sdk, load_config_file
 from opentelemetry.trace import get_tracer_provider
@@ -59,15 +66,15 @@ print(type(get_tracer_provider()).__name__)
 """
 
 
-def _container_only_config():
+def _config_listing(**detectors: object) -> ResourceConfig:
     return ResourceConfig(
         detection_development=ExperimentalResourceDetection(
-            detectors=[ExperimentalResourceDetector(container={})]
+            detectors=[ExperimentalResourceDetector(**detectors)]
         )
     )
 
 
-def _tracer_provider_after_configure_sdk(tmp_path, preamble):
+def _tracer_provider_after_configure_sdk(tmp_path: Path, preamble: str) -> str:
     config_file = tmp_path / "otel-config.yaml"
     config_file.write_text(_CONFIG_FILE, encoding="utf8")
     program = _PROGRAM.format(preamble=preamble, path=str(config_file))
@@ -79,10 +86,12 @@ def _tracer_provider_after_configure_sdk(tmp_path, preamble):
     return completed.stdout.strip().splitlines()[-1]
 
 
-def test_a_detector_that_is_not_installed_still_yields_a_resource(caplog):
+def test_a_detector_that_is_not_installed_still_yields_a_resource(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     """``container`` names a schema field whose contrib package this distro omits."""
     with caplog.at_level("WARNING", logger="opentelemetry._configuration._resource"):
-        resource = create_resource(_container_only_config())
+        resource = create_resource(_config_listing(container={}))
 
     assert resource.attributes[TELEMETRY_SDK_LANGUAGE] == "python"
     assert CONTAINER_ID not in resource.attributes
@@ -90,8 +99,8 @@ def test_a_detector_that_is_not_installed_still_yields_a_resource(caplog):
 
 
 def test_a_detector_that_raises_inside_detect_still_yields_a_resource(
-    caplog, monkeypatch
-):
+    caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """``load_entry_point`` never sees a failure that happens after the class loads."""
     detector = MagicMock()
     detector.return_value.detect.side_effect = RuntimeError("no cgroup here")
@@ -103,22 +112,33 @@ def test_a_detector_that_raises_inside_detect_still_yields_a_resource(
     )
 
     with caplog.at_level("ERROR", logger="opentelemetry._configuration._resource"):
-        resource = create_resource(_container_only_config())
+        resource = create_resource(_config_listing(container={}))
 
     assert resource.attributes[TELEMETRY_SDK_LANGUAGE] == "python"
     assert CONTAINER_ID not in resource.attributes
     assert "container" in caplog.text
 
 
+def test_a_detector_that_is_not_installed_does_not_stop_the_detectors_after_it(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """The handler wraps one detector, so a later one still contributes attributes."""
+    with caplog.at_level("WARNING", logger="opentelemetry._configuration._resource"):
+        resource = create_resource(_config_listing(container={}, host={}))
+
+    assert CONTAINER_ID not in resource.attributes
+    assert resource.attributes[HOST_NAME] == gethostname()
+
+
 def test_configure_sdk_still_installs_a_tracer_provider_when_a_detector_is_absent(
-    tmp_path,
-):
+    tmp_path: Path,
+) -> None:
     assert _tracer_provider_after_configure_sdk(tmp_path, "") == "TracerProvider"
 
 
 def test_configure_sdk_still_installs_a_tracer_provider_when_a_detector_raises(
-    tmp_path,
-):
+    tmp_path: Path,
+) -> None:
     assert (
         _tracer_provider_after_configure_sdk(tmp_path, _MAKE_THE_DETECTOR_RAISE)
         == "TracerProvider"

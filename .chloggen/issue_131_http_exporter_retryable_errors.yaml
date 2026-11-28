@@ -35,4 +35,10 @@ subtext: |
   changes there is that ``export`` returns FAILURE and records the error
   instead of raising through the SDK.
 
+  An export attempt is no longer started once the deadline has passed, which
+  happens when a backoff sleep returns later than the time it was given. Such
+  an attempt used to open a connection with a zero timeout, fail with
+  ``BlockingIOError``, and replace the real transport failure in the exporter's
+  error telemetry with ``Operation now in progress``.
+
 change_logs: [user]

@@ -1,0 +1,22 @@
+change_type: bug_fix
+
+component: configuration
+
+note: Substitute the default of a ${VAR:-default} reference in a configuration file when VAR is set to an empty string, as the declarative configuration specification requires
+
+issues: [144]
+
+subtext: |
+  The fallback fired only when the variable was undefined. A Kubernetes
+  manifest written with ``value: ""``, a Compose file with an empty assignment
+  and a ConfigMap key present with no value all set a variable that exists and
+  holds nothing, and every ``${VAR:-fallback}`` in the file then resolved to
+  null. A ``service.name`` built that way arrived as
+  ``unknown_service:python3``, an endpoint fell back to the SDK default, and a
+  header became an empty header that also wiped the ``headers_list`` entry of
+  the same name.
+
+  A reference with no default still resolves to an empty value, which the
+  parser reads as null. That part of the specification is unchanged.
+
+change_logs: []

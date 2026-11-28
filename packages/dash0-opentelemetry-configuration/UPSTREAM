@@ -1,4 +1,4 @@
 repository = https://github.com/dash0hq/opentelemetry-python
 branch = dash0-v1.45.2
-commit = 90f23ad13707603d6009b79747260b3ff31ff3ff
+commit = 4305b1d258a0210a8b1adbf241da80b06325ec4a
 source = opentelemetry-configuration/src/opentelemetry/configuration

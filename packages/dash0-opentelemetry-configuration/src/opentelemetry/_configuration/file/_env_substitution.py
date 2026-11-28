@@ -27,13 +27,15 @@ def substitute_env_vars(text: str) -> str:
     Supports the following syntax:
 
     - ${VAR}: Substitute with environment variable VAR, or an empty value if
-      VAR is not set.
-    - ${VAR:-default}: Substitute with VAR if set, otherwise use default value.
+      VAR is unset or empty.
+    - ${VAR:-default}: Substitute with VAR when VAR holds a non-empty value,
+      otherwise use default value.
     - $$: Escape sequence for literal $.
 
-    Per the declarative configuration specification, a referenced environment
-    variable that is not set and has no default is replaced with an empty
-    value (which the YAML parser then interprets as null). This matches the
+    Per the declarative configuration specification, a default value is
+    substituted when the referenced environment variable is null, empty or
+    undefined, and a reference with no default is replaced with an empty value
+    (which the YAML parser then interprets as null). This matches the
     behavior of the Java and Node.js implementations and lets configuration
     files be shared across languages.
 
@@ -48,6 +50,9 @@ def substitute_env_vars(text: str) -> str:
         >>> substitute_env_vars("${SERVICE_NAME}")
         'my-service'
         >>> substitute_env_vars("${MISSING:-default}")
+        'default'
+        >>> os.environ["EMPTY"] = ""
+        >>> substitute_env_vars("${EMPTY:-default}")
         'default'
         >>> substitute_env_vars("$$100")
         '$100'
@@ -67,9 +72,7 @@ def substitute_env_vars(text: str) -> str:
 
         value = os.environ.get(var_name)
 
-        if value is None:
-            # An unset variable is replaced with its default if one is
-            # provided, otherwise with an empty value, per the spec.
+        if not value:
             return default_value or ""
 
         # Substitution runs on an already-parsed configuration value, so the

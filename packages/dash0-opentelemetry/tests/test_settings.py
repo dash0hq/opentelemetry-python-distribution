@@ -66,3 +66,13 @@ def test_gate_disabled_without_endpoint():
 
     assert enabled is False
     assert DASH0_OTEL_COLLECTOR_BASE_URL in reason
+
+
+def test_gate_disabled_by_an_endpoint_urlparse_rejects(monkeypatch):
+    monkeypatch.setenv(DASH0_OTEL_COLLECTOR_BASE_URL, "http://[::1:4318")
+
+    enabled, reason = evaluate_gate()
+
+    assert enabled is False
+    assert DASH0_OTEL_COLLECTOR_BASE_URL in reason
+    assert "Invalid IPv6 URL" in reason

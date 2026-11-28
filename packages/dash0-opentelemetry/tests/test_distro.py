@@ -316,14 +316,14 @@ def test_configure_disabled_when_no_collector_endpoint():
     assert OTEL_TRACES_EXPORTER not in os.environ
 
 
-def test_a_base_url_urlparse_rejects_still_leaves_the_exporters_configured(monkeypatch):
+def test_a_base_url_urlparse_rejects_disables_the_sdk_instead_of_raising(monkeypatch):
     monkeypatch.setenv(DASH0_OTEL_COLLECTOR_BASE_URL, "http://[::1:4318")
 
     Dash0Distro().configure()
 
-    assert os.environ[OTEL_TRACES_EXPORTER] == "otlp_proto_http"
-    assert os.environ[OTEL_EXPORTER_OTLP_ENDPOINT] == "http://[::1:4318"
-    assert OTEL_EXPORTER_OTLP_TRACES_ENDPOINT not in os.environ
+    assert os.environ[OTEL_SDK_DISABLED] == "true"
+    assert OTEL_TRACES_EXPORTER not in os.environ
+    assert OTEL_EXPORTER_OTLP_ENDPOINT not in os.environ
 
 
 def test_configure_isolates_resource_detection_failures(monkeypatch):

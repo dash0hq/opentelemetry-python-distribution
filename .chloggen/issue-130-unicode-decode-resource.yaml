@@ -1,6 +1,6 @@
 change_type: bug_fix
 
-component: resource
+component: resource-detectors
 
 note: Keep auto-instrumentation working when ``/etc/hosts`` or ``/proc/self/mountinfo`` holds a byte that UTF-8 cannot decode
 

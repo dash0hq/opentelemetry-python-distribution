@@ -1,6 +1,6 @@
 change_type: bug_fix
 
-component: resource
+component: resource-detectors
 
 note: Report ``k8s.pod.uid`` only when the path segment carrying it has the shape of a pod UID
 

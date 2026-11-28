@@ -132,7 +132,7 @@ def test_a_detector_that_raises_inside_detect_still_yields_a_resource(
 def test_a_detector_the_schema_does_not_declare_still_yields_a_resource(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """A name outside the four schema fields arrives through ``additional_properties``."""
+    """A name the schema omits arrives through ``additional_properties``."""
     with caplog.at_level("WARNING", logger="opentelemetry._configuration._resource"):
         resource = create_resource(_config_listing(**{"aws_ecs": {}}))
 
@@ -144,7 +144,7 @@ def test_a_detector_the_schema_does_not_declare_still_yields_a_resource(
 def test_a_built_in_detector_that_raises_still_yields_a_resource(
     caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """``host``, ``process`` and ``service`` run from the registry, not an entry point."""
+    """``host``, ``process`` and ``service`` skip the entry point group."""
     monkeypatch.setitem(
         _RESOURCE_DETECTOR_REGISTRY,
         "process",

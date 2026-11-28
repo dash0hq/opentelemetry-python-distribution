@@ -123,9 +123,25 @@ def test_a_static_pod_uid_with_no_hyphens_is_detected(monkeypatch):
     assert pod_uid_from_cgroup_v1() == static_uid
 
 
-def test_a_static_pod_uid_with_no_hyphens_is_detected_from_a_cgroup_slice(monkeypatch):
+def test_a_static_pod_uid_with_no_hyphens_is_detected_from_a_cgroupfs_segment(
+    monkeypatch,
+):
     static_uid = "d4a0cb0a1d5a11ea9d3642010a800175"
     line = f"12:devices:/kubepods/besteffort/pod{static_uid}/" + ("a" * 64)
+    monkeypatch.setattr(
+        resource_module, "_read_candidate_lines", lambda *a, **k: [line]
+    )
+
+    assert pod_uid_from_cgroup_v2() == static_uid
+
+
+def test_a_static_pod_uid_with_no_hyphens_is_detected_from_a_systemd_slice(monkeypatch):
+    static_uid = "d4a0cb0a1d5a11ea9d3642010a800175"
+    line = (
+        "0::/kubepods.slice/kubepods-besteffort.slice/"
+        f"kubepods-besteffort-pod{static_uid}.slice/"
+        "cri-containerd-" + ("a" * 64) + ".scope"
+    )
     monkeypatch.setattr(
         resource_module, "_read_candidate_lines", lambda *a, **k: [line]
     )

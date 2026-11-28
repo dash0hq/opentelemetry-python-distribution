@@ -88,13 +88,13 @@ _POD_MOUNT_MARKER = "/pods/"
 _POD_UID_LEN = 36
 _CONTAINER_ID_LEN = 64
 _POD_LABEL = "pod"
+_POD_UID_PATTERN = (
+    r"(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[0-9a-f]{32})"
+)
 # matches cgroup v2 slices like kubepods-pode462ffed_94ce_4806_a52e_d2726f448f15.slice
 _POD_UID_IN_CGROUP = re.compile(
     r"^[a-z_-]*pod(?P<uid>[0-9a-f]{8}[-_][0-9a-f]{4}[-_][0-9a-f]{4}"
-    r"[-_][0-9a-f]{4}[-_][0-9a-f]{12})\.slice$"
-)
-_POD_UID_PATTERN = (
-    r"(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[0-9a-f]{32})"
+    r"[-_][0-9a-f]{4}[-_][0-9a-f]{12}|[0-9a-f]{32})\.slice$"
 )
 _POD_UID_EXACT = re.compile(_POD_UID_PATTERN)
 _POD_UID_IN_MOUNTINFO = re.compile(

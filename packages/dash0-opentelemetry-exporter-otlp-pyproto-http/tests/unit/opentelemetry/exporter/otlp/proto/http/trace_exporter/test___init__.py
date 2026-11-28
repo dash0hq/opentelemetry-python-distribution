@@ -197,28 +197,29 @@ class TestOTLPSpanExporter(unittest.TestCase):
         exporter.shutdown()
         return result, export.call_count
 
-    def test_read_timeout_is_retried_rather_than_escaping_export(self):
-        result, attempts = self._export_with_each_attempt_raising(
-            TimeoutError("timed out")
-        )
+    def test_read_timeout_returns_failure_instead_of_escaping_export(self):
+        exporter = OTLPSpanExporter(timeout=0.01)
+        with patch.object(exporter, "_export", side_effect=TimeoutError("timed out")):
+            with patch(_UNIFORM, return_value=100.0):
+                result = exporter.export([])
         self.assertEqual(result, SpanExportResult.FAILURE)
-        self.assertEqual(attempts, _MAX_RETRYS)
+        exporter.shutdown()
 
-    def test_remote_disconnected_is_retried_rather_than_escaping_export(self):
+    def test_remote_disconnected_is_retried_until_the_budget_is_spent(self):
         result, attempts = self._export_with_each_attempt_raising(
             RemoteDisconnected("Remote end closed connection without response")
         )
         self.assertEqual(result, SpanExportResult.FAILURE)
         self.assertEqual(attempts, _MAX_RETRYS)
 
-    def test_connection_reset_is_retried_rather_than_escaping_export(self):
+    def test_connection_reset_is_retried_until_the_budget_is_spent(self):
         result, attempts = self._export_with_each_attempt_raising(
             ConnectionResetError(104, "Connection reset by peer")
         )
         self.assertEqual(result, SpanExportResult.FAILURE)
         self.assertEqual(attempts, _MAX_RETRYS)
 
-    def test_bad_status_line_is_retried_rather_than_escaping_export(self):
+    def test_bad_status_line_is_retried_until_the_budget_is_spent(self):
         result, attempts = self._export_with_each_attempt_raising(
             BadStatusLine("not an http response")
         )

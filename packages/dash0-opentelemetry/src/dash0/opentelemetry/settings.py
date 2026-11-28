@@ -7,11 +7,16 @@ checked is the one the SDK will export to, which is ``OTEL_EXPORTER_OTLP_ENDPOIN
 when the user set it, and an endpoint ``urlparse`` rejects counts as no endpoint
 at all. A per-signal endpoint the user set is checked the same way, because it
 is the endpoint its own signal exports to, and is skipped when that signal's
-exporter is not an OTLP one, because then nothing ever parses it.
+exporter is not an OTLP one, because then nothing ever parses it. Every endpoint
+is skipped under declarative configuration, which builds its exporters from the
+configuration file and reads none of these variables.
 """
 
 from os import environ
+from os.path import isfile
 from urllib.parse import urlparse
+
+from opentelemetry.sdk.environment_variables import OTEL_CONFIG_FILE
 
 from ._environment_variables import (
     DASH0_DISABLE,
@@ -33,6 +38,8 @@ _PER_SIGNAL_ENDPOINTS = (
 
 _OTLP_EXPORTER_NAMES = frozenset({"otlp", "otlp_proto_grpc", "otlp_proto_http"})
 
+_DEFAULT_CONFIG_FILE = "/etc/opentelemetry/python/otel-config.yaml"
+
 
 def is_true(value):
     return value is not None and value.strip().lower() == "true"
@@ -52,6 +59,8 @@ def evaluate_gate():
     base_url = environ.get(DASH0_OTEL_COLLECTOR_BASE_URL)
     if not base_url:
         return False, f"{DASH0_OTEL_COLLECTOR_BASE_URL} is not set"
+    if environ.get(OTEL_CONFIG_FILE) or isfile(_DEFAULT_CONFIG_FILE):
+        return True, None
     override = environ.get(OTEL_EXPORTER_OTLP_ENDPOINT)
     shared_variable = (
         OTEL_EXPORTER_OTLP_ENDPOINT if override else DASH0_OTEL_COLLECTOR_BASE_URL

@@ -23,6 +23,11 @@ subtext: |
   or anything else that is not an OTLP exporter never parses its endpoint, so
   that endpoint is left alone.
 
+  Declarative configuration builds its exporters from the configuration file and
+  reads none of these variables, so under ``OTEL_CONFIG_FILE``, or under the
+  ``/etc/opentelemetry/python/otel-config.yaml`` a Dash0 language package
+  installs, no endpoint variable is checked at all.
+
   Such a value is now treated the same way as an unset
   ``DASH0_OTEL_COLLECTOR_BASE_URL``: the SDK is turned off, a warning names the
   variable and the parse error, and startup continues.

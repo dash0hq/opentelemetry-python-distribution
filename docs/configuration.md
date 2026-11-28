@@ -33,7 +33,7 @@ The following variables are relevant to the distribution's behavior:
 | `OTEL_RESOURCE_ATTRIBUTES` | — | Additional resource attributes. The distro reads this to detect whether `service.name` is already set, and appends its own detected attributes (`telemetry.distro.*`, `k8s.pod.uid`) to it. |
 | `OTEL_PYTHON_DISABLED_INSTRUMENTATIONS` | — | Comma-separated list of instrumentor entry-point names to skip (e.g. `flask,redis`). Honored by the auto-instrumentation loader. |
 | `OTEL_EXPERIMENTAL_RESOURCE_DETECTORS` | — | Comma-separated resource detector names, honored by the SDK's environment-based configuration. Declarative configuration (`OTEL_CONFIG_FILE`) never reads it. |
-| `OTEL_CONFIG_FILE` | `/etc/opentelemetry/python/otel-config.yaml` when that file exists | Path to a declarative SDK configuration file, which takes over from every variable above that configures providers, exporters or the resource. List the `dash0_*` detectors in the file to keep `telemetry.distro.*`, `k8s.pod.uid` and the `service.name` fallback. See [Configuration file](#configuration-file). |
+| `OTEL_CONFIG_FILE` | `/etc/opentelemetry/python/otel-config.yaml` when that file exists | Path to a declarative SDK configuration file, which takes over from every variable above that configures providers, exporters or the resource. List the `dash0_*` detectors in the file to keep `telemetry.distro.*`, `k8s.pod.uid` and the `service.name` fallback. The gate checks no endpoint variable while this file is in effect, because the SDK builds its exporters from the file and reads none of them. See [Configuration file](#configuration-file). |
 
 ## Configuration file
 

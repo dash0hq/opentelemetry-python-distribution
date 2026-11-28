@@ -1,4 +1,5 @@
 import pytest
+from dash0.opentelemetry import settings as settings_module
 from dash0.opentelemetry._environment_variables import (
     DASH0_DISABLE,
     DASH0_OTEL_COLLECTOR_BASE_URL,
@@ -9,10 +10,12 @@ from dash0.opentelemetry._environment_variables import (
     OTEL_LOGS_EXPORTER,
 )
 from dash0.opentelemetry.settings import evaluate_gate, is_false, is_true
+from opentelemetry.sdk.environment_variables import OTEL_CONFIG_FILE
 
 
 @pytest.fixture(autouse=True)
 def _clean_env(monkeypatch):
+    monkeypatch.delenv(OTEL_CONFIG_FILE, raising=False)
     monkeypatch.delenv(DASH0_DISABLE, raising=False)
     monkeypatch.delenv(DASH0_OTEL_COLLECTOR_BASE_URL, raising=False)
     monkeypatch.delenv(OTEL_EXPORTER_OTLP_ENDPOINT, raising=False)
@@ -191,6 +194,53 @@ def test_gate_disabled_when_the_signal_of_a_rejected_endpoint_uses_otlp(
 
     assert enabled is False
     assert OTEL_EXPORTER_OTLP_LOGS_ENDPOINT in reason
+
+
+@pytest.mark.parametrize(
+    "variable",
+    [DASH0_OTEL_COLLECTOR_BASE_URL, OTEL_EXPORTER_OTLP_TRACES_ENDPOINT],
+)
+def test_gate_enabled_by_a_rejected_endpoint_under_an_explicit_config_file(
+    monkeypatch, tmp_path, variable
+):
+    config_file = tmp_path / "otel-config.yaml"
+    config_file.write_text('file_format: "1.0"\n')
+    monkeypatch.setenv(DASH0_OTEL_COLLECTOR_BASE_URL, "http://collector:4318")
+    monkeypatch.setenv(variable, "http://[::1:4318")
+    monkeypatch.setenv(OTEL_CONFIG_FILE, str(config_file))
+
+    enabled, reason = evaluate_gate()
+
+    assert enabled is True
+    assert reason is None
+
+
+def test_gate_enabled_by_a_rejected_endpoint_under_the_default_config_file(
+    monkeypatch, tmp_path
+):
+    config_file = tmp_path / "otel-config.yaml"
+    config_file.write_text('file_format: "1.0"\n')
+    monkeypatch.setattr(settings_module, "_DEFAULT_CONFIG_FILE", str(config_file))
+    monkeypatch.setenv(DASH0_OTEL_COLLECTOR_BASE_URL, "http://collector:4318")
+    monkeypatch.setenv(OTEL_EXPORTER_OTLP_TRACES_ENDPOINT, "http://[::1:4318")
+
+    enabled, reason = evaluate_gate()
+
+    assert enabled is True
+    assert reason is None
+
+
+def test_gate_disabled_by_a_rejected_endpoint_when_the_config_file_variable_is_empty(
+    monkeypatch,
+):
+    monkeypatch.setenv(DASH0_OTEL_COLLECTOR_BASE_URL, "http://collector:4318")
+    monkeypatch.setenv(OTEL_EXPORTER_OTLP_TRACES_ENDPOINT, "http://[::1:4318")
+    monkeypatch.setenv(OTEL_CONFIG_FILE, "")
+
+    enabled, reason = evaluate_gate()
+
+    assert enabled is False
+    assert OTEL_EXPORTER_OTLP_TRACES_ENDPOINT in reason
 
 
 def test_gate_enabled_by_per_signal_endpoints_that_parse(monkeypatch):

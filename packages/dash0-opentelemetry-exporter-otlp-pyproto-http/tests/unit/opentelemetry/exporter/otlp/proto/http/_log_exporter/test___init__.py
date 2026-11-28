@@ -4,11 +4,13 @@
 # pylint: disable=protected-access
 
 import unittest
+from contextlib import contextmanager
 from http.client import BadStatusLine, InvalidURL, RemoteDisconnected
 from os import environ
 from socket import AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR, socket
 from threading import Thread
 from time import sleep
+from types import SimpleNamespace
 from unittest.mock import patch
 from urllib.error import URLError
 
@@ -22,8 +24,21 @@ from opentelemetry.exporter.otlp.proto.http._log_exporter import (
     _append_logs_path,
 )
 from opentelemetry.sdk._logs.export import LogRecordExportResult
+from opentelemetry.semconv.attributes.http_attributes import (
+    HTTP_RESPONSE_STATUS_CODE,
+)
 
 _UNIFORM = "opentelemetry.exporter.otlp.proto.http._log_exporter.uniform"
+
+
+def _exporter_metrics_that_keep_every_result(results):
+    @contextmanager
+    def export_operation(num_items):
+        result = SimpleNamespace(error=None, error_attrs=None)
+        results.append(result)
+        yield result
+
+    return SimpleNamespace(export_operation=export_operation)
 
 
 def _server_that_closes_after_reading_the_request():
@@ -202,11 +217,14 @@ class TestOTLPLogExporter(unittest.TestCase):
 
     def test_shutdown_interrupts_retry(self):
         exporter = OTLPLogExporter(timeout=100)
+        results = []
+        exporter._metrics = _exporter_metrics_that_keep_every_result(results)
         with patch.object(exporter, "_export", return_value=_503()):
             with patch(_UNIFORM, return_value=0.0001):
                 with patch.object(exporter._shutdown_is_occuring, "wait", return_value=True):
                     result = exporter.export([])
         self.assertEqual(result, LogRecordExportResult.FAILURE)
+        self.assertEqual(results[0].error_attrs, {HTTP_RESPONSE_STATUS_CODE: 503})
         exporter.shutdown()
 
     def test_connection_error_is_retryable(self):
@@ -279,6 +297,8 @@ class TestOTLPLogExporter(unittest.TestCase):
 
     def test_a_backoff_that_overshoots_the_deadline_makes_no_further_attempt(self):
         exporter = OTLPLogExporter(timeout=0.5)
+        results = []
+        exporter._metrics = _exporter_metrics_that_keep_every_result(results)
         budgets = []
 
         def record_the_budget_and_fail(serialized_data, timeout_sec=None):
@@ -298,6 +318,21 @@ class TestOTLPLogExporter(unittest.TestCase):
         self.assertEqual(result, LogRecordExportResult.FAILURE)
         self.assertEqual(len(budgets), 1)
         self.assertTrue(all(budget > 0 for budget in budgets))
+        self.assertIsInstance(results[0].error, URLError)
+        exporter.shutdown()
+
+    def test_a_deadline_already_spent_records_a_timeout_without_an_attempt(self):
+        exporter = OTLPLogExporter(timeout=100)
+        results = []
+        exporter._metrics = _exporter_metrics_that_keep_every_result(results)
+        exporter._timeout = 0
+
+        with patch.object(exporter, "_export") as export:
+            result = exporter.export([])
+        self.assertEqual(result, LogRecordExportResult.FAILURE)
+        self.assertEqual(export.call_count, 0)
+        self.assertIsInstance(results[0].error, TimeoutError)
+        self.assertIsNone(results[0].error_attrs)
         exporter.shutdown()
 
     # ── shutdown ──────────────────────────────────────────────────────────────

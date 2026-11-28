@@ -13,6 +13,7 @@ from typing import Any
 from urllib import parse
 
 from opentelemetry._configuration._common import load_entry_point
+from opentelemetry._configuration._exceptions import ConfigurationError
 from opentelemetry._configuration.models import (
     AttributeNameValue,
     AttributeType,
@@ -174,22 +175,31 @@ def _run_detectors(
     unknown plugin detectors captured in additional_properties — are
     loaded via the ``opentelemetry_resource_detector`` entry point group.
 
+    A detector that cannot be loaded, or that fails inside ``detect()``, is
+    logged and skipped. The remaining detectors still run, and so does the
+    rest of the SDK configuration that follows resource creation.
+
     The detected_attrs dict is updated in-place; later detectors overwrite
     earlier ones for the same key.
     """
-    for name in dataclasses.fields(detector_config):
-        value = getattr(detector_config, name.name, None)
-        if value is None:
-            continue
-        if name.name in _RESOURCE_DETECTOR_REGISTRY:
-            detected_attrs.update(_RESOURCE_DETECTOR_REGISTRY[name.name](value))
-        else:
-            cls = load_entry_point("opentelemetry_resource_detector", name.name)
-            detected_attrs.update(cls(**(value or {})).detect().attributes)
+    requested: list[tuple[str, Any]] = [
+        (field.name, value)
+        for field in dataclasses.fields(detector_config)
+        if (value := getattr(detector_config, field.name, None)) is not None
+    ]
+    requested.extend(detector_config.additional_properties.items())
 
-    for name, plugin_config in detector_config.additional_properties.items():
-        cls = load_entry_point("opentelemetry_resource_detector", name)
-        detected_attrs.update(cls(**(plugin_config or {})).detect().attributes)
+    for name, value in requested:
+        try:
+            if name in _RESOURCE_DETECTOR_REGISTRY:
+                detected_attrs.update(_RESOURCE_DETECTOR_REGISTRY[name](value))
+            else:
+                cls = load_entry_point("opentelemetry_resource_detector", name)
+                detected_attrs.update(cls(**(value or {})).detect().attributes)
+        except ConfigurationError as exc:
+            _logger.warning("Skipping resource detector '%s' in declarative config: %s", name, exc)
+        except Exception:  # pylint: disable=broad-except
+            _logger.exception("Failed to run resource detector '%s' from declarative config", name)
 
 
 def _filter_attributes(attrs: dict[str, object], filter_config: IncludeExclude | None) -> dict[str, object]:

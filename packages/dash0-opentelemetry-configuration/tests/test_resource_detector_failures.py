@@ -100,6 +100,8 @@ def test_a_detector_that_is_not_installed_still_yields_a_resource(
     assert resource.attributes[TELEMETRY_SDK_LANGUAGE] == "python"
     assert CONTAINER_ID not in resource.attributes
     assert "container" in caplog.text
+    assert [record.levelname for record in caplog.records] == ["WARNING"]
+    assert caplog.records[0].exc_info is None
 
 
 def test_a_detector_that_raises_inside_detect_still_yields_a_resource(
@@ -121,6 +123,8 @@ def test_a_detector_that_raises_inside_detect_still_yields_a_resource(
     assert resource.attributes[TELEMETRY_SDK_LANGUAGE] == "python"
     assert CONTAINER_ID not in resource.attributes
     assert "container" in caplog.text
+    assert [record.levelname for record in caplog.records] == ["ERROR"]
+    assert caplog.records[0].exc_info is not None
 
 
 def test_a_detector_that_is_not_installed_does_not_stop_the_detectors_after_it(

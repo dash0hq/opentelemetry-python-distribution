@@ -17,6 +17,14 @@ subtext: |
   the same name.
 
   A reference with no default still resolves to an empty value, which the
-  parser reads as null. That part of the specification is unchanged.
+  parser reads as null. That part of the specification is unchanged, so
+  ``${VAR:-}`` still resolves to null exactly as ``${VAR}`` does.
+
+  The 0.4.0 section of this changelog says "No default of any kind covers a
+  variable the environment has but holds empty, since a default applies only
+  to a name the environment does not have at all". That sentence stops being
+  true here. A real default now covers an empty variable, and a configuration
+  file that worked around the old rule by deleting the variable instead of
+  emptying it can set it to an empty string again.
 
 change_logs: []

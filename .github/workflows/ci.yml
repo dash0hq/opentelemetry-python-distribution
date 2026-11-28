@@ -53,17 +53,21 @@ jobs:
           --python ${{ matrix.python-version }}
           python -m pytest packages/dash0-opentelemetry-configuration/tests -v
       - name: Run pyproto encoder unit and equivalence tests
-        run: >
-          uv run --package dash0-opentelemetry
-          --python ${{ matrix.python-version }}
-          --with protobuf==7.36.2
-          --with opentelemetry-proto==1.45.2
-          --with opentelemetry-exporter-otlp-proto-common==1.45.2
-          python -m pytest
-          packages/dash0-opentelemetry-pyproto/tests/unit
-          packages/dash0-opentelemetry-pyproto/tests/equivalence
-          packages/dash0-opentelemetry-exporter-otlp-pyproto-common/tests/equivalence
-          -v
+        run: |
+          set -euo pipefail
+          oracle=$(grep -oP '"opentelemetry-sdk\s*==\s*\K[^"]+' \
+            packages/dash0-opentelemetry/pyproject.toml)
+          echo "Comparing the vendored encoder against upstream $oracle."
+          uv run --package dash0-opentelemetry \
+            --python ${{ matrix.python-version }} \
+            --with protobuf==7.36.2 \
+            --with "opentelemetry-proto==$oracle" \
+            --with "opentelemetry-exporter-otlp-proto-common==$oracle" \
+            python -m pytest \
+            packages/dash0-opentelemetry-pyproto/tests/unit \
+            packages/dash0-opentelemetry-pyproto/tests/equivalence \
+            packages/dash0-opentelemetry-exporter-otlp-pyproto-common/tests/equivalence \
+            -v
 
   test-against-wrapt-2:
     runs-on: ubuntu-latest

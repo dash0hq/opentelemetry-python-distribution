@@ -158,8 +158,21 @@ def test_a_longer_hex_segment_under_pods_is_not_truncated_into_a_uuid(monkeypatc
     assert pod_uid_from_cgroup_v1() is None
 
 
-def test_a_non_uuid_slice_is_never_reported_as_the_pod_uid(monkeypatch):
+def test_a_non_uuid_cgroupfs_segment_is_never_reported_as_the_pod_uid(monkeypatch):
     line = "12:devices:/some/pod" + ("Z" * 36) + "/" + ("a" * 64)
+    monkeypatch.setattr(
+        resource_module, "_read_candidate_lines", lambda *a, **k: [line]
+    )
+
+    assert pod_uid_from_cgroup_v2() is None
+
+
+def test_a_non_uuid_systemd_slice_is_never_reported_as_the_pod_uid(monkeypatch):
+    line = (
+        "0::/kubepods.slice/kubepods-besteffort.slice/"
+        "kubepods-besteffort-pod" + ("Z" * 36) + ".slice/"
+        "cri-containerd-" + ("a" * 64) + ".scope"
+    )
     monkeypatch.setattr(
         resource_module, "_read_candidate_lines", lambda *a, **k: [line]
     )

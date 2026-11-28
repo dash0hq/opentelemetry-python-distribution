@@ -16,7 +16,7 @@ helper combines three operations that every SerializeToString() method must
 perform for every field it writes:
 
     1. Apply the proto3 default-omission rule — if the value equals the type's
-       default (0, 0.0, False, b"", ""), return b"" immediately.
+       default (0, 0.0, False, b"", "") or is None, return b"" immediately.
     2. Encode the tag — (field_number << 3) | wire_type, then varint-encoded.
     3. Encode the value — using the appropriate primitive from this package.
 
@@ -314,7 +314,7 @@ def fix64(field: int, value: int | None) -> bytes:
 
 
 def dbl(field: int, value: float | None) -> bytes:
-    """Encode a proto3 double field (8-byte IEEE 754), omitting when zero.
+    """Encode a proto3 double field (8-byte IEEE 754), omitting zero and None.
 
     double uses wire type WT_64BIT. The decoder reads exactly 8 bytes and
     interprets them as an IEEE 754 double-precision floating-point number in
@@ -387,7 +387,7 @@ def opt_dbl(field: int, value: float | None) -> bytes:
 
 
 def sint32(field: int, value: int | None) -> bytes:
-    """Encode a proto3 sint32 field (ZigZag varint), omitting when zero.
+    """Encode a proto3 sint32 field (ZigZag varint), omitting zero and None.
 
     sint32 uses wire type WT_VARINT but applies ZigZag encoding before the
     varint step. ZigZag maps signed integers to unsigned integers so that

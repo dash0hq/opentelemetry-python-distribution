@@ -37,7 +37,7 @@ Both standard cgroup path formats and Kubernetes slice naming conventions are ha
 A path segment is accepted as a pod UID only when it is a lowercase hyphenated UUID, or the 32 hexadecimal characters the kubelet assigns to a static pod whose manifest carries no `metadata.uid`.
 Any other segment is skipped and the search carries on.
 
-The first accepted UUID in the file wins, and the detector has no way to tell which pod it belongs to.
+The first accepted pod UID in the file wins, and the detector has no way to tell which pod it belongs to.
 A container that can see other pods' mounts, such as a DaemonSet that mounts `/var/lib/kubelet`, can therefore report another pod's UID.
 
 If the detector cannot confirm it is inside a Kubernetes pod, or cannot extract the pod UID, it returns an empty resource without failing.

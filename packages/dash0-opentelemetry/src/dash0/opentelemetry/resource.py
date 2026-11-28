@@ -144,8 +144,9 @@ def running_in_kubernetes():
 def pod_uid_from_cgroup_v1():
     """The pod UID of the first ``/pods/<uid>`` mount path that holds one.
 
-    A path segment after ``/pods/`` that is not a UUID is skipped, and the
-    search carries on through the rest of the file.
+    A path segment after ``/pods/`` that has neither the shape of a lowercase
+    hyphenated UUID nor that of a 32-character static pod UID is skipped, and
+    the search carries on through the rest of the file.
     """
     for line in _read_candidate_lines(_CGROUP_V1_MOUNTINFO, _POD_UID_LEN):
         match = _POD_UID_IN_MOUNTINFO.search(line)

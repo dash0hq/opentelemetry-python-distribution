@@ -98,3 +98,32 @@ def test_gate_disabled_by_an_override_urlparse_rejects(monkeypatch):
 
     assert enabled is False
     assert OTEL_EXPORTER_OTLP_ENDPOINT in reason
+
+
+def test_gate_disabled_by_an_endpoint_whose_port_is_not_a_number(monkeypatch):
+    monkeypatch.setenv(DASH0_OTEL_COLLECTOR_BASE_URL, "http://collector:notaport")
+
+    enabled, reason = evaluate_gate()
+
+    assert enabled is False
+    assert DASH0_OTEL_COLLECTOR_BASE_URL in reason
+    assert "notaport" in reason
+
+
+def test_gate_disabled_by_an_override_whose_port_is_not_a_number(monkeypatch):
+    monkeypatch.setenv(DASH0_OTEL_COLLECTOR_BASE_URL, "http://collector:4318")
+    monkeypatch.setenv(OTEL_EXPORTER_OTLP_ENDPOINT, "http://collector:notaport")
+
+    enabled, reason = evaluate_gate()
+
+    assert enabled is False
+    assert OTEL_EXPORTER_OTLP_ENDPOINT in reason
+
+
+def test_gate_enabled_by_an_endpoint_with_no_port(monkeypatch):
+    monkeypatch.setenv(DASH0_OTEL_COLLECTOR_BASE_URL, "http://collector")
+
+    enabled, reason = evaluate_gate()
+
+    assert enabled is True
+    assert reason is None

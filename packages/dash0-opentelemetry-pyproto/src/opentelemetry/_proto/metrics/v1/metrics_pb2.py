@@ -345,7 +345,10 @@ class Sum:
 
     def SerializeToString(self) -> bytes:
         temp = self.aggregation_temporality
-        temp_int = temp.value if hasattr(temp, "value") else int(temp)
+        if temp is None:
+            temp_int = None
+        else:
+            temp_int = temp.value if hasattr(temp, "value") else int(temp)
         return (
             b"".join(msg(1, dp.SerializeToString()) for dp in self.data_points)
             + u64(2, temp_int)
@@ -366,7 +369,10 @@ class Histogram:
 
     def SerializeToString(self) -> bytes:
         temp = self.aggregation_temporality
-        temp_int = temp.value if hasattr(temp, "value") else int(temp)
+        if temp is None:
+            temp_int = None
+        else:
+            temp_int = temp.value if hasattr(temp, "value") else int(temp)
         return (
             b"".join(msg(1, dp.SerializeToString()) for dp in self.data_points)
             + u64(2, temp_int)
@@ -386,7 +392,10 @@ class ExponentialHistogram:
 
     def SerializeToString(self) -> bytes:
         temp = self.aggregation_temporality
-        temp_int = temp.value if hasattr(temp, "value") else int(temp)
+        if temp is None:
+            temp_int = None
+        else:
+            temp_int = temp.value if hasattr(temp, "value") else int(temp)
         return (
             b"".join(msg(1, dp.SerializeToString()) for dp in self.data_points)
             + u64(2, temp_int)

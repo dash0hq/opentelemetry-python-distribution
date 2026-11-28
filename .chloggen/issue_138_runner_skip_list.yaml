@@ -2,14 +2,14 @@ change_type: bug_fix
 
 component: resource-detectors
 
-note: Name the application rather than the launcher when it is started with fastapi, streamlit, scrapy, airflow, uwsgi, chalice, pserve, twistd, dagster or prefect
+note: Name the application rather than the launcher when it is started with fastapi, streamlit, scrapy, airflow, apache-airflow, uwsgi, chalice, pserve, twist, twistd, dagster or prefect
 
 issues: [138]
 
 subtext: |
   The service-name detector skips a launcher, a console script that runs
-  someone else's application, and reports the application instead. Ten common
-  launchers were missing from that list, so ``fastapi run main.py`` reported
+  someone else's application, and reports the application instead. Twelve
+  launcher names were missing from that list, so ``fastapi run main.py`` reported
   ``service.name=fastapi`` and carried FastAPI's own release as
   ``service.version``. Every deployment started that way collapsed into a
   single service, and the detected name beat both the application's own

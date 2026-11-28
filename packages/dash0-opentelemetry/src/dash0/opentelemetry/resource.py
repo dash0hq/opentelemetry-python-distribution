@@ -79,6 +79,7 @@ _RUNNER_PROGRAMS = frozenset(
         "streamlit",
         "supervisord",
         "tox",
+        "twist",
         "twistd",
         "uv",
         "uvicorn",

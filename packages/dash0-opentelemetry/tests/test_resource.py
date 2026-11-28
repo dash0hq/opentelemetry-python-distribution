@@ -349,6 +349,7 @@ _LAUNCHERS_ADDED_FOR_ISSUE_138 = [
     "pserve",
     "scrapy",
     "streamlit",
+    "twist",
     "twistd",
     "uwsgi",
 ]

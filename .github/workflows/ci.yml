@@ -56,9 +56,9 @@ jobs:
         run: >
           uv run --package dash0-opentelemetry
           --python ${{ matrix.python-version }}
-          --with protobuf
-          --with opentelemetry-proto
-          --with opentelemetry-exporter-otlp-proto-common
+          --with protobuf==7.36.2
+          --with opentelemetry-proto==1.45.2
+          --with opentelemetry-exporter-otlp-proto-common==1.45.2
           python -m pytest
           packages/dash0-opentelemetry-pyproto/tests/unit
           packages/dash0-opentelemetry-pyproto/tests/equivalence

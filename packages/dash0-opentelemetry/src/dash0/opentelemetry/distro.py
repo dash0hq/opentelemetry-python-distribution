@@ -130,8 +130,8 @@ def _per_signal_endpoint_override(base_endpoint, protocol, signal_path):
     collector is assumed to serve that protocol there, or the user supplies an
     explicit per-signal endpoint, which is always honored).
     """
-    parsed = urlparse(base_endpoint)
     try:
+        parsed = urlparse(base_endpoint)
         current_port = parsed.port
     except ValueError:
         return None

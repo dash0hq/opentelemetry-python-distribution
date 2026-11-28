@@ -5,6 +5,8 @@
 
 import unittest
 from http.client import BadStatusLine, InvalidURL, RemoteDisconnected
+from socket import AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR, socket
+from threading import Thread
 from time import sleep
 from unittest.mock import patch
 from urllib.error import URLError
@@ -36,6 +38,32 @@ from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.util.instrumentation import InstrumentationScope
 
 _UNIFORM = "opentelemetry.exporter.otlp.proto.http.metric_exporter.uniform"
+
+
+def _server_that_closes_after_reading_the_request():
+    server = socket(AF_INET, SOCK_STREAM)
+    server.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
+    server.bind(("127.0.0.1", 0))
+    server.listen(16)
+    served = []
+
+    def close_every_connection_without_answering():
+        while True:
+            try:
+                connection, _ = server.accept()
+            except OSError:
+                return
+            served.append(connection)
+            request = b""
+            while b"\r\n\r\n" not in request:
+                chunk = connection.recv(65536)
+                if not chunk:
+                    break
+                request += chunk
+            connection.close()
+
+    Thread(target=close_every_connection_without_answering, daemon=True).start()
+    return server, served
 
 
 def _ok():
@@ -266,6 +294,18 @@ class TestOTLPMetricExporter(unittest.TestCase):
         )
         self.assertEqual(result, MetricExportResult.FAILURE)
         self.assertEqual(attempts, 1)
+
+    def test_a_collector_closing_after_the_body_is_retried_over_a_real_socket(self):
+        server, served = _server_that_closes_after_reading_the_request()
+        self.addCleanup(server.close)
+        endpoint = f"http://127.0.0.1:{server.getsockname()[1]}/v1/metrics"
+        exporter = OTLPMetricExporter(endpoint=endpoint, timeout=100)
+        with patch(_UNIFORM, return_value=0.0001):
+            with patch.object(exporter._shutdown_in_progress, "wait", return_value=False):
+                result = exporter.export(_empty_metrics_data())
+        self.assertEqual(result, MetricExportResult.FAILURE)
+        self.assertEqual(len(served), _MAX_RETRYS)
+        exporter.shutdown()
 
     def test_a_backoff_that_overshoots_never_hands_export_a_negative_timeout(self):
         exporter = OTLPMetricExporter(timeout=0.5)

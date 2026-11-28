@@ -385,13 +385,21 @@ def apply_detected_resource_attributes(version):
     if not is_false(environ.get(DASH0_AUTOMATIC_SERVICE_NAME)) and (
         not _service_name_already_configured()
     ):
-        name, service_version = detect_service_metadata()
+        try:
+            name, service_version = detect_service_metadata()
+        except Exception:  # pylint: disable=broad-except
+            _logger.exception("dash0: detecting the service name and version failed")
+            name, service_version = None, None
         if name:
             environ[OTEL_SERVICE_NAME] = name
         if service_version:
             attributes[_SERVICE_VERSION] = service_version
 
-    pod_uid = detect_kubernetes_pod_uid()
+    try:
+        pod_uid = detect_kubernetes_pod_uid()
+    except Exception:  # pylint: disable=broad-except
+        _logger.exception("dash0: detecting the Kubernetes pod UID failed")
+        pod_uid = None
     if pod_uid:
         attributes[_K8S_POD_UID] = pod_uid
     _merge_into_resource_attributes(attributes)

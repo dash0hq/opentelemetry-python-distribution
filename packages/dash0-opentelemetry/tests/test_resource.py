@@ -119,6 +119,35 @@ def test_detect_fallback_service_name(monkeypatch):
     assert detect_fallback_service_name() == "server"
 
 
+def test_a_service_detection_failure_still_leaves_the_distro_attributes(monkeypatch):
+    monkeypatch.setattr(
+        resource_module, "detect_service_metadata", _raise_unicode_decode_error
+    )
+    monkeypatch.setattr(resource_module, "detect_kubernetes_pod_uid", lambda: _POD_UID)
+
+    apply_detected_resource_attributes("9.9.9")
+
+    attributes = os.environ[OTEL_RESOURCE_ATTRIBUTES]
+    assert "telemetry.distro.name=dash0-python" in attributes
+    assert "telemetry.distro.version=9.9.9" in attributes
+    assert f"k8s.pod.uid={_POD_UID}" in attributes
+    assert OTEL_SERVICE_NAME not in os.environ
+
+
+def test_a_pod_uid_failure_still_leaves_the_distro_attributes(monkeypatch):
+    monkeypatch.setattr(
+        resource_module, "detect_kubernetes_pod_uid", _raise_unicode_decode_error
+    )
+    monkeypatch.setattr(resource_module.sys, "argv", ["/opt/app/server.py"])
+
+    apply_detected_resource_attributes("9.9.9")
+
+    attributes = os.environ[OTEL_RESOURCE_ATTRIBUTES]
+    assert "telemetry.distro.name=dash0-python" in attributes
+    assert "k8s.pod.uid" not in attributes
+    assert os.environ[OTEL_SERVICE_NAME] == "server"
+
+
 def test_apply_sets_distro_attributes_and_service_name(monkeypatch):
     monkeypatch.setattr(resource_module.sys, "argv", ["/opt/app/server.py"])
 

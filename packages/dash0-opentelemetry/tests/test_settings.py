@@ -3,6 +3,9 @@ from dash0.opentelemetry._environment_variables import (
     DASH0_DISABLE,
     DASH0_OTEL_COLLECTOR_BASE_URL,
     OTEL_EXPORTER_OTLP_ENDPOINT,
+    OTEL_EXPORTER_OTLP_LOGS_ENDPOINT,
+    OTEL_EXPORTER_OTLP_METRICS_ENDPOINT,
+    OTEL_EXPORTER_OTLP_TRACES_ENDPOINT,
 )
 from dash0.opentelemetry.settings import evaluate_gate, is_false, is_true
 
@@ -12,6 +15,9 @@ def _clean_env(monkeypatch):
     monkeypatch.delenv(DASH0_DISABLE, raising=False)
     monkeypatch.delenv(DASH0_OTEL_COLLECTOR_BASE_URL, raising=False)
     monkeypatch.delenv(OTEL_EXPORTER_OTLP_ENDPOINT, raising=False)
+    monkeypatch.delenv(OTEL_EXPORTER_OTLP_TRACES_ENDPOINT, raising=False)
+    monkeypatch.delenv(OTEL_EXPORTER_OTLP_METRICS_ENDPOINT, raising=False)
+    monkeypatch.delenv(OTEL_EXPORTER_OTLP_LOGS_ENDPOINT, raising=False)
 
 
 @pytest.mark.parametrize(
@@ -122,6 +128,45 @@ def test_gate_disabled_by_an_override_whose_port_is_not_a_number(monkeypatch):
 
 def test_gate_enabled_by_an_endpoint_with_no_port(monkeypatch):
     monkeypatch.setenv(DASH0_OTEL_COLLECTOR_BASE_URL, "http://collector")
+
+    enabled, reason = evaluate_gate()
+
+    assert enabled is True
+    assert reason is None
+
+
+@pytest.mark.parametrize(
+    "variable",
+    [
+        OTEL_EXPORTER_OTLP_TRACES_ENDPOINT,
+        OTEL_EXPORTER_OTLP_METRICS_ENDPOINT,
+        OTEL_EXPORTER_OTLP_LOGS_ENDPOINT,
+    ],
+)
+@pytest.mark.parametrize(
+    "value,expected_in_reason",
+    [("http://[::1:4318", "Invalid IPv6 URL"), ("http://c:notaport", "notaport")],
+)
+def test_gate_disabled_by_a_per_signal_endpoint_urlparse_rejects(
+    monkeypatch, variable, value, expected_in_reason
+):
+    monkeypatch.setenv(DASH0_OTEL_COLLECTOR_BASE_URL, "http://collector:4318")
+    monkeypatch.setenv(variable, value)
+
+    enabled, reason = evaluate_gate()
+
+    assert enabled is False
+    assert variable in reason
+    assert expected_in_reason in reason
+
+
+def test_gate_enabled_by_per_signal_endpoints_that_parse(monkeypatch):
+    monkeypatch.setenv(DASH0_OTEL_COLLECTOR_BASE_URL, "http://collector:4318")
+    monkeypatch.setenv(OTEL_EXPORTER_OTLP_TRACES_ENDPOINT, "http://collector:4317")
+    monkeypatch.setenv(
+        OTEL_EXPORTER_OTLP_METRICS_ENDPOINT, "http://collector:4318/v1/metrics"
+    )
+    monkeypatch.setenv(OTEL_EXPORTER_OTLP_LOGS_ENDPOINT, "http://[::1]:4318/v1/logs")
 
     enabled, reason = evaluate_gate()
 

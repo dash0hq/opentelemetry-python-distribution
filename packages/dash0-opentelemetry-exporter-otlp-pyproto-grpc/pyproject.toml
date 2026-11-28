@@ -12,7 +12,7 @@ requires-python = ">=3.10"
 dependencies = [
   "opentelemetry-api ~= 1.12",
   "opentelemetry-sdk ~= 1.12",
-  "dash0-opentelemetry-exporter-otlp-pyproto-common == 1.44.0.post2",
+  "dash0-opentelemetry-exporter-otlp-pyproto-common == 1.44.0.post3",
 ]
 # No grpcio: the gRPC transport is the pure-Python _pygrpc subpackage, so this
 # exporter installs and runs without any compiled extension.

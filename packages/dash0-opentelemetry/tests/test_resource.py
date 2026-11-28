@@ -345,8 +345,12 @@ _LAUNCHERS_ADDED_FOR_ISSUE_138 = [
     "chalice",
     "dagster",
     "fastapi",
+    "gradio",
+    "litestar",
     "prefect",
     "pserve",
+    "quart",
+    "sanic",
     "scrapy",
     "streamlit",
     "twist",
@@ -363,7 +367,19 @@ def test_a_launcher_console_script_supplies_no_fallback_name(monkeypatch, launch
 
 
 @pytest.mark.parametrize(
-    "launcher", ["airflow", "chalice", "dagster", "fastapi", "prefect", "streamlit"]
+    "launcher",
+    [
+        "airflow",
+        "chalice",
+        "dagster",
+        "fastapi",
+        "gradio",
+        "litestar",
+        "prefect",
+        "quart",
+        "sanic",
+        "streamlit",
+    ],
 )
 def test_a_launcher_run_as_a_module_supplies_no_fallback_name(monkeypatch, launcher):
     monkeypatch.setattr(resource_module.sys, "orig_argv", [_PYTHON, "-m", launcher])

@@ -2,15 +2,15 @@ change_type: bug_fix
 
 component: resource-detectors
 
-note: Name the application rather than the launcher when it is started with fastapi, streamlit, scrapy, airflow, apache-airflow, uwsgi, chalice, pserve, twist, twistd, dagster or prefect
+note: Name the application rather than the launcher when it is started with fastapi, quart, litestar, sanic, gradio, streamlit, scrapy, airflow, apache-airflow, uwsgi, chalice, pserve, twist, twistd, dagster or prefect
 
 issues: [138]
 
 subtext: |
   The service-name detector skips a launcher, a console script that runs
-  someone else's application, and reports the application instead. Twelve
-  launcher names were missing from that list, so ``fastapi run main.py`` reported
-  ``service.name=fastapi`` and carried FastAPI's own release as
+  someone else's application, and reports the application instead. Sixteen
+  launcher names were missing from that list, so ``fastapi run main.py``
+  reported ``service.name=fastapi`` and carried FastAPI's own release as
   ``service.version``. Every deployment started that way collapsed into a
   single service, and the detected name beat both the application's own
   ``pyproject.toml`` and the SDK's honest ``unknown_service:python3``.
@@ -20,8 +20,17 @@ subtext: |
   no entry in the skip list and no ``console_scripts`` entry point either, so
   the list did nothing there and ``uvicorn.exe`` was reported as the service.
 
-  ``mlflow`` is deliberately not skipped. It runs projects and models in child
-  processes, and ``mlflow server`` serves MLflow's own API, so a process named
-  ``mlflow`` really is MLflow.
+  ``airflow``, ``apache-airflow``, ``dagster`` and ``prefect`` also carry
+  subcommands that serve the product's own API, such as ``airflow api-server``
+  and ``prefect server start``. One console script covers both kinds of
+  subcommand, so the skip applies to both. A deployment of Airflow, Dagster or
+  Prefect itself used to report the product's own distribution name and now
+  reports ``unknown_service:<executable>``, so set ``OTEL_SERVICE_NAME`` on
+  those workloads.
+
+  ``mlflow`` is deliberately not skipped. No ``mlflow`` subcommand runs the
+  customer's code in the ``mlflow`` process: ``mlflow run`` and ``mlflow
+  models serve`` start child processes, and ``mlflow server`` serves MLflow's
+  own API.
 
 change_logs: [user]

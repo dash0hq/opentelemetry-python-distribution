@@ -85,8 +85,10 @@ This step needs `tomllib` and is therefore skipped on Python 3.10, which predate
 **Generic runners are skipped.**
 A console script such as `gunicorn`, `uvicorn`, `celery` or `flask` launches someone else's application, so its name describes the launcher and its version describes the launcher's release.
 Running `gunicorn myapp:app` therefore does not report `service.name=gunicorn`, and never reports `gunicorn`'s version as `service.version`.
-`fastapi`, `streamlit`, `scrapy`, `airflow`, `apache-airflow`, `uwsgi`, `chalice`, `pserve`, `twist`, `twistd`, `dagster` and `prefect` are skipped for the same reason, since each one loads and runs the customer's own code in its own process.
-`mlflow` is deliberately not skipped: it runs projects and models in child processes, and `mlflow server` serves MLflow's own API, so a process named `mlflow` really is MLflow.
+`fastapi`, `quart`, `litestar`, `sanic`, `gradio`, `streamlit`, `scrapy`, `airflow`, `apache-airflow`, `uwsgi`, `chalice`, `pserve`, `twist`, `twistd`, `dagster` and `prefect` are skipped for the same reason, since each one runs the customer's own code in its own process.
+`airflow`, `apache-airflow`, `dagster` and `prefect` also carry subcommands that serve the product's own API, such as `airflow api-server` and `prefect server start`.
+One console script covers both kinds of subcommand, so the skip applies to both, and a deployment of Airflow, Dagster or Prefect itself reports `unknown_service:<executable>` until you set `OTEL_SERVICE_NAME`.
+`mlflow` is not skipped, because no `mlflow` subcommand runs the customer's code in the `mlflow` process: `mlflow run` and `mlflow models serve` start child processes, and `mlflow server` serves MLflow's own API.
 A runner started as a module is skipped too, so `python -m gunicorn` and `python -m flask run` behave the same way, matched on the top-level package so that `python -m flask.cli` is also covered.
 Detection falls through to `pyproject.toml`, which still finds the application when the virtual environment sits inside the project directory.
 When that finds nothing either, no name is reported and the SDK's own default stands, `unknown_service:<executable>` such as `unknown_service:python3`, because an honest absence is easier to act on than a name that every deployment shares.

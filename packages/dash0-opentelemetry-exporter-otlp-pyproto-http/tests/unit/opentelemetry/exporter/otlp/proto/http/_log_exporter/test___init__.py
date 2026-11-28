@@ -4,6 +4,7 @@
 # pylint: disable=protected-access
 
 import unittest
+from http.client import BadStatusLine, RemoteDisconnected
 from unittest.mock import patch
 from urllib.error import URLError
 
@@ -13,6 +14,7 @@ from opentelemetry.exporter.otlp.proto.http._log_exporter import (
     DEFAULT_LOGS_EXPORT_PATH,
     DEFAULT_TIMEOUT,
     OTLPLogExporter,
+    _MAX_RETRYS,
     _append_logs_path,
 )
 from opentelemetry.sdk._logs.export import LogRecordExportResult
@@ -183,6 +185,43 @@ class TestOTLPLogExporter(unittest.TestCase):
                 result = exporter.export([])
         self.assertEqual(result, LogRecordExportResult.FAILURE)
         exporter.shutdown()
+
+    def _export_with_each_attempt_raising(self, error):
+        exporter = OTLPLogExporter(timeout=100)
+        with patch.object(exporter, "_export", side_effect=error) as export:
+            with patch(_UNIFORM, return_value=0.0001):
+                with patch.object(exporter._shutdown_is_occuring, "wait", return_value=False):
+                    result = exporter.export([])
+        exporter.shutdown()
+        return result, export.call_count
+
+    def test_read_timeout_is_retried_rather_than_escaping_export(self):
+        result, attempts = self._export_with_each_attempt_raising(
+            TimeoutError("timed out")
+        )
+        self.assertEqual(result, LogRecordExportResult.FAILURE)
+        self.assertEqual(attempts, _MAX_RETRYS)
+
+    def test_remote_disconnected_is_retried_rather_than_escaping_export(self):
+        result, attempts = self._export_with_each_attempt_raising(
+            RemoteDisconnected("Remote end closed connection without response")
+        )
+        self.assertEqual(result, LogRecordExportResult.FAILURE)
+        self.assertEqual(attempts, _MAX_RETRYS)
+
+    def test_connection_reset_is_retried_rather_than_escaping_export(self):
+        result, attempts = self._export_with_each_attempt_raising(
+            ConnectionResetError(104, "Connection reset by peer")
+        )
+        self.assertEqual(result, LogRecordExportResult.FAILURE)
+        self.assertEqual(attempts, _MAX_RETRYS)
+
+    def test_bad_status_line_is_retried_rather_than_escaping_export(self):
+        result, attempts = self._export_with_each_attempt_raising(
+            BadStatusLine("not an http response")
+        )
+        self.assertEqual(result, LogRecordExportResult.FAILURE)
+        self.assertEqual(attempts, _MAX_RETRYS)
 
     # ── shutdown ──────────────────────────────────────────────────────────────
 

@@ -85,7 +85,7 @@ This step needs `tomllib` and is therefore skipped on Python 3.10, which predate
 **Generic runners are skipped.**
 A console script such as `gunicorn`, `uvicorn`, `celery` or `flask` launches someone else's application, so its name describes the launcher and its version describes the launcher's release.
 Running `gunicorn myapp:app` therefore does not report `service.name=gunicorn`, and never reports `gunicorn`'s version as `service.version`.
-`fastapi`, `streamlit`, `scrapy`, `airflow`, `uwsgi`, `chalice`, `pserve`, `twistd`, `dagster` and `prefect` are skipped for the same reason, since each one loads and runs the customer's own code in its own process.
+`fastapi`, `streamlit`, `scrapy`, `airflow`, `apache-airflow`, `uwsgi`, `chalice`, `pserve`, `twistd`, `dagster` and `prefect` are skipped for the same reason, since each one loads and runs the customer's own code in its own process.
 `mlflow` is deliberately not skipped: it runs projects and models in child processes, and `mlflow server` serves MLflow's own API, so a process named `mlflow` really is MLflow.
 A runner started as a module is skipped too, so `python -m gunicorn` and `python -m flask run` behave the same way, matched on the top-level package so that `python -m flask.cli` is also covered.
 Detection falls through to `pyproject.toml`, which still finds the application when the virtual environment sits inside the project directory.

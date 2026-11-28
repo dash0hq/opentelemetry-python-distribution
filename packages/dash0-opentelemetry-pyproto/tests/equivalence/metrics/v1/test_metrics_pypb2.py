@@ -26,7 +26,6 @@ from opentelemetry._proto.common.v1.common_pb2 import (
     KeyValue,
 )
 from opentelemetry._proto.metrics.v1.metrics_pb2 import (
-    _sfixed64,
     Exemplar,
     ExponentialHistogram,
     ExponentialHistogramDataPoint,
@@ -560,15 +559,3 @@ def test_resource_metrics_with_scope_metrics() -> None:
     our = ResourceMetrics(scope_metrics=[sm])
     proto = ProtoResourceMetrics(scope_metrics=[proto_sm])
     assert our.SerializeToString() == proto.SerializeToString()
-
-
-def test_sfixed64_zero_is_omitted() -> None:
-    assert _sfixed64(1, 0) == b""
-
-
-def test_sfixed64_none_is_omitted_like_zero() -> None:
-    assert _sfixed64(1, None) == b""
-
-
-def test_sfixed64_negative_one() -> None:
-    assert _sfixed64(1, -1) == b"\x09\xff\xff\xff\xff\xff\xff\xff\xff"

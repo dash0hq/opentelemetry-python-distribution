@@ -80,7 +80,11 @@ def _tracer_provider_after_configure_sdk(tmp_path: Path, preamble: str) -> str:
     program = _PROGRAM.format(preamble=preamble, path=str(config_file))
 
     completed = run(
-        [executable, "-c", program], capture_output=True, text=True, check=True
+        [executable, "-c", program],
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=60,
     )
 
     return completed.stdout.strip().splitlines()[-1]

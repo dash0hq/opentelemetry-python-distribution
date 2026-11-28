@@ -252,6 +252,14 @@ def test_exp_histogram_buckets_empty_matches_proto() -> None:
     )
 
 
+def test_exp_histogram_buckets_unset_offset_matches_proto() -> None:
+    our = ExponentialHistogramDataPoint.Buckets(offset=None)
+    assert (
+        our.SerializeToString()
+        == ProtoExponentialHistogramDataPoint.Buckets().SerializeToString()
+    )
+
+
 def test_exp_histogram_buckets_with_data() -> None:
     our = ExponentialHistogramDataPoint.Buckets(offset=2, bucket_counts=[1, 2, 3])
     proto = ProtoExponentialHistogramDataPoint.Buckets(offset=2, bucket_counts=[1, 2, 3])
@@ -349,6 +357,14 @@ def test_value_at_quantile_empty() -> None:
 def test_value_at_quantile_empty_matches_proto() -> None:
     assert (
         SummaryDataPoint.ValueAtQuantile().SerializeToString()
+        == ProtoSummaryDataPoint.ValueAtQuantile().SerializeToString()
+    )
+
+
+def test_value_at_quantile_every_unset_scalar_matches_proto() -> None:
+    our = SummaryDataPoint.ValueAtQuantile(quantile=None, value=None)
+    assert (
+        our.SerializeToString()
         == ProtoSummaryDataPoint.ValueAtQuantile().SerializeToString()
     )
 

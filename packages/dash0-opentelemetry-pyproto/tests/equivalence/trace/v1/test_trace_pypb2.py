@@ -57,6 +57,15 @@ def test_span_event_empty_matches_proto() -> None:
     assert Span.Event().SerializeToString() == ProtoSpan.Event().SerializeToString()
 
 
+def test_span_event_every_unset_scalar_matches_proto() -> None:
+    our = Span.Event(
+        time_unix_nano=None,
+        name=None,
+        dropped_attributes_count=None,
+    )
+    assert our.SerializeToString() == ProtoSpan.Event().SerializeToString()
+
+
 def test_span_event_name_and_time() -> None:
     our = Span.Event(name="button.click", time_unix_nano=1_000_000)
     proto = ProtoSpan.Event(name="button.click", time_unix_nano=1_000_000)
@@ -79,6 +88,17 @@ def test_span_link_empty() -> None:
 
 def test_span_link_empty_matches_proto() -> None:
     assert Span.Link().SerializeToString() == ProtoSpan.Link().SerializeToString()
+
+
+def test_span_link_every_unset_scalar_matches_proto() -> None:
+    our = Span.Link(
+        trace_id=None,
+        span_id=None,
+        trace_state=None,
+        dropped_attributes_count=None,
+        flags=None,
+    )
+    assert our.SerializeToString() == ProtoSpan.Link().SerializeToString()
 
 
 def test_span_link_with_ids() -> None:
@@ -105,6 +125,24 @@ def test_span_empty() -> None:
 
 def test_span_empty_matches_proto() -> None:
     assert Span().SerializeToString() == ProtoSpan().SerializeToString()
+
+
+def test_span_every_unset_scalar_matches_proto() -> None:
+    our = Span(
+        trace_id=None,
+        span_id=None,
+        trace_state=None,
+        parent_span_id=None,
+        flags=None,
+        name=None,
+        kind=None,
+        start_time_unix_nano=None,
+        end_time_unix_nano=None,
+        dropped_attributes_count=None,
+        dropped_events_count=None,
+        dropped_links_count=None,
+    )
+    assert our.SerializeToString() == ProtoSpan().SerializeToString()
 
 
 def test_span_basic() -> None:

@@ -1,0 +1,29 @@
+change_type: bug_fix
+
+component: pyproto
+
+note: Export a log record that carries no timestamp instead of raising ``struct.error`` and dropping the batch
+
+issues: [129]
+
+subtext: |
+  ``opentelemetry._logs.LogRecord`` declares ``timestamp`` as ``int | None`` and
+  leaves it unset when the caller omits it, which is what the Logs and Events
+  API prescribe and what the GenAI and event semantic conventions produce. The
+  field helpers decided to omit a field by comparing the value against 0, and
+  ``None == 0`` is ``False``, so the unset timestamp reached ``struct.pack`` and
+  raised ``struct.error`` out of ``OTLPLogExporter.export()``. The
+  ``BatchLogRecordProcessor`` logged the traceback and discarded every record in
+  the batch, so an application using the Events API sent no logs at all. The
+  stdlib ``logging`` bridge always fills in a timestamp, which is why
+  ``logging.info(...)`` was unaffected.
+
+  ``u64``, ``fix32``, ``fix64``, ``dbl``, ``sint32`` and ``_sfixed64`` now treat
+  ``None`` as the proto3 default and omit the field, and ``Sum``, ``Histogram``
+  and ``ExponentialHistogram`` no longer coerce an unset
+  ``aggregation_temporality`` with ``int()``. A sweep over all 143 constructor
+  parameters of all 36 message classes, nested ones included, confirms that
+  passing ``None`` now produces the same bytes ``google.protobuf`` produces for
+  an unset field. 45 of the 143 raised before.
+
+change_logs: [user]

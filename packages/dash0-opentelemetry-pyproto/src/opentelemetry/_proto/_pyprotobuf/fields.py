@@ -16,7 +16,7 @@ helper combines three operations that every SerializeToString() method must
 perform for every field it writes:
 
     1. Apply the proto3 default-omission rule — if the value equals the type's
-       default (0, 0.0, False, b"", ""), return b"" immediately.
+       default (0, 0.0, False, b"", "") or is None, return b"" immediately.
     2. Encode the tag — (field_number << 3) | wire_type, then varint-encoded.
     3. Encode the value — using the appropriate primitive from this package.
 
@@ -185,7 +185,7 @@ def byt(field: int, value: bytes) -> bytes:
     return encode_tag(field, WT_LEN) + encode_varint(len(value)) + value
 
 
-def u64(field: int, value: int) -> bytes:
+def u64(field: int, value: int | None) -> bytes:
     """Encode a proto3 uint64 (or any varint-encoded integer) field.
 
     This helper covers all proto3 field types whose wire type is WT_VARINT
@@ -205,15 +205,15 @@ def u64(field: int, value: int) -> bytes:
     field:
         The field number as declared in the .proto schema.
     value:
-        A non-negative integer. Zero causes this helper to return b""
-        (field omitted).
+        A non-negative integer, or None for an unset field. Zero and None
+        both cause this helper to return b"" (field omitted).
 
     Returns
     -------
     bytes
-        b"" if value is 0, otherwise tag + varint(value).
+        b"" if value is 0 or None, otherwise tag + varint(value).
     """
-    if value == 0:
+    if value is None or value == 0:
         return b""
     return encode_tag(field, WT_VARINT) + encode_varint(value)
 
@@ -250,7 +250,7 @@ def bool_field(field: int, value: bool) -> bytes:
     return encode_tag(field, WT_VARINT) + encode_varint(1)
 
 
-def fix32(field: int, value: int) -> bytes:
+def fix32(field: int, value: int | None) -> bytes:
     """Encode a proto3 fixed32 field (4-byte little-endian uint32).
 
     fixed32 uses wire type WT_32BIT. The decoder reads exactly 4 bytes after
@@ -268,20 +268,20 @@ def fix32(field: int, value: int) -> bytes:
     field:
         The field number as declared in the .proto schema.
     value:
-        An unsigned 32-bit integer. Zero causes this helper to return b""
-        (field omitted).
+        An unsigned 32-bit integer, or None for an unset field. Zero and
+        None both cause this helper to return b"" (field omitted).
 
     Returns
     -------
     bytes
-        b"" if value is 0, otherwise tag + 4 bytes little-endian.
+        b"" if value is 0 or None, otherwise tag + 4 bytes little-endian.
     """
-    if value == 0:
+    if value is None or value == 0:
         return b""
     return encode_tag(field, WT_32BIT) + encode_fixed32(value)
 
 
-def fix64(field: int, value: int) -> bytes:
+def fix64(field: int, value: int | None) -> bytes:
     """Encode a proto3 fixed64 field (8-byte little-endian uint64).
 
     fixed64 uses wire type WT_64BIT. The decoder reads exactly 8 bytes after
@@ -300,21 +300,21 @@ def fix64(field: int, value: int) -> bytes:
     field:
         The field number as declared in the .proto schema.
     value:
-        An unsigned 64-bit integer. Zero causes this helper to return b""
-        (field omitted).
+        An unsigned 64-bit integer, or None for an unset field. Zero and
+        None both cause this helper to return b"" (field omitted).
 
     Returns
     -------
     bytes
-        b"" if value is 0, otherwise tag + 8 bytes little-endian.
+        b"" if value is 0 or None, otherwise tag + 8 bytes little-endian.
     """
-    if value == 0:
+    if value is None or value == 0:
         return b""
     return encode_tag(field, WT_64BIT) + encode_fixed64(value)
 
 
-def dbl(field: int, value: float) -> bytes:
-    """Encode a proto3 double field (8-byte IEEE 754), omitting when zero.
+def dbl(field: int, value: float | None) -> bytes:
+    """Encode a proto3 double field (8-byte IEEE 754), omitting zero and None.
 
     double uses wire type WT_64BIT. The decoder reads exactly 8 bytes and
     interprets them as an IEEE 754 double-precision floating-point number in
@@ -334,15 +334,17 @@ def dbl(field: int, value: float) -> bytes:
     field:
         The field number as declared in the .proto schema.
     value:
-        An IEEE 754 double. 0.0 causes this helper to return b""
-        (field omitted). Infinity and NaN are encoded as-is.
+        An IEEE 754 double, or None for an unset field. 0.0 and None both
+        cause this helper to return b"" (field omitted). Infinity and NaN
+        are encoded as-is.
 
     Returns
     -------
     bytes
-        b"" if value == 0.0, otherwise tag + 8-byte little-endian double.
+        b"" if value is None or value == 0.0, otherwise tag + 8-byte
+        little-endian double.
     """
-    if value == 0.0:
+    if value is None or value == 0.0:
         return b""
     return encode_tag(field, WT_64BIT) + pack("<d", value)
 
@@ -384,8 +386,8 @@ def opt_dbl(field: int, value: float | None) -> bytes:
     return encode_tag(field, WT_64BIT) + pack("<d", value)
 
 
-def sint32(field: int, value: int) -> bytes:
-    """Encode a proto3 sint32 field (ZigZag varint), omitting when zero.
+def sint32(field: int, value: int | None) -> bytes:
+    """Encode a proto3 sint32 field (ZigZag varint), omitting zero and None.
 
     sint32 uses wire type WT_VARINT but applies ZigZag encoding before the
     varint step. ZigZag maps signed integers to unsigned integers so that
@@ -414,15 +416,15 @@ def sint32(field: int, value: int) -> bytes:
     field:
         The field number as declared in the .proto schema.
     value:
-        A signed 32-bit integer. Zero causes this helper to return b""
-        (field omitted).
+        A signed 32-bit integer, or None for an unset field. Zero and None
+        both cause this helper to return b"" (field omitted).
 
     Returns
     -------
     bytes
-        b"" if value is 0, otherwise tag + ZigZag-encoded varint.
+        b"" if value is 0 or None, otherwise tag + ZigZag-encoded varint.
     """
-    if value == 0:
+    if value is None or value == 0:
         return b""
     return encode_tag(field, WT_VARINT) + encode_sint32(value)
 

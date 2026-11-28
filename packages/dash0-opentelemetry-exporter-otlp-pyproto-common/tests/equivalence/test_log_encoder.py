@@ -160,3 +160,22 @@ def test_encode_logs_no_trace_context_matches_proto() -> None:
     )
     logs = [log]
     assert pyproto_encode_logs(logs).SerializeToString() == proto_encode_logs(logs).SerializeToString()
+
+
+def test_encode_logs_without_an_explicit_timestamp_matches_proto() -> None:
+    log = ReadWriteLogRecord(
+        LogRecord(
+            context=_CONTEXT,
+            severity_text="INFO",
+            severity_number=SeverityNumber.INFO,
+            body="order placed",
+            event_name="order.placed",
+        ),
+        resource=SDKResource({"first_resource": "value"}),
+        instrumentation_scope=InstrumentationScope(
+            "first_name", "first_version"
+        ),
+    )
+    assert log.log_record.timestamp is None
+    logs = [log]
+    assert pyproto_encode_logs(logs).SerializeToString() == proto_encode_logs(logs).SerializeToString()

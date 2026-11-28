@@ -155,6 +155,11 @@ def test_sum_empty_matches_proto() -> None:
     assert Sum().SerializeToString() == ProtoSum().SerializeToString()
 
 
+def test_sum_unset_aggregation_temporality_matches_proto() -> None:
+    our = Sum(aggregation_temporality=None)
+    assert our.SerializeToString() == ProtoSum().SerializeToString()
+
+
 def test_sum_with_data_and_temporality() -> None:
     our = Sum(
         data_points=[NumberDataPoint(as_int=10)],
@@ -216,6 +221,11 @@ def test_histogram_empty_matches_proto() -> None:
     assert Histogram().SerializeToString() == ProtoHistogram().SerializeToString()
 
 
+def test_histogram_unset_aggregation_temporality_matches_proto() -> None:
+    our = Histogram(aggregation_temporality=None)
+    assert our.SerializeToString() == ProtoHistogram().SerializeToString()
+
+
 def test_histogram_with_data_and_temporality() -> None:
     our = Histogram(
         data_points=[HistogramDataPoint(count=5, time_unix_nano=1_000)],
@@ -237,6 +247,14 @@ def test_exp_histogram_buckets_empty() -> None:
 def test_exp_histogram_buckets_empty_matches_proto() -> None:
     assert (
         ExponentialHistogramDataPoint.Buckets().SerializeToString()
+        == ProtoExponentialHistogramDataPoint.Buckets().SerializeToString()
+    )
+
+
+def test_exp_histogram_buckets_unset_offset_matches_proto() -> None:
+    our = ExponentialHistogramDataPoint.Buckets(offset=None)
+    assert (
+        our.SerializeToString()
         == ProtoExponentialHistogramDataPoint.Buckets().SerializeToString()
     )
 
@@ -309,6 +327,14 @@ def test_exp_histogram_empty_matches_proto() -> None:
     )
 
 
+def test_exp_histogram_unset_aggregation_temporality_matches_proto() -> None:
+    our = ExponentialHistogram(aggregation_temporality=None)
+    assert (
+        our.SerializeToString()
+        == ProtoExponentialHistogram().SerializeToString()
+    )
+
+
 def test_exp_histogram_with_data() -> None:
     our = ExponentialHistogram(
         data_points=[ExponentialHistogramDataPoint(count=5, time_unix_nano=1_000)],
@@ -330,6 +356,14 @@ def test_value_at_quantile_empty() -> None:
 def test_value_at_quantile_empty_matches_proto() -> None:
     assert (
         SummaryDataPoint.ValueAtQuantile().SerializeToString()
+        == ProtoSummaryDataPoint.ValueAtQuantile().SerializeToString()
+    )
+
+
+def test_value_at_quantile_every_unset_scalar_matches_proto() -> None:
+    our = SummaryDataPoint.ValueAtQuantile(quantile=None, value=None)
+    assert (
+        our.SerializeToString()
         == ProtoSummaryDataPoint.ValueAtQuantile().SerializeToString()
     )
 

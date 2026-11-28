@@ -6,6 +6,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import bump_for_release as bfr  # noqa: E402
+from tomllib import loads  # noqa: E402
 
 
 def test_accepts_plain_release_versions():
@@ -33,3 +34,18 @@ def test_rejects_leading_v_and_malformed_versions():
         "0.3.0 ",
     ]:
         assert not bfr.is_valid_distro_version(version), version
+
+
+def test_write_pin_leaves_the_toml_parseable(tmp_path):
+    pyproject = tmp_path / "pyproject.toml"
+    pyproject.write_text(
+        "[project]\n"
+        "dependencies = [\n"
+        '  "dash0-opentelemetry-pyproto == 1.44.0.post1",\n'
+        "]\n"
+    )
+    bfr.write_pin(pyproject, "dash0-opentelemetry-pyproto", "1.44.0.post2")
+    assert loads(pyproject.read_text())["project"]["dependencies"] == [
+        "dash0-opentelemetry-pyproto == 1.44.0.post2"
+    ]
+    assert bfr.read_pin(pyproject, "dash0-opentelemetry-pyproto") == "1.44.0.post2"

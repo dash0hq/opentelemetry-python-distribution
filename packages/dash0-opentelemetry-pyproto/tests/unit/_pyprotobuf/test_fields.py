@@ -208,6 +208,10 @@ def test_u64_zero_is_omitted() -> None:
     assert u64(1, 0) == b""
 
 
+def test_u64_none_is_omitted_like_zero() -> None:
+    assert u64(1, None) == b""
+
+
 def test_u64_one() -> None:
     # tag(1, 0) = 0x08; varint(1) = 0x01
     assert u64(1, 1) == b"\x08\x01"
@@ -276,6 +280,10 @@ def test_fix32_zero_is_omitted() -> None:
     assert fix32(1, 0) == b""
 
 
+def test_fix32_none_is_omitted_like_zero() -> None:
+    assert fix32(1, None) == b""
+
+
 def test_fix32_one() -> None:
     # tag(1, 5) = (1<<3)|5 = 13 = 0x0D; pack("<I", 1) = 01 00 00 00
     assert fix32(1, 1) == b"\x0d\x01\x00\x00\x00"
@@ -317,6 +325,10 @@ def test_fix64_zero_is_omitted() -> None:
     assert fix64(1, 0) == b""
 
 
+def test_fix64_none_is_omitted_like_zero() -> None:
+    assert fix64(1, None) == b""
+
+
 def test_fix64_one() -> None:
     # tag(1, 1) = (1<<3)|1 = 9 = 0x09; pack("<Q", 1) = 01 00 00 00 00 00 00 00
     assert fix64(1, 1) == b"\x09\x01\x00\x00\x00\x00\x00\x00\x00"
@@ -355,6 +367,10 @@ def test_fix64_matches_formula(value: int) -> None:
 
 def test_dbl_zero_is_omitted() -> None:
     assert dbl(1, 0.0) == b""
+
+
+def test_dbl_none_is_omitted_like_zero() -> None:
+    assert dbl(1, None) == b""
 
 
 def test_dbl_negative_zero_is_omitted() -> None:
@@ -462,6 +478,10 @@ def test_opt_dbl_versus_dbl_differ_at_zero() -> None:
 
 def test_sint32_zero_is_omitted() -> None:
     assert sint32(1, 0) == b""
+
+
+def test_sint32_none_is_omitted_like_zero() -> None:
+    assert sint32(1, None) == b""
 
 
 def test_sint32_positive_one() -> None:

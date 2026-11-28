@@ -4,7 +4,7 @@ component: resource
 
 note: Keep auto-instrumentation working when ``/etc/hosts`` or ``/proc/self/mountinfo`` holds a byte that UTF-8 cannot decode
 
-issues: [130]
+issues: [130, 153]
 
 subtext: |
   Resource detection read both files with the strict UTF-8 codec and handled

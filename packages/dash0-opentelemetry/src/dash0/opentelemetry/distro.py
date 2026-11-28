@@ -235,7 +235,13 @@ class Dash0Distro(BaseDistro):
                     protocol,
                 )
 
-        apply_detected_resource_attributes(__version__)
+        try:
+            apply_detected_resource_attributes(__version__)
+        except Exception:  # pylint: disable=broad-except
+            _logger.exception(
+                "dash0: resource detection failed, continuing without the"
+                " attributes it would have added"
+            )
 
     def load_instrumentor(self, entry_point, **kwargs):
         enabled, _ = evaluate_gate()

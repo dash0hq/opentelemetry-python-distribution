@@ -128,6 +128,8 @@ resource:
       value: ${DASH0_TEST_SUBSTITUTION}
     - name: with_default
       value: ${DASH0_TEST_SUBSTITUTION:-fallback}
+    - name: with_empty_default
+      value: ${DASH0_TEST_SUBSTITUTION:-}
 """
 
 _BARE_PROPAGATORS: str = """
@@ -265,6 +267,24 @@ def test_an_empty_variable_without_a_default_leaves_the_setting_null(
     attributes = _substituted_attributes(tmp_path, monkeypatch, "")
 
     assert attributes["bare"] is None
+
+
+def test_an_empty_default_leaves_the_setting_null_whatever_the_variable_holds(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``${VAR:-}`` resolves to null for an unset and for an empty variable.
+
+    An empty default is still empty, so it reaches the same null a reference
+    with no default reaches. A fork change that started returning the matched
+    text for a present but empty default would pass the vendoring check.
+    """
+    assert (
+        _substituted_attributes(tmp_path, monkeypatch, None)["with_empty_default"]
+        is None
+    )
+    assert (
+        _substituted_attributes(tmp_path, monkeypatch, "")["with_empty_default"] is None
+    )
 
 
 def test_an_unset_variable_with_a_default_substitutes_the_default(

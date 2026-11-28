@@ -2,8 +2,10 @@
 
 Mirrors the two hard gates the Node.js distribution checks before doing
 anything: an explicit kill switch, and a required collector endpoint (there is
-no point instrumenting if there is nowhere to send the telemetry). An endpoint
-``urlparse`` rejects is treated as no endpoint at all.
+no point instrumenting if there is nowhere to send the telemetry). The endpoint
+checked is the one the SDK will export to, which is ``OTEL_EXPORTER_OTLP_ENDPOINT``
+when the user set it, and an endpoint ``urlparse`` rejects counts as no endpoint
+at all.
 """
 
 from os import environ
@@ -12,6 +14,7 @@ from urllib.parse import urlparse
 from ._environment_variables import (
     DASH0_DISABLE,
     DASH0_OTEL_COLLECTOR_BASE_URL,
+    OTEL_EXPORTER_OTLP_ENDPOINT,
 )
 
 
@@ -33,8 +36,12 @@ def evaluate_gate():
     base_url = environ.get(DASH0_OTEL_COLLECTOR_BASE_URL)
     if not base_url:
         return False, f"{DASH0_OTEL_COLLECTOR_BASE_URL} is not set"
+    override = environ.get(OTEL_EXPORTER_OTLP_ENDPOINT)
+    variable = (
+        OTEL_EXPORTER_OTLP_ENDPOINT if override else DASH0_OTEL_COLLECTOR_BASE_URL
+    )
     try:
-        urlparse(base_url)
+        urlparse(override or base_url)
     except ValueError as error:
-        return False, f"{DASH0_OTEL_COLLECTOR_BASE_URL} cannot be parsed: {error}"
+        return False, f"{variable} cannot be parsed: {error}"
     return True, None

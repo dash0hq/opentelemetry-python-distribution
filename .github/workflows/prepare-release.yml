@@ -29,9 +29,7 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
-          # Use the maintainer PAT so the resulting push fires
-          # create-tag-for-release.yml (GITHUB_TOKEN pushes are suppressed).
-          token: ${{ secrets.REPOSITORY_FULL_ACCESS_GITHUB_TOKEN }}
+          persist-credentials: false
 
       - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
         with:
@@ -60,9 +58,15 @@ jobs:
       - name: Commit and push
         env:
           VERSION: ${{ inputs.version }}
+          # Use the maintainer PAT so the resulting push fires
+          # create-tag-for-release.yml (GITHUB_TOKEN pushes are suppressed).
+          PUSH_TOKEN: ${{ secrets.REPOSITORY_FULL_ACCESS_GITHUB_TOKEN }}
         run: |
           git config user.name d0etu
           git config user.email d0etu@users.noreply.github.com
+          git config credential.helper ''
+          git config --add credential.helper \
+            '!f() { printf "username=x-access-token\npassword=%s\n" "$PUSH_TOKEN"; }; f'
           git add -A
           if git diff --cached --quiet; then
             echo "::error::Nothing to commit — version may already be set or changelog entries missing"

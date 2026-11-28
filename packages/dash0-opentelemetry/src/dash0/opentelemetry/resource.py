@@ -93,6 +93,9 @@ _POD_UID_IN_CGROUP = re.compile(
     r"^[a-z_-]*pod(?P<uid>[0-9a-f]{8}[-_][0-9a-f]{4}[-_][0-9a-f]{4}"
     r"[-_][0-9a-f]{4}[-_][0-9a-f]{12})\.slice$"
 )
+_POD_UID_IN_MOUNTINFO = re.compile(
+    r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+)
 
 
 def distribution_resource_attributes(version):
@@ -135,12 +138,23 @@ def running_in_kubernetes():
 
 
 def pod_uid_from_cgroup_v1():
+    """The pod UID of the first ``/pods/<uid>`` mount path that holds one.
+
+    A path segment after ``/pods/`` that is not a UUID is skipped, and the
+    search carries on through the rest of the file.
+    """
     for line in _read_candidate_lines(_CGROUP_V1_MOUNTINFO, _POD_UID_LEN):
-        marker_index = line.find(_POD_MOUNT_MARKER)
-        if marker_index > 0:
-            after_marker = line[marker_index + len(_POD_MOUNT_MARKER) :]
-            if len(after_marker) >= _POD_UID_LEN:
-                return after_marker[:_POD_UID_LEN]
+        search_from = 0
+        while True:
+            marker_index = line.find(_POD_MOUNT_MARKER, search_from)
+            if marker_index < 0:
+                break
+            search_from = marker_index + len(_POD_MOUNT_MARKER)
+            if marker_index == 0:
+                continue
+            candidate = line[search_from : search_from + _POD_UID_LEN]
+            if _POD_UID_IN_MOUNTINFO.fullmatch(candidate):
+                return candidate
     return None
 
 

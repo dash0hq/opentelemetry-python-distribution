@@ -72,10 +72,34 @@ def test_a_mountinfo_carrying_an_undecodable_byte_still_yields_the_pod_uid(
 ):
     mountinfo = tmp_path / "mountinfo"
     mountinfo.write_bytes(
-        b"1234 1234 0:42 / /mnt/caf\xe9 rw\n"
-        + f"1235 1235 0:43 / /var/lib/kubelet/pods/{_POD_UID}/etc-hosts rw\n".encode()
+        b"900 800 0:50 /mnt/"
+        + (b"\xe9" * 60)
+        + b" /data rw,relatime shared:1 ext4\n"
+        + f"901 800 0:51 / /var/lib/kubelet/pods/{_POD_UID}/etc-hosts rw\n".encode()
     )
     monkeypatch.setattr(resource_module, "_CGROUP_V1_MOUNTINFO", str(mountinfo))
+
+    assert pod_uid_from_cgroup_v1() == _POD_UID
+
+
+def test_a_hostpath_volume_under_pods_never_becomes_the_pod_uid(monkeypatch, tmp_path):
+    mountinfo = tmp_path / "mountinfo"
+    mountinfo.write_bytes(
+        b"900 800 0:50 /srv/pods/"
+        + (b"\xe9" * 40)
+        + b" /data rw,relatime shared:1\n"
+        + f"901 800 0:51 / /var/lib/kubelet/pods/{_POD_UID}/etc-hosts rw\n".encode()
+    )
+    monkeypatch.setattr(resource_module, "_CGROUP_V1_MOUNTINFO", str(mountinfo))
+
+    assert pod_uid_from_cgroup_v1() == _POD_UID
+
+
+def test_a_second_pods_marker_on_one_line_is_searched_too(monkeypatch):
+    line = f"900 800 0:50 /srv/pods/{'x' * 40} /var/lib/kubelet/pods/{_POD_UID}/x rw"
+    monkeypatch.setattr(
+        resource_module, "_read_candidate_lines", lambda *a, **k: [line]
+    )
 
     assert pod_uid_from_cgroup_v1() == _POD_UID
 

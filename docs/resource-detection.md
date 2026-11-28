@@ -33,7 +33,7 @@ cgroup v1 is tried first; cgroup v2 is the fallback.
 
 Both standard cgroup path formats and Kubernetes slice naming conventions are handled.
 
-Both files are decoded with `errors="replace"`, so bytes that are not valid UTF-8 in a mount path no longer stop detection.
+`/etc/hosts`, `/proc/self/mountinfo` and `/proc/self/cgroup` are all decoded with `errors="replace"`, so a byte that is not valid UTF-8 no longer stops detection.
 A path segment is accepted as a pod UID only when it is a lowercase hyphenated UUID, or the 32 hexadecimal characters the kubelet assigns to a static pod whose manifest carries no `metadata.uid`.
 Any other segment is skipped and the search carries on.
 

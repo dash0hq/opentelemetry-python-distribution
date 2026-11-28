@@ -6,6 +6,7 @@ from dash0.opentelemetry._environment_variables import (
     OTEL_EXPORTER_OTLP_LOGS_ENDPOINT,
     OTEL_EXPORTER_OTLP_METRICS_ENDPOINT,
     OTEL_EXPORTER_OTLP_TRACES_ENDPOINT,
+    OTEL_LOGS_EXPORTER,
 )
 from dash0.opentelemetry.settings import evaluate_gate, is_false, is_true
 
@@ -18,6 +19,7 @@ def _clean_env(monkeypatch):
     monkeypatch.delenv(OTEL_EXPORTER_OTLP_TRACES_ENDPOINT, raising=False)
     monkeypatch.delenv(OTEL_EXPORTER_OTLP_METRICS_ENDPOINT, raising=False)
     monkeypatch.delenv(OTEL_EXPORTER_OTLP_LOGS_ENDPOINT, raising=False)
+    monkeypatch.delenv(OTEL_LOGS_EXPORTER, raising=False)
 
 
 @pytest.mark.parametrize(
@@ -161,6 +163,34 @@ def test_gate_disabled_by_a_per_signal_endpoint_urlparse_rejects(monkeypatch, va
     assert enabled is False
     assert variable in reason
     assert "Invalid IPv6 URL" in reason
+
+
+@pytest.mark.parametrize("exporter", ["none", "console", ""])
+def test_gate_enabled_when_the_signal_of_a_rejected_endpoint_skips_otlp(
+    monkeypatch, exporter
+):
+    monkeypatch.setenv(DASH0_OTEL_COLLECTOR_BASE_URL, "http://collector:4318")
+    monkeypatch.setenv(OTEL_LOGS_EXPORTER, exporter)
+    monkeypatch.setenv(OTEL_EXPORTER_OTLP_LOGS_ENDPOINT, "http://[::1:4318")
+
+    enabled, reason = evaluate_gate()
+
+    assert enabled is True
+    assert reason is None
+
+
+@pytest.mark.parametrize("exporter", ["otlp", "otlp_proto_http", "otlp,console"])
+def test_gate_disabled_when_the_signal_of_a_rejected_endpoint_uses_otlp(
+    monkeypatch, exporter
+):
+    monkeypatch.setenv(DASH0_OTEL_COLLECTOR_BASE_URL, "http://collector:4318")
+    monkeypatch.setenv(OTEL_LOGS_EXPORTER, exporter)
+    monkeypatch.setenv(OTEL_EXPORTER_OTLP_LOGS_ENDPOINT, "http://[::1:4318")
+
+    enabled, reason = evaluate_gate()
+
+    assert enabled is False
+    assert OTEL_EXPORTER_OTLP_LOGS_ENDPOINT in reason
 
 
 def test_gate_enabled_by_per_signal_endpoints_that_parse(monkeypatch):

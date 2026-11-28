@@ -6,7 +6,8 @@ no point instrumenting if there is nowhere to send the telemetry). The endpoint
 checked is the one the SDK will export to, which is ``OTEL_EXPORTER_OTLP_ENDPOINT``
 when the user set it, and an endpoint ``urlparse`` rejects counts as no endpoint
 at all. A per-signal endpoint the user set is checked the same way, because it
-is the endpoint its own signal exports to.
+is the endpoint its own signal exports to, and is skipped when that signal's
+exporter is not an OTLP one, because then nothing ever parses it.
 """
 
 from os import environ
@@ -19,13 +20,18 @@ from ._environment_variables import (
     OTEL_EXPORTER_OTLP_LOGS_ENDPOINT,
     OTEL_EXPORTER_OTLP_METRICS_ENDPOINT,
     OTEL_EXPORTER_OTLP_TRACES_ENDPOINT,
+    OTEL_LOGS_EXPORTER,
+    OTEL_METRICS_EXPORTER,
+    OTEL_TRACES_EXPORTER,
 )
 
 _PER_SIGNAL_ENDPOINTS = (
-    OTEL_EXPORTER_OTLP_TRACES_ENDPOINT,
-    OTEL_EXPORTER_OTLP_METRICS_ENDPOINT,
-    OTEL_EXPORTER_OTLP_LOGS_ENDPOINT,
+    (OTEL_TRACES_EXPORTER, OTEL_EXPORTER_OTLP_TRACES_ENDPOINT),
+    (OTEL_METRICS_EXPORTER, OTEL_EXPORTER_OTLP_METRICS_ENDPOINT),
+    (OTEL_LOGS_EXPORTER, OTEL_EXPORTER_OTLP_LOGS_ENDPOINT),
 )
+
+_OTLP_EXPORTER_NAMES = frozenset({"otlp", "otlp_proto_grpc", "otlp_proto_http"})
 
 
 def is_true(value):
@@ -51,11 +57,14 @@ def evaluate_gate():
         OTEL_EXPORTER_OTLP_ENDPOINT if override else DASH0_OTEL_COLLECTOR_BASE_URL
     )
     endpoints = [(shared_variable, override or base_url)]
-    endpoints += [
-        (variable, environ[variable])
-        for variable in _PER_SIGNAL_ENDPOINTS
-        if environ.get(variable)
-    ]
+    for exporter_variable, endpoint_variable in _PER_SIGNAL_ENDPOINTS:
+        endpoint = environ.get(endpoint_variable)
+        selected = environ.get(exporter_variable)
+        exports_over_otlp = selected is None or any(
+            name.strip() in _OTLP_EXPORTER_NAMES for name in selected.split(",")
+        )
+        if endpoint and exports_over_otlp:
+            endpoints.append((endpoint_variable, endpoint))
     for variable, endpoint in endpoints:
         try:
             urlparse(endpoint)

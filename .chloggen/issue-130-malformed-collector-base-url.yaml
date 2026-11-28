@@ -18,7 +18,10 @@ subtext: |
   that signal parses it while the configurators load. The gate therefore checks
   ``OTEL_EXPORTER_OTLP_TRACES_ENDPOINT``,
   ``OTEL_EXPORTER_OTLP_METRICS_ENDPOINT`` and
-  ``OTEL_EXPORTER_OTLP_LOGS_ENDPOINT`` as well, whenever the user set them.
+  ``OTEL_EXPORTER_OTLP_LOGS_ENDPOINT`` as well, whenever the user set them and
+  the signal exports over OTLP. A signal whose exporter is ``none``, ``console``
+  or anything else that is not an OTLP exporter never parses its endpoint, so
+  that endpoint is left alone.
 
   Such a value is now treated the same way as an unset
   ``DASH0_OTEL_COLLECTOR_BASE_URL``: the SDK is turned off, a warning names the

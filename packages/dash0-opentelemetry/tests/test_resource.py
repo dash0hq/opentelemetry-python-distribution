@@ -167,10 +167,12 @@ def test_a_non_uuid_cgroupfs_segment_is_never_reported_as_the_pod_uid(monkeypatc
     assert pod_uid_from_cgroup_v2() is None
 
 
-def test_a_non_uuid_systemd_slice_is_never_reported_as_the_pod_uid(monkeypatch):
+def test_a_systemd_slice_holding_one_hex_character_too_many_is_not_a_pod_uid(
+    monkeypatch,
+):
     line = (
         "0::/kubepods.slice/kubepods-besteffort.slice/"
-        "kubepods-besteffort-pod" + ("Z" * 36) + ".slice/"
+        "kubepods-besteffort-podd4a0cb0a1d5a11ea9d3642010a8001750.slice/"
         "cri-containerd-" + ("a" * 64) + ".scope"
     )
     monkeypatch.setattr(

@@ -18,7 +18,10 @@ from sys import executable
 from unittest.mock import MagicMock
 
 import pytest
-from opentelemetry._configuration._resource import create_resource
+from opentelemetry._configuration._resource import (
+    _RESOURCE_DETECTOR_REGISTRY,
+    create_resource,
+)
 from opentelemetry._configuration.models import (
     ExperimentalResourceDetection,
     ExperimentalResourceDetector,
@@ -136,6 +139,25 @@ def test_a_detector_the_schema_does_not_declare_still_yields_a_resource(
     assert resource.attributes[TELEMETRY_SDK_LANGUAGE] == "python"
     assert [record.levelname for record in caplog.records] == ["WARNING"]
     assert "'aws_ecs'" in caplog.records[0].getMessage()
+
+
+def test_a_built_in_detector_that_raises_still_yields_a_resource(
+    caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``host``, ``process`` and ``service`` run from the registry, not an entry point."""
+    monkeypatch.setitem(
+        _RESOURCE_DETECTOR_REGISTRY,
+        "process",
+        MagicMock(side_effect=RuntimeError("no proc table here")),
+    )
+
+    with caplog.at_level("ERROR", logger="opentelemetry._configuration._resource"):
+        resource = create_resource(_config_listing(process={}, host={}))
+
+    assert resource.attributes[HOST_NAME] == gethostname()
+    assert [record.levelname for record in caplog.records] == ["ERROR"]
+    assert caplog.records[0].exc_info is not None
+    assert "'process'" in caplog.records[0].getMessage()
 
 
 def test_a_detector_that_is_not_installed_does_not_stop_later_detectors() -> None:

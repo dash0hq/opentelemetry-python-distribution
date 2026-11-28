@@ -106,24 +106,33 @@ def test_gate_disabled_by_an_override_urlparse_rejects(monkeypatch):
     assert OTEL_EXPORTER_OTLP_ENDPOINT in reason
 
 
-def test_gate_disabled_by_an_endpoint_whose_port_is_not_a_number(monkeypatch):
-    monkeypatch.setenv(DASH0_OTEL_COLLECTOR_BASE_URL, "http://collector:notaport")
+@pytest.mark.parametrize(
+    "endpoint", ["http://collector:notaport", "http://collector:70000"]
+)
+def test_gate_enabled_by_an_endpoint_whose_port_urlparse_cannot_read(
+    monkeypatch, endpoint
+):
+    monkeypatch.setenv(DASH0_OTEL_COLLECTOR_BASE_URL, endpoint)
 
     enabled, reason = evaluate_gate()
 
-    assert enabled is False
-    assert DASH0_OTEL_COLLECTOR_BASE_URL in reason
-    assert "notaport" in reason
+    assert enabled is True
+    assert reason is None
 
 
-def test_gate_disabled_by_an_override_whose_port_is_not_a_number(monkeypatch):
+@pytest.mark.parametrize(
+    "endpoint", ["http://collector:notaport", "http://collector:70000"]
+)
+def test_gate_enabled_by_a_per_signal_endpoint_whose_port_urlparse_cannot_read(
+    monkeypatch, endpoint
+):
     monkeypatch.setenv(DASH0_OTEL_COLLECTOR_BASE_URL, "http://collector:4318")
-    monkeypatch.setenv(OTEL_EXPORTER_OTLP_ENDPOINT, "http://collector:notaport")
+    monkeypatch.setenv(OTEL_EXPORTER_OTLP_METRICS_ENDPOINT, endpoint)
 
     enabled, reason = evaluate_gate()
 
-    assert enabled is False
-    assert OTEL_EXPORTER_OTLP_ENDPOINT in reason
+    assert enabled is True
+    assert reason is None
 
 
 def test_gate_enabled_by_an_endpoint_with_no_port(monkeypatch):
@@ -143,21 +152,15 @@ def test_gate_enabled_by_an_endpoint_with_no_port(monkeypatch):
         OTEL_EXPORTER_OTLP_LOGS_ENDPOINT,
     ],
 )
-@pytest.mark.parametrize(
-    "value,expected_in_reason",
-    [("http://[::1:4318", "Invalid IPv6 URL"), ("http://c:notaport", "notaport")],
-)
-def test_gate_disabled_by_a_per_signal_endpoint_urlparse_rejects(
-    monkeypatch, variable, value, expected_in_reason
-):
+def test_gate_disabled_by_a_per_signal_endpoint_urlparse_rejects(monkeypatch, variable):
     monkeypatch.setenv(DASH0_OTEL_COLLECTOR_BASE_URL, "http://collector:4318")
-    monkeypatch.setenv(variable, value)
+    monkeypatch.setenv(variable, "http://[::1:4318")
 
     enabled, reason = evaluate_gate()
 
     assert enabled is False
     assert variable in reason
-    assert expected_in_reason in reason
+    assert "Invalid IPv6 URL" in reason
 
 
 def test_gate_enabled_by_per_signal_endpoints_that_parse(monkeypatch):

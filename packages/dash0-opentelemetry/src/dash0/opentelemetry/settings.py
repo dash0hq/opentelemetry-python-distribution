@@ -4,9 +4,9 @@ Mirrors the two hard gates the Node.js distribution checks before doing
 anything: an explicit kill switch, and a required collector endpoint (there is
 no point instrumenting if there is nowhere to send the telemetry). The endpoint
 checked is the one the SDK will export to, which is ``OTEL_EXPORTER_OTLP_ENDPOINT``
-when the user set it, and an endpoint whose URL or whose port ``urlparse``
-rejects counts as no endpoint at all. A per-signal endpoint the user set is
-checked the same way, because it is the endpoint its own signal exports to.
+when the user set it, and an endpoint ``urlparse`` rejects counts as no endpoint
+at all. A per-signal endpoint the user set is checked the same way, because it
+is the endpoint its own signal exports to.
 """
 
 from os import environ
@@ -58,7 +58,7 @@ def evaluate_gate():
     ]
     for variable, endpoint in endpoints:
         try:
-            _ = urlparse(endpoint).port
+            urlparse(endpoint)
         except ValueError as error:
             return False, f"{variable} cannot be parsed: {error}"
     return True, None

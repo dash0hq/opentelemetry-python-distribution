@@ -201,9 +201,6 @@ def test_a_console_script_names_the_distribution_that_declared_it(monkeypatch):
         "distributions",
         lambda: [_FakeDistribution("checkout-service", "2.4.0", ("checkout",))],
     )
-    monkeypatch.setattr(
-        resource_module, "service_metadata_from_pyproject", lambda: (None, None)
-    )
 
     assert detect_service_metadata() == ("checkout-service", "2.4.0")
 
@@ -485,84 +482,6 @@ def test_pyproject_supplies_the_name_when_nothing_is_installed(monkeypatch, tmp_
 
     assert service_metadata_from_pyproject() == ("checkout-service", "0.9.1")
     assert detect_service_metadata() == ("checkout-service", "0.9.1")
-
-
-@_needs_tomllib
-def test_a_console_script_naming_another_project_loses_to_pyproject(
-    monkeypatch, tmp_path
-):
-    """``circus`` declares ``circusd``, so the two names disagree on the service."""
-    (tmp_path / "pyproject.toml").write_text(
-        '[project]\nname = "checkout-service"\nversion = "2.4.0"\n', encoding="utf8"
-    )
-    binaries = tmp_path / ".venv" / "bin"
-    binaries.mkdir(parents=True)
-    monkeypatch.setattr(resource_module.sys, "argv", [str(binaries / "circusd")])
-    monkeypatch.setattr(
-        resource_module,
-        "distributions",
-        lambda: [_FakeDistribution("circus", "0.19.0", ("circusd",))],
-    )
-
-    assert detect_service_metadata() == ("checkout-service", "2.4.0")
-
-
-def test_a_console_script_naming_another_project_stands_without_a_pyproject(
-    monkeypatch,
-):
-    """A deployed container ships no manifest, so a name beats no name at all."""
-    monkeypatch.setattr(resource_module.sys, "argv", ["/usr/local/bin/circusd"])
-    monkeypatch.setattr(
-        resource_module,
-        "distributions",
-        lambda: [_FakeDistribution("circus", "0.19.0", ("circusd",))],
-    )
-    monkeypatch.setattr(
-        resource_module, "service_metadata_from_pyproject", lambda: (None, None)
-    )
-
-    assert detect_service_metadata() == ("circus", "0.19.0")
-
-
-@_needs_tomllib
-def test_a_console_script_matching_its_distribution_outranks_pyproject(
-    monkeypatch, tmp_path
-):
-    """Agreeing names describe the application itself, which the install dates."""
-    (tmp_path / "pyproject.toml").write_text(
-        '[project]\nname = "checkout"\nversion = "9.9.9.dev0"\n', encoding="utf8"
-    )
-    binaries = tmp_path / ".venv" / "bin"
-    binaries.mkdir(parents=True)
-    monkeypatch.setattr(resource_module.sys, "argv", [str(binaries / "checkout")])
-    monkeypatch.setattr(
-        resource_module,
-        "distributions",
-        lambda: [_FakeDistribution("checkout", "2.4.0", ("checkout",))],
-    )
-
-    assert detect_service_metadata() == ("checkout", "2.4.0")
-
-
-def test_a_module_run_with_dash_m_never_loses_to_pyproject(monkeypatch):
-    """A package name routinely differs from its distribution name."""
-    monkeypatch.setattr(resource_module.sys, "orig_argv", [_PYTHON, "-m", "checkout"])
-    monkeypatch.setattr(resource_module.sys, "argv", ["-m"])
-    monkeypatch.setattr(
-        resource_module,
-        "packages_distributions",
-        lambda: {"checkout": ["checkout-service"]},
-    )
-    monkeypatch.setattr(
-        resource_module,
-        "distributions",
-        lambda: [_FakeDistribution("checkout-service", "3.1.0")],
-    )
-    monkeypatch.setattr(
-        resource_module, "service_metadata_from_pyproject", lambda: ("elsewhere", "0.1")
-    )
-
-    assert detect_service_metadata() == ("checkout-service", "3.1.0")
 
 
 @_needs_tomllib

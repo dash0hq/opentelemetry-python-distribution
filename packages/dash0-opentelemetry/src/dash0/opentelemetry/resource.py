@@ -360,31 +360,16 @@ def detect_service_metadata():
     ships no source manifest, then ``pyproject.toml`` for a source checkout,
     then the entrypoint basename.
 
-    A console script whose name differs from the name of the distribution that
-    declared it has the shape of a launcher, as ``circus`` has with
-    ``circusd``, and for one of those ``pyproject.toml`` is read first. The
-    distribution still stands when no ``pyproject.toml`` names a project.
-
     ``service.version`` has no entrypoint-derived fallback. An absent version
     is reported as ``None``, since a wrong version is worse than no version.
     """
     distribution = distribution_of_running_program()
-    name = None
-    version = None
     if distribution is not None:
         name = distribution.metadata["Name"]
-        version = distribution.metadata["Version"] or None
+        if name:
+            return name, distribution.metadata["Version"] or None
 
-    script = running_console_script_name()
-    console_script_names_another_project = bool(
-        name and script and _normalized(script) != _normalized(name)
-    )
-    if name and not console_script_names_another_project:
-        return name, version
-
-    project_name, project_version = service_metadata_from_pyproject()
-    if project_name:
-        return project_name, project_version
+    name, version = service_metadata_from_pyproject()
     if name:
         return name, version
 

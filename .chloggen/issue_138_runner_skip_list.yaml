@@ -20,13 +20,6 @@ subtext: |
   no entry in the skip list and no ``console_scripts`` entry point either, so
   the list did nothing there and ``uvicorn.exe`` was reported as the service.
 
-  A console script whose name differs from the distribution that declared it,
-  as ``circusd`` differs from ``circus``, now loses to the application's
-  ``pyproject.toml`` when one sits above the script. The distribution still
-  supplies the name when no ``pyproject.toml`` names a project, which is the
-  usual case in a deployed container, and the ``python -m package`` route is
-  unaffected.
-
   ``mlflow`` is deliberately not skipped. It runs projects and models in child
   processes, and ``mlflow server`` serves MLflow's own API, so a process named
   ``mlflow`` really is MLflow.

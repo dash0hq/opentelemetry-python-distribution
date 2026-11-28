@@ -64,13 +64,7 @@ No version is ever invented, because an absent version is more useful than a wro
 Steps 3 and 5 both decline to name a generic runner, so a process launched by one can finish with no detected name at all.
 A `.py`, `.pyw` or `.exe` suffix comes off the basename before step 5 reports it and before the runner check reads it.
 A console script installed on Windows as `uvicorn.exe` is therefore recognised as the runner `uvicorn`.
-
-Step 4 moves ahead of step 3 when the console script that started the process carries a name different from the distribution that declared it.
-`circus` declares `circusd` and `pyramid` declares `pserve`, which is the shape of a launcher rather than of an application.
-An application packaged from its own `pyproject.toml` usually declares a script named after itself, so the two names agree and step 3 keeps its place.
-The installed distribution still supplies the name when no `pyproject.toml` above the script names a project, which is the usual case in a deployed container.
-The reordering covers the console-script route only.
-A top-level package name differs from its distribution name too often for the same comparison to carry any signal on the `python -m package` route.
+The `.exe` comes off before step 3 reads the name too, since `pip` installs the console script as `uvicorn.exe` while the `console_scripts` entry point is declared as `uvicorn`.
 
 **How the installed distribution is identified.**
 A process started by a console script is owned by the distribution that declared that script, which is the common shape of a `pip install .` deployment.

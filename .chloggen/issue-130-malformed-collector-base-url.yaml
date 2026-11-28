@@ -1,0 +1,43 @@
+change_type: bug_fix
+
+component: distro
+
+note: Disable the distribution with one warning when the collector endpoint cannot be parsed, instead of raising out of auto-instrumentation
+
+issues: [130, 153]
+
+subtext: |
+  A value ``urlparse`` rejects, such as the IPv6 literal
+  ``http://[::1:4318`` with its closing bracket missing, raised
+  ``ValueError: Invalid IPv6 URL`` while the distribution configured itself.
+  That happened before the instrumentors were loaded, so the process reported
+  nothing at all, and an injected process deactivated the distribution on top
+  of it.
+
+  A per-signal endpoint variable cost the same outage, because the exporter for
+  that signal parses it while the configurators load. The gate therefore checks
+  ``OTEL_EXPORTER_OTLP_TRACES_ENDPOINT``,
+  ``OTEL_EXPORTER_OTLP_METRICS_ENDPOINT`` and
+  ``OTEL_EXPORTER_OTLP_LOGS_ENDPOINT`` as well, whenever the user set them and
+  the signal exports over OTLP. A signal whose exporter is ``none``, ``console``
+  or anything else that is not an OTLP exporter never parses its endpoint, so
+  that endpoint is left alone. The shared endpoint is checked only when some
+  signal exports over OTLP with no endpoint of its own, since that is the only
+  case in which an exporter reads it.
+
+  Declarative configuration builds its exporters from the configuration file and
+  reads none of these variables, so under ``OTEL_CONFIG_FILE``, or under the
+  ``/etc/opentelemetry/python/otel-config.yaml`` a Dash0 language package
+  installs, no endpoint variable is checked at all.
+
+  Such a value is now treated the same way as an unset
+  ``DASH0_OTEL_COLLECTOR_BASE_URL``: the SDK is turned off, a warning names the
+  variable and the parse error, and startup continues.
+
+  The value checked is the endpoint the SDK exports to, which is
+  ``OTEL_EXPORTER_OTLP_ENDPOINT`` when it is set and
+  ``DASH0_OTEL_COLLECTOR_BASE_URL`` otherwise. A base URL that cannot be parsed
+  therefore changes nothing when ``OTEL_EXPORTER_OTLP_ENDPOINT`` overrides it
+  with a value that can.
+
+change_logs: [user]

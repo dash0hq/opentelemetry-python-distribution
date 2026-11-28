@@ -19,6 +19,7 @@ from dash0.opentelemetry.resource import (
     module_run_with_dash_m,
     pod_uid_from_cgroup_v1,
     pod_uid_from_cgroup_v2,
+    running_in_kubernetes,
     service_metadata_from_pyproject,
 )
 from dash0.opentelemetry.version import __version__
@@ -66,9 +67,163 @@ def test_pod_uid_from_cgroup_v2(monkeypatch):
     assert pod_uid_from_cgroup_v2() == _POD_UID
 
 
+def test_a_mountinfo_carrying_an_undecodable_byte_still_yields_the_pod_uid(
+    monkeypatch, tmp_path
+):
+    mountinfo = tmp_path / "mountinfo"
+    mountinfo.write_bytes(
+        b"900 800 0:50 /mnt/"
+        + (b"\xe9" * 60)
+        + b" /data rw,relatime shared:1 ext4\n"
+        + f"901 800 0:51 / /var/lib/kubelet/pods/{_POD_UID}/etc-hosts rw\n".encode()
+    )
+    monkeypatch.setattr(resource_module, "_CGROUP_V1_MOUNTINFO", str(mountinfo))
+
+    assert pod_uid_from_cgroup_v1() == _POD_UID
+
+
+def test_a_non_uuid_segment_under_pods_is_skipped(monkeypatch, tmp_path):
+    mountinfo = tmp_path / "mountinfo"
+    mountinfo.write_bytes(
+        b"900 800 0:50 /srv/pods/"
+        + (b"\xe9" * 40)
+        + b" /data rw,relatime shared:1\n"
+        + f"901 800 0:51 / /var/lib/kubelet/pods/{_POD_UID}/etc-hosts rw\n".encode()
+    )
+    monkeypatch.setattr(resource_module, "_CGROUP_V1_MOUNTINFO", str(mountinfo))
+
+    assert pod_uid_from_cgroup_v1() == _POD_UID
+
+
+def test_a_second_pods_marker_on_one_line_is_searched_too(monkeypatch):
+    line = f"900 800 0:50 /srv/pods/{'x' * 40} /var/lib/kubelet/pods/{_POD_UID}/x rw"
+    monkeypatch.setattr(
+        resource_module, "_read_candidate_lines", lambda *a, **k: [line]
+    )
+
+    assert pod_uid_from_cgroup_v1() == _POD_UID
+
+
+def test_a_pods_marker_overlapping_the_previous_one_is_searched_too(monkeypatch):
+    line = f"111 222 0:1 /mnt/pods/pods/{_POD_UID}/x /y rw - ext4 /dev/x rw"
+    monkeypatch.setattr(
+        resource_module, "_read_candidate_lines", lambda *a, **k: [line]
+    )
+
+    assert pod_uid_from_cgroup_v1() == _POD_UID
+
+
+def test_a_static_pod_uid_with_no_hyphens_is_detected(monkeypatch):
+    static_uid = "d4a0cb0a1d5a11ea9d3642010a800175"
+    line = f"2172 2135 259:1 /var/lib/kubelet/pods/{static_uid}/etc-hosts /etc/hosts rw"
+    monkeypatch.setattr(
+        resource_module, "_read_candidate_lines", lambda *a, **k: [line]
+    )
+
+    assert pod_uid_from_cgroup_v1() == static_uid
+
+
+def test_a_static_pod_uid_with_no_hyphens_is_detected_from_a_cgroupfs_segment(
+    monkeypatch,
+):
+    static_uid = "d4a0cb0a1d5a11ea9d3642010a800175"
+    line = f"12:devices:/kubepods/besteffort/pod{static_uid}/" + ("a" * 64)
+    monkeypatch.setattr(
+        resource_module, "_read_candidate_lines", lambda *a, **k: [line]
+    )
+
+    assert pod_uid_from_cgroup_v2() == static_uid
+
+
+def test_a_static_pod_uid_with_no_hyphens_is_detected_from_a_systemd_slice(monkeypatch):
+    static_uid = "d4a0cb0a1d5a11ea9d3642010a800175"
+    line = (
+        "0::/kubepods.slice/kubepods-besteffort.slice/"
+        f"kubepods-besteffort-pod{static_uid}.slice/"
+        "cri-containerd-" + ("a" * 64) + ".scope"
+    )
+    monkeypatch.setattr(
+        resource_module, "_read_candidate_lines", lambda *a, **k: [line]
+    )
+
+    assert pod_uid_from_cgroup_v2() == static_uid
+
+
+def test_a_longer_hex_segment_under_pods_is_not_truncated_into_a_uuid(monkeypatch):
+    line = f"111 222 0:1 / /var/lib/kubelet/pods/{_POD_UID}abcd/etc-hosts rw"
+    monkeypatch.setattr(
+        resource_module, "_read_candidate_lines", lambda *a, **k: [line]
+    )
+
+    assert pod_uid_from_cgroup_v1() is None
+
+
+def test_a_non_uuid_cgroupfs_segment_is_never_reported_as_the_pod_uid(monkeypatch):
+    line = "12:devices:/some/pod" + ("Z" * 36) + "/" + ("a" * 64)
+    monkeypatch.setattr(
+        resource_module, "_read_candidate_lines", lambda *a, **k: [line]
+    )
+
+    assert pod_uid_from_cgroup_v2() is None
+
+
+def test_a_systemd_slice_holding_one_hex_character_too_many_is_not_a_pod_uid(
+    monkeypatch,
+):
+    line = (
+        "0::/kubepods.slice/kubepods-besteffort.slice/"
+        "kubepods-besteffort-podd4a0cb0a1d5a11ea9d3642010a8001750.slice/"
+        "cri-containerd-" + ("a" * 64) + ".scope"
+    )
+    monkeypatch.setattr(
+        resource_module, "_read_candidate_lines", lambda *a, **k: [line]
+    )
+
+    assert pod_uid_from_cgroup_v2() is None
+
+
+def test_an_etc_hosts_carrying_an_undecodable_byte_still_reports_kubernetes(
+    monkeypatch, tmp_path
+):
+    hosts = tmp_path / "hosts"
+    hosts.write_bytes(b"# Kubernetes-managed hosts file\n127.0.0.1\tcaf\xe9\n")
+    monkeypatch.setattr(resource_module, "_ETC_HOSTS", str(hosts))
+
+    assert running_in_kubernetes() is True
+
+
 def test_detect_fallback_service_name(monkeypatch):
     monkeypatch.setattr(resource_module.sys, "argv", ["/opt/app/server.py"])
     assert detect_fallback_service_name() == "server"
+
+
+def test_a_service_detection_failure_still_leaves_the_distro_attributes(monkeypatch):
+    monkeypatch.setattr(
+        resource_module, "detect_service_metadata", _raise_unicode_decode_error
+    )
+    monkeypatch.setattr(resource_module, "detect_kubernetes_pod_uid", lambda: _POD_UID)
+
+    apply_detected_resource_attributes("9.9.9")
+
+    attributes = os.environ[OTEL_RESOURCE_ATTRIBUTES]
+    assert "telemetry.distro.name=dash0-python" in attributes
+    assert "telemetry.distro.version=9.9.9" in attributes
+    assert f"k8s.pod.uid={_POD_UID}" in attributes
+    assert OTEL_SERVICE_NAME not in os.environ
+
+
+def test_a_pod_uid_failure_still_leaves_the_distro_attributes(monkeypatch):
+    monkeypatch.setattr(
+        resource_module, "detect_kubernetes_pod_uid", _raise_unicode_decode_error
+    )
+    monkeypatch.setattr(resource_module.sys, "argv", ["/opt/app/server.py"])
+
+    apply_detected_resource_attributes("9.9.9")
+
+    attributes = os.environ[OTEL_RESOURCE_ATTRIBUTES]
+    assert "telemetry.distro.name=dash0-python" in attributes
+    assert "k8s.pod.uid" not in attributes
+    assert os.environ[OTEL_SERVICE_NAME] == "server"
 
 
 def test_apply_sets_distro_attributes_and_service_name(monkeypatch):
@@ -128,6 +283,31 @@ def test_kubernetes_detector_reports_pod_uid(monkeypatch):
 
 def test_kubernetes_detector_is_empty_outside_kubernetes():
     assert not Dash0KubernetesResourceDetector().detect().attributes
+
+
+def _raise_unicode_decode_error(*_args, **_kwargs):
+    raise UnicodeDecodeError("utf-8", b"\xe9", 0, 1, "invalid continuation byte")
+
+
+def test_the_kubernetes_detector_reports_nothing_when_detection_raises(monkeypatch):
+    monkeypatch.setattr(
+        resource_module, "detect_kubernetes_pod_uid", _raise_unicode_decode_error
+    )
+
+    assert not Dash0KubernetesResourceDetector().detect().attributes
+
+
+def test_the_service_name_detector_keeps_the_instance_id_when_detection_raises(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        resource_module, "_detected_service_metadata", _raise_unicode_decode_error
+    )
+
+    attributes = Dash0ServiceNameResourceDetector().detect().attributes
+
+    assert attributes["service.instance.id"]
+    assert "service.name" not in attributes
 
 
 def test_service_name_detector_reports_fallback_service_name(monkeypatch):

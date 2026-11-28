@@ -1,0 +1,26 @@
+change_type: bug_fix
+
+component: resource-detectors
+
+note: Report ``k8s.pod.uid`` only when the path segment carrying it has the shape of a pod UID
+
+issues: [130, 153]
+
+subtext: |
+  The cgroup v1 detector returned the 36 characters following the first
+  ``/pods/`` in ``/proc/self/mountinfo`` without looking at them, and the cgroup
+  v2 detector did the same for a segment of the right length. A ``hostPath``
+  volume mounted at a path containing ``/pods/`` therefore reported 36
+  characters of that path as the pod UID, and a longer hexadecimal segment was
+  truncated to 36 characters.
+
+  A segment is now accepted only as a lowercase hyphenated UUID or as the 32
+  hexadecimal characters the kubelet assigns to a static pod whose manifest
+  carries no ``metadata.uid``. A segment of any other shape is skipped and the
+  search carries on through the rest of the file.
+
+  Two attribute changes follow. A static pod reports ``k8s.pod.uid`` where it
+  reported none, and a pod whose mount paths hold no segment of either shape
+  reports none where it reported a wrong value.
+
+change_logs: [user]

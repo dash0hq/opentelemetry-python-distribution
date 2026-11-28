@@ -4,7 +4,7 @@
 
 | Variable | Effect |
 |---|---|
-| `DASH0_OTEL_COLLECTOR_BASE_URL` | **Required.** OTLP endpoint to export to. If unset, the distribution disables itself entirely and sets `OTEL_SDK_DISABLED=true`. |
+| `DASH0_OTEL_COLLECTOR_BASE_URL` | **Required.** OTLP endpoint to export to. If unset, the distribution disables itself entirely and sets `OTEL_SDK_DISABLED=true`. A value `urlparse` rejects, such as `http://[::1:4318` with its closing bracket missing, disables the distribution the same way and is named in the warning, unless `OTEL_EXPORTER_OTLP_ENDPOINT` holds a value that parses, which is then the endpoint the gate checks, or unless every signal that exports over OTLP has its own `OTEL_EXPORTER_OTLP_<SIGNAL>_ENDPOINT`, in which case nothing reads the value. |
 | `DASH0_DISABLE` | Set to `true` to disable the distribution entirely. The SDK becomes a no-op. |
 | `DASH0_AUTOMATIC_SERVICE_NAME` | Set to `false` to opt out of detected `service.name` and `service.version`. |
 | `DASH0_BOOTSTRAP_SPAN` | Name of a single span to emit once at startup. Useful for confirming the distribution is active. |
@@ -25,15 +25,15 @@ The following variables are relevant to the distribution's behavior:
 | `OTEL_EXPORTER_OTLP_PROTOCOL` | `http/protobuf` | Set to `grpc` for OTLP/gRPC. |
 | `OTEL_TRACES_SAMPLER` | `always_on` | The SDK records and exports every span, whatever an incoming trace context says. See [Sampling](#sampling). Declarative configuration (`OTEL_CONFIG_FILE`) never reads it. |
 | `OTEL_PROPAGATORS` | `tracecontext,baggage,xray` | Installed directly; the variable itself stays unset. Reads and writes W3C `traceparent`, W3C `baggage`, and AWS `X-Amzn-Trace-Id`. See [Propagation](#propagation). Declarative configuration (`OTEL_CONFIG_FILE`) never reads it. |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | Value of `DASH0_OTEL_COLLECTOR_BASE_URL` | Derived automatically; override if needed. |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | Value of `DASH0_OTEL_COLLECTOR_BASE_URL` | Derived automatically; override if needed. When set, this is the value the gate checks instead of `DASH0_OTEL_COLLECTOR_BASE_URL`, and a value `urlparse` rejects disables the distribution. |
 | `OTEL_EXPORTER_OTLP_HEADERS` | — | Headers sent with every OTLP request. Required for Dash0 authentication: `Authorization=Bearer <token>,Dash0-Dataset=default`. |
 | `OTEL_EXPORTER_OTLP_<SIGNAL>_PROTOCOL` | — | Per-signal protocol override (`TRACES`, `METRICS`, `LOGS`). |
-| `OTEL_EXPORTER_OTLP_<SIGNAL>_ENDPOINT` | — | Per-signal endpoint override. Custom ports and explicitly set endpoints are never rewritten by the distro. |
+| `OTEL_EXPORTER_OTLP_<SIGNAL>_ENDPOINT` | — | Per-signal endpoint override. Custom ports and explicitly set endpoints are never rewritten by the distro. A value `urlparse` rejects disables the distribution, because the exporter for that signal raises while the SDK is configured and no instrumentor loads after it. A signal whose `OTEL_<SIGNAL>_EXPORTER` is not an OTLP exporter never parses its endpoint, so the value is left alone. |
 | `OTEL_SERVICE_NAME` | — | Standard service name. The distro adds a fallback derived from the entrypoint when this is unset. |
 | `OTEL_RESOURCE_ATTRIBUTES` | — | Additional resource attributes. The distro reads this to detect whether `service.name` is already set, and appends its own detected attributes (`telemetry.distro.*`, `k8s.pod.uid`) to it. |
 | `OTEL_PYTHON_DISABLED_INSTRUMENTATIONS` | — | Comma-separated list of instrumentor entry-point names to skip (e.g. `flask,redis`). Honored by the auto-instrumentation loader. |
 | `OTEL_EXPERIMENTAL_RESOURCE_DETECTORS` | — | Comma-separated resource detector names, honored by the SDK's environment-based configuration. Declarative configuration (`OTEL_CONFIG_FILE`) never reads it. |
-| `OTEL_CONFIG_FILE` | `/etc/opentelemetry/python/otel-config.yaml` when that file exists | Path to a declarative SDK configuration file, which takes over from every variable above that configures providers, exporters or the resource. List the `dash0_*` detectors in the file to keep `telemetry.distro.*`, `k8s.pod.uid` and the `service.name` fallback. See [Configuration file](#configuration-file). |
+| `OTEL_CONFIG_FILE` | `/etc/opentelemetry/python/otel-config.yaml` when that file exists | Path to a declarative SDK configuration file, which takes over from every variable above that configures providers, exporters or the resource. List the `dash0_*` detectors in the file to keep `telemetry.distro.*`, `k8s.pod.uid` and the `service.name` fallback. The gate checks no endpoint variable while this file is in effect, because the SDK builds its exporters from the file and reads none of them. See [Configuration file](#configuration-file). |
 
 ## Configuration file
 

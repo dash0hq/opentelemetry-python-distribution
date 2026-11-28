@@ -33,7 +33,15 @@ cgroup v1 is tried first; cgroup v2 is the fallback.
 
 Both standard cgroup path formats and Kubernetes slice naming conventions are handled.
 
+`/etc/hosts`, `/proc/self/mountinfo` and `/proc/self/cgroup` are all decoded with `errors="replace"`, so a byte that is not valid UTF-8 no longer stops detection.
+A path segment is accepted as a pod UID only when it is a lowercase hyphenated UUID, or the 32 hexadecimal characters the kubelet assigns to a static pod whose manifest carries no `metadata.uid`.
+Any other segment is skipped and the search carries on.
+
+The first accepted pod UID in the file wins, and the detector has no way to tell which pod it belongs to.
+A container that can see other pods' mounts, such as a DaemonSet that mounts `/var/lib/kubelet`, can therefore report another pod's UID.
+
 If the detector cannot confirm it is inside a Kubernetes pod, or cannot extract the pod UID, it returns an empty resource without failing.
+It also returns an empty resource when detection raises, and logs the error.
 
 **Other `k8s.*` attributes** — such as `k8s.namespace.name`, `k8s.node.name`, `k8s.deployment.name`, and similar — cannot be read from the cgroup filesystem and are not set by this detector.
 They require access to the Kubernetes API and should be added via the [OpenTelemetry Collector's `k8sattributesprocessor`](https://opentelemetry.io/docs/kubernetes/collector/components/#kubernetes-attributes-processor).
@@ -62,6 +70,8 @@ Steps 3 and 4 also supply `service.version`, from `Version` and `[project].versi
 Steps 1, 2 and 5 do not.
 No version is ever invented, because an absent version is more useful than a wrong one.
 Steps 3 and 5 both decline to name a generic runner, so a process launched by one can finish with no detected name at all.
+When a step cannot read the metadata it needs, the error is logged and the detector reports `service.instance.id` alone, leaving `service.name` and `service.version` unset.
+One case that reaches this is a non-UTF-8 byte in the `.dist-info/METADATA` or `entry_points.txt` of any installed package.
 
 **How the installed distribution is identified.**
 A process started by a console script is owned by the distribution that declared that script, which is the common shape of a `pip install .` deployment.

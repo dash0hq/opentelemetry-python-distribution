@@ -22,6 +22,7 @@ entry-point group (see ``pyproject.toml``):
 import re
 import sys
 from importlib.metadata import distributions, packages_distributions
+from logging import getLogger
 from os import environ, path
 from pathlib import Path
 
@@ -38,6 +39,8 @@ from ._environment_variables import (
 )
 from .settings import is_false
 from .version import __version__
+
+_logger = getLogger(__name__)
 
 _SERVICE_NAME = "service.name"
 _SERVICE_VERSION = "service.version"
@@ -85,10 +88,17 @@ _POD_MOUNT_MARKER = "/pods/"
 _POD_UID_LEN = 36
 _CONTAINER_ID_LEN = 64
 _POD_LABEL = "pod"
+_POD_UID_PATTERN = (
+    r"(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[0-9a-f]{32})"
+)
 # matches cgroup v2 slices like kubepods-pode462ffed_94ce_4806_a52e_d2726f448f15.slice
 _POD_UID_IN_CGROUP = re.compile(
     r"^[a-z_-]*pod(?P<uid>[0-9a-f]{8}[-_][0-9a-f]{4}[-_][0-9a-f]{4}"
-    r"[-_][0-9a-f]{4}[-_][0-9a-f]{12})\.slice$"
+    r"[-_][0-9a-f]{4}[-_][0-9a-f]{12}|[0-9a-f]{32})\.slice$"
+)
+_POD_UID_EXACT = re.compile(_POD_UID_PATTERN)
+_POD_UID_IN_MOUNTINFO = re.compile(
+    rf".{re.escape(_POD_MOUNT_MARKER)}(?P<uid>{_POD_UID_PATTERN})(?![0-9a-f-])"
 )
 
 
@@ -100,8 +110,13 @@ def distribution_resource_attributes(version):
 
 
 def _read_candidate_lines(filename, minimum_length):
+    """The stripped lines of ``filename`` longer than ``minimum_length``.
+
+    A byte that UTF-8 cannot decode becomes a replacement character, and an
+    unreadable file yields no lines.
+    """
     try:
-        with open(filename, encoding="utf8") as file:
+        with open(filename, encoding="utf8", errors="replace") as file:
             content = file.read()
     except OSError:
         return []
@@ -113,8 +128,13 @@ def _read_candidate_lines(filename, minimum_length):
 
 
 def running_in_kubernetes():
+    """Whether the first line of ``/etc/hosts`` carries the kubelet marker.
+
+    A byte that UTF-8 cannot decode becomes a replacement character, and an
+    unreadable file answers ``False``.
+    """
     try:
-        with open(_ETC_HOSTS, encoding="utf8") as file:
+        with open(_ETC_HOSTS, encoding="utf8", errors="replace") as file:
             first_line = file.readline()
     except OSError:
         return False
@@ -122,12 +142,16 @@ def running_in_kubernetes():
 
 
 def pod_uid_from_cgroup_v1():
+    """The pod UID of the first ``/pods/<uid>`` mount path that holds one.
+
+    A path segment after ``/pods/`` that has neither the shape of a lowercase
+    hyphenated UUID nor that of a 32-character static pod UID is skipped, and
+    the search carries on through the rest of the file.
+    """
     for line in _read_candidate_lines(_CGROUP_V1_MOUNTINFO, _POD_UID_LEN):
-        marker_index = line.find(_POD_MOUNT_MARKER)
-        if marker_index > 0:
-            after_marker = line[marker_index + len(_POD_MOUNT_MARKER) :]
-            if len(after_marker) >= _POD_UID_LEN:
-                return after_marker[:_POD_UID_LEN]
+        match = _POD_UID_IN_MOUNTINFO.search(line)
+        if match:
+            return match.group("uid")
     return None
 
 
@@ -137,9 +161,10 @@ def pod_uid_from_cgroup_v2():
         if len(segments) <= 2:
             continue
         penultimate = segments[-2]
-        expected_length = _POD_UID_LEN + len(_POD_LABEL)
-        if penultimate.startswith(_POD_LABEL) and len(penultimate) == expected_length:
-            return penultimate[len(_POD_LABEL) :]
+        if penultimate.startswith(_POD_LABEL):
+            candidate = penultimate[len(_POD_LABEL) :]
+            if _POD_UID_EXACT.fullmatch(candidate):
+                return candidate
         match = _POD_UID_IN_CGROUP.match(penultimate)
         if match:
             return match.group("uid").replace("_", "-")
@@ -358,13 +383,21 @@ def apply_detected_resource_attributes(version):
     if not is_false(environ.get(DASH0_AUTOMATIC_SERVICE_NAME)) and (
         not _service_name_already_configured()
     ):
-        name, service_version = detect_service_metadata()
+        try:
+            name, service_version = detect_service_metadata()
+        except Exception:  # pylint: disable=broad-except
+            _logger.exception("dash0: detecting the service name and version failed")
+            name, service_version = None, None
         if name:
             environ[OTEL_SERVICE_NAME] = name
         if service_version:
             attributes[_SERVICE_VERSION] = service_version
 
-    pod_uid = detect_kubernetes_pod_uid()
+    try:
+        pod_uid = detect_kubernetes_pod_uid()
+    except Exception:  # pylint: disable=broad-except
+        _logger.exception("dash0: detecting the Kubernetes pod UID failed")
+        pod_uid = None
     if pod_uid:
         attributes[_K8S_POD_UID] = pod_uid
     _merge_into_resource_attributes(attributes)
@@ -412,7 +445,11 @@ class Dash0KubernetesResourceDetector(ResourceDetector):
     """Reports ``k8s.pod.uid``, detected from ``/etc/hosts`` and the cgroups."""
 
     def detect(self):
-        pod_uid = detect_kubernetes_pod_uid()
+        try:
+            pod_uid = detect_kubernetes_pod_uid()
+        except Exception:  # pylint: disable=broad-except
+            _logger.exception("dash0: detecting the Kubernetes pod UID failed")
+            return Resource.get_empty()
         if pod_uid:
             return Resource({_K8S_POD_UID: pod_uid})
         return Resource.get_empty()
@@ -430,7 +467,11 @@ class Dash0ServiceNameResourceDetector(ResourceDetector):
 
     def detect(self):
         attributes = dict(ServiceInstanceIdResourceDetector().detect().attributes)
-        service_name, service_version = _detected_service_metadata()
+        try:
+            service_name, service_version = _detected_service_metadata()
+        except Exception:  # pylint: disable=broad-except
+            _logger.exception("dash0: detecting the service name and version failed")
+            return Resource(attributes)
         if service_name:
             attributes[_SERVICE_NAME] = service_name
         if service_version:

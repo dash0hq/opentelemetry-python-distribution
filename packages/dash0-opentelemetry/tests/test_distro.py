@@ -1,6 +1,7 @@
 import os
 
 import pytest
+from dash0.opentelemetry import distro as distro_module
 from dash0.opentelemetry._environment_variables import (
     DASH0_DISABLE,
     DASH0_OTEL_COLLECTOR_BASE_URL,
@@ -315,6 +316,32 @@ def test_configure_disabled_when_no_collector_endpoint():
     assert OTEL_TRACES_EXPORTER not in os.environ
 
 
+def test_a_base_url_urlparse_rejects_disables_the_sdk_instead_of_raising(monkeypatch):
+    monkeypatch.setenv(DASH0_OTEL_COLLECTOR_BASE_URL, "http://[::1:4318")
+
+    Dash0Distro().configure()
+
+    assert os.environ[OTEL_SDK_DISABLED] == "true"
+    assert OTEL_TRACES_EXPORTER not in os.environ
+    assert OTEL_EXPORTER_OTLP_ENDPOINT not in os.environ
+
+
+def test_configure_isolates_resource_detection_failures(monkeypatch):
+    monkeypatch.setenv(DASH0_OTEL_COLLECTOR_BASE_URL, "http://collector:4318")
+
+    def _raise_on_detection(_version):
+        raise UnicodeDecodeError("utf-8", b"\xe9", 0, 1, "invalid continuation byte")
+
+    monkeypatch.setattr(
+        distro_module, "apply_detected_resource_attributes", _raise_on_detection
+    )
+
+    Dash0Distro().configure()
+
+    assert os.environ[OTEL_TRACES_EXPORTER] == "otlp_proto_http"
+    assert os.environ[OTEL_EXPORTER_OTLP_ENDPOINT] == "http://collector:4318"
+
+
 def test_load_instrumentor_isolates_failures(monkeypatch):
     monkeypatch.setenv(DASH0_OTEL_COLLECTOR_BASE_URL, "http://collector:4318")
 
@@ -377,6 +404,7 @@ def test_load_instrumentor_skips_when_disabled():
         # Custom and absent ports are left alone.
         ("http://collector:9999", "grpc", "v1/traces", None),
         ("http://collector", "grpc", "v1/traces", None),
+        ("http://[::1:4318", "grpc", "v1/traces", None),
     ],
 )
 def test_per_signal_endpoint_override(base_endpoint, protocol, signal_path, expected):

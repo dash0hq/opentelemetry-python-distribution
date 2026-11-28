@@ -130,8 +130,8 @@ def _per_signal_endpoint_override(base_endpoint, protocol, signal_path):
     collector is assumed to serve that protocol there, or the user supplies an
     explicit per-signal endpoint, which is always honored).
     """
-    parsed = urlparse(base_endpoint)
     try:
+        parsed = urlparse(base_endpoint)
         current_port = parsed.port
     except ValueError:
         return None
@@ -235,7 +235,13 @@ class Dash0Distro(BaseDistro):
                     protocol,
                 )
 
-        apply_detected_resource_attributes(__version__)
+        try:
+            apply_detected_resource_attributes(__version__)
+        except Exception:  # pylint: disable=broad-except
+            _logger.exception(
+                "dash0: resource detection failed, continuing without the"
+                " attributes it would have added"
+            )
 
     def load_instrumentor(self, entry_point, **kwargs):
         enabled, _ = evaluate_gate()

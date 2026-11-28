@@ -33,11 +33,9 @@ from ._environment_variables import (
     DASH0_BOOTSTRAP_SPAN,
     DASH0_FLUSH_ON_SIGTERM_SIGINT,
 )
-from .settings import evaluate_gate, is_true
+from .settings import _DEFAULT_CONFIG_FILE, evaluate_gate, is_true
 
 _logger = getLogger(__name__)
-
-_DEFAULT_CONFIG_FILE = "/etc/opentelemetry/python/otel-config.yaml"
 
 
 class Dash0Configurator(_OTelSDKConfigurator):

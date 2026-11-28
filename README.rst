@@ -115,6 +115,8 @@ Configuration
      - Effect
    * - ``DASH0_OTEL_COLLECTOR_BASE_URL`` (required)
      - OTLP endpoint to export to. If unset, the distribution disables itself.
+       A value ``urlparse`` rejects does the same, unless
+       ``OTEL_EXPORTER_OTLP_ENDPOINT`` overrides it with a value that parses.
    * - ``DASH0_DISABLE``
      - ``true`` disables the distribution entirely (SDK becomes a no-op).
    * - ``DASH0_AUTOMATIC_SERVICE_NAME``

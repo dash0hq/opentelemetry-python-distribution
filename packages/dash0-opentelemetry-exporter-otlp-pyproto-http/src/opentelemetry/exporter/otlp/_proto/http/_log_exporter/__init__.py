@@ -25,8 +25,10 @@ from opentelemetry.exporter.otlp._proto.http import (
     Compression,
 )
 from opentelemetry.exporter.otlp._proto.http._common import (
+    _RETRYABLE_EXPORT_ERRORS,
     _build_ssl_context,
     _is_retryable,
+    _is_retryable_error,
     _post,
 )
 from opentelemetry.metrics import MeterProvider
@@ -181,20 +183,27 @@ class OTLPLogExporter(LogRecordExporter):
         with self._metrics.export_operation(len(batch)) as result:
             serialized_data = encode_logs(batch).SerializeToString()
             deadline_sec = time() + self._timeout
+            export_error: Exception | None = None
+            status_code: int | None = None
             for retry_num in range(_MAX_RETRYS):
                 backoff_seconds = 2**retry_num * uniform(0.8, 1.2)
-                export_error: Exception | None = None
+                timeout_sec = deadline_sec - time()
+                if timeout_sec <= 0:
+                    if export_error is None and status_code is None:
+                        export_error = TimeoutError(
+                            "the export deadline expired before an attempt was made"
+                        )
+                    break
                 try:
-                    status_code, reason = self._export(
-                        serialized_data, deadline_sec - time()
-                    )
+                    export_error = None
+                    status_code, reason = self._export(serialized_data, timeout_sec)
                     if status_code < 400:
                         return LogRecordExportResult.SUCCESS
                     retryable = _is_retryable(status_code)
-                except URLError as error:
-                    reason = error.reason
+                except _RETRYABLE_EXPORT_ERRORS as error:
+                    reason = getattr(error, "reason", error)
                     export_error = error
-                    retryable = True
+                    retryable = _is_retryable_error(error)
                     status_code = None
 
                 if not retryable:
@@ -217,17 +226,7 @@ class OTLPLogExporter(LogRecordExporter):
                     or backoff_seconds > (deadline_sec - time())
                     or self._shutdown
                 ):
-                    _logger.error(
-                        "Failed to export logs batch due to timeout, max retries or shutdown."
-                    )
-                    error_attrs = (
-                        {HTTP_RESPONSE_STATUS_CODE: status_code}
-                        if status_code is not None
-                        else None
-                    )
-                    result.error = export_error
-                    result.error_attrs = error_attrs
-                    return LogRecordExportResult.FAILURE
+                    break
 
                 _logger.warning(
                     "Transient error %s encountered while exporting logs batch, retrying in %.2fs.",
@@ -237,6 +236,17 @@ class OTLPLogExporter(LogRecordExporter):
                 if self._shutdown_is_occuring.wait(backoff_seconds):
                     _logger.warning("Shutdown in progress, aborting retry.")
                     break
+
+            _logger.error(
+                "Failed to export logs batch due to timeout, max retries or shutdown."
+            )
+            error_attrs = (
+                {HTTP_RESPONSE_STATUS_CODE: status_code}
+                if status_code is not None
+                else None
+            )
+            result.error = export_error
+            result.error_attrs = error_attrs
             return LogRecordExportResult.FAILURE
 
     def force_flush(self, timeout_millis: float = 10_000) -> bool:

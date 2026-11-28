@@ -8,9 +8,10 @@ when the user set it, and an endpoint ``urlparse`` rejects counts as no endpoint
 at all. A per-signal endpoint the user set is checked the same way, because it
 is the endpoint its own signal exports to, and is skipped when that signal's
 exporter is not an OTLP one, because then nothing ever parses it. The shared
-endpoint is skipped when no signal at all exports over OTLP, for the same
-reason. Every endpoint is skipped under declarative configuration, which builds
-its exporters from the configuration file and reads none of these variables.
+endpoint is skipped unless some signal exports over OTLP with no endpoint of its
+own, for the same reason. Every endpoint is skipped under declarative
+configuration, which builds its exporters from the configuration file and reads
+none of these variables.
 """
 
 from os import environ
@@ -67,20 +68,20 @@ def evaluate_gate():
         OTEL_EXPORTER_OTLP_ENDPOINT if override else DASH0_OTEL_COLLECTOR_BASE_URL
     )
     endpoints = []
-    signals_over_otlp = 0
+    signals_on_the_shared_endpoint = 0
     for exporter_variable, endpoint_variable in _PER_SIGNAL_ENDPOINTS:
         selected = environ.get(exporter_variable)
         if selected is not None and not any(
             name.strip() in _OTLP_EXPORTER_NAMES for name in selected.split(",")
         ):
             continue
-        signals_over_otlp += 1
         endpoint = environ.get(endpoint_variable)
         if endpoint:
             endpoints.append((endpoint_variable, endpoint))
-    if not signals_over_otlp:
-        return True, None
-    endpoints.insert(0, (shared_variable, override or base_url))
+        else:
+            signals_on_the_shared_endpoint += 1
+    if signals_on_the_shared_endpoint:
+        endpoints.insert(0, (shared_variable, override or base_url))
     for variable, endpoint in endpoints:
         try:
             urlparse(endpoint)

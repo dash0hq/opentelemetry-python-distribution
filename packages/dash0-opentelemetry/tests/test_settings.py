@@ -276,6 +276,41 @@ def test_gate_disabled_by_a_rejected_base_url_when_one_signal_still_uses_otlp(
     assert DASH0_OTEL_COLLECTOR_BASE_URL in reason
 
 
+def test_gate_enabled_by_a_rejected_base_url_every_signal_overrides(monkeypatch):
+    monkeypatch.setenv(DASH0_OTEL_COLLECTOR_BASE_URL, "http://[::1:4318")
+    monkeypatch.setenv(
+        OTEL_EXPORTER_OTLP_TRACES_ENDPOINT, "http://collector:4318/v1/traces"
+    )
+    monkeypatch.setenv(
+        OTEL_EXPORTER_OTLP_METRICS_ENDPOINT, "http://collector:4318/v1/metrics"
+    )
+    monkeypatch.setenv(
+        OTEL_EXPORTER_OTLP_LOGS_ENDPOINT, "http://collector:4318/v1/logs"
+    )
+
+    enabled, reason = evaluate_gate()
+
+    assert enabled is True
+    assert reason is None
+
+
+def test_gate_disabled_by_a_rejected_base_url_when_one_signal_lacks_an_override(
+    monkeypatch,
+):
+    monkeypatch.setenv(DASH0_OTEL_COLLECTOR_BASE_URL, "http://[::1:4318")
+    monkeypatch.setenv(
+        OTEL_EXPORTER_OTLP_TRACES_ENDPOINT, "http://collector:4318/v1/traces"
+    )
+    monkeypatch.setenv(
+        OTEL_EXPORTER_OTLP_METRICS_ENDPOINT, "http://collector:4318/v1/metrics"
+    )
+
+    enabled, reason = evaluate_gate()
+
+    assert enabled is False
+    assert DASH0_OTEL_COLLECTOR_BASE_URL in reason
+
+
 def test_gate_enabled_by_per_signal_endpoints_that_parse(monkeypatch):
     monkeypatch.setenv(DASH0_OTEL_COLLECTOR_BASE_URL, "http://collector:4318")
     monkeypatch.setenv(OTEL_EXPORTER_OTLP_TRACES_ENDPOINT, "http://collector:4317")

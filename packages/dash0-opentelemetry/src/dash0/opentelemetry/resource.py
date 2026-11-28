@@ -67,6 +67,8 @@ _RUNNER_PROGRAMS = frozenset(
         "manage",
         "nox",
         "pdm",
+        "pip",
+        "pip3",
         "pipenv",
         "pipx",
         "poetry",

@@ -339,7 +339,7 @@ def test_a_generic_runner_run_as_a_module_supplies_no_fallback_name(
     assert detect_fallback_service_name() is None
 
 
-_LAUNCHERS_ADDED_FOR_ISSUE_138 = [
+_PROGRAMS_ADDED_FOR_ISSUE_138 = [
     "airflow",
     "apache-airflow",
     "chalice",
@@ -347,6 +347,8 @@ _LAUNCHERS_ADDED_FOR_ISSUE_138 = [
     "fastapi",
     "gradio",
     "litestar",
+    "pip",
+    "pip3",
     "prefect",
     "pserve",
     "quart",
@@ -359,9 +361,9 @@ _LAUNCHERS_ADDED_FOR_ISSUE_138 = [
 ]
 
 
-@pytest.mark.parametrize("launcher", _LAUNCHERS_ADDED_FOR_ISSUE_138)
-def test_a_launcher_console_script_supplies_no_fallback_name(monkeypatch, launcher):
-    monkeypatch.setattr(resource_module.sys, "argv", [f"/usr/local/bin/{launcher}"])
+@pytest.mark.parametrize("program", _PROGRAMS_ADDED_FOR_ISSUE_138)
+def test_a_runner_console_script_supplies_no_fallback_name(monkeypatch, program):
+    monkeypatch.setattr(resource_module.sys, "argv", [f"/usr/local/bin/{program}"])
 
     assert detect_fallback_service_name() is None
 

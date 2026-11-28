@@ -20,6 +20,11 @@ subtext: |
   no entry in the skip list and no ``console_scripts`` entry point either, so
   the list did nothing there and ``uvicorn.exe`` was reported as the service.
 
+  ``pip`` and ``pip3`` join the packaging tools the list already held,
+  ``pipx``, ``pipenv``, ``poetry``, ``pdm``, ``uv`` and ``uvx``. Under the
+  Kubernetes injector a ``pip install`` in a container reported
+  ``service.name=pip`` with pip's own release.
+
   ``airflow``, ``apache-airflow``, ``dagster`` and ``prefect`` also carry
   subcommands that serve the product's own API, such as ``airflow api-server``
   and ``prefect server start``. One console script covers both kinds of

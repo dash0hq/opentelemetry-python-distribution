@@ -154,6 +154,31 @@ def test_kubernetes_detector_is_empty_outside_kubernetes():
     assert not Dash0KubernetesResourceDetector().detect().attributes
 
 
+def _raise_unicode_decode_error(*_args, **_kwargs):
+    raise UnicodeDecodeError("utf-8", b"\xe9", 0, 1, "invalid continuation byte")
+
+
+def test_the_kubernetes_detector_reports_nothing_when_detection_raises(monkeypatch):
+    monkeypatch.setattr(
+        resource_module, "detect_kubernetes_pod_uid", _raise_unicode_decode_error
+    )
+
+    assert not Dash0KubernetesResourceDetector().detect().attributes
+
+
+def test_the_service_name_detector_keeps_the_instance_id_when_detection_raises(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        resource_module, "_detected_service_metadata", _raise_unicode_decode_error
+    )
+
+    attributes = Dash0ServiceNameResourceDetector().detect().attributes
+
+    assert attributes["service.instance.id"]
+    assert "service.name" not in attributes
+
+
 def test_service_name_detector_reports_fallback_service_name(monkeypatch):
     monkeypatch.setattr(resource_module.sys, "argv", ["/opt/app/server.py"])
 

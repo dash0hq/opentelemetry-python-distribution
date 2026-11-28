@@ -22,6 +22,7 @@ entry-point group (see ``pyproject.toml``):
 import re
 import sys
 from importlib.metadata import distributions, packages_distributions
+from logging import getLogger
 from os import environ, path
 from pathlib import Path
 
@@ -38,6 +39,8 @@ from ._environment_variables import (
 )
 from .settings import is_false
 from .version import __version__
+
+_logger = getLogger(__name__)
 
 _SERVICE_NAME = "service.name"
 _SERVICE_VERSION = "service.version"
@@ -422,7 +425,11 @@ class Dash0KubernetesResourceDetector(ResourceDetector):
     """Reports ``k8s.pod.uid``, detected from ``/etc/hosts`` and the cgroups."""
 
     def detect(self):
-        pod_uid = detect_kubernetes_pod_uid()
+        try:
+            pod_uid = detect_kubernetes_pod_uid()
+        except Exception:  # pylint: disable=broad-except
+            _logger.exception("dash0: detecting the Kubernetes pod UID failed")
+            return Resource.get_empty()
         if pod_uid:
             return Resource({_K8S_POD_UID: pod_uid})
         return Resource.get_empty()
@@ -440,7 +447,11 @@ class Dash0ServiceNameResourceDetector(ResourceDetector):
 
     def detect(self):
         attributes = dict(ServiceInstanceIdResourceDetector().detect().attributes)
-        service_name, service_version = _detected_service_metadata()
+        try:
+            service_name, service_version = _detected_service_metadata()
+        except Exception:  # pylint: disable=broad-except
+            _logger.exception("dash0: detecting the service name and version failed")
+            return Resource(attributes)
         if service_name:
             attributes[_SERVICE_NAME] = service_name
         if service_version:

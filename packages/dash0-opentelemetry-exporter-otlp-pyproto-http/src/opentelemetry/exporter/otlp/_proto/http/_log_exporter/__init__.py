@@ -188,7 +188,7 @@ class OTLPLogExporter(LogRecordExporter):
                 export_error: Exception | None = None
                 try:
                     status_code, reason = self._export(
-                        serialized_data, deadline_sec - time()
+                        serialized_data, max(0.0, deadline_sec - time())
                     )
                     if status_code < 400:
                         return LogRecordExportResult.SUCCESS

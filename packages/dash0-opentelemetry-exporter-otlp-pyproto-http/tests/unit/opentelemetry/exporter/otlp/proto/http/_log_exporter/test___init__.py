@@ -5,6 +5,7 @@
 
 import unittest
 from http.client import BadStatusLine, InvalidURL, RemoteDisconnected
+from time import sleep
 from unittest.mock import patch
 from urllib.error import URLError
 
@@ -230,6 +231,29 @@ class TestOTLPLogExporter(unittest.TestCase):
         )
         self.assertEqual(result, LogRecordExportResult.FAILURE)
         self.assertEqual(attempts, 1)
+
+    def test_a_backoff_that_overshoots_never_hands_export_a_negative_timeout(self):
+        exporter = OTLPLogExporter(timeout=0.5)
+        budgets = []
+
+        def record_the_budget_and_fail(serialized_data, timeout_sec=None):
+            budgets.append(timeout_sec)
+            raise URLError("refused")
+
+        def wait_longer_than_asked(seconds):
+            sleep(seconds + 0.4)
+            return False
+
+        with patch.object(exporter, "_export", side_effect=record_the_budget_and_fail):
+            with patch(_UNIFORM, return_value=0.25):
+                with patch.object(
+                    exporter._shutdown_is_occuring, "wait", side_effect=wait_longer_than_asked
+                ):
+                    result = exporter.export([])
+        self.assertEqual(result, LogRecordExportResult.FAILURE)
+        self.assertGreater(len(budgets), 1)
+        self.assertTrue(all(budget >= 0 for budget in budgets))
+        exporter.shutdown()
 
     # ── shutdown ──────────────────────────────────────────────────────────────
 

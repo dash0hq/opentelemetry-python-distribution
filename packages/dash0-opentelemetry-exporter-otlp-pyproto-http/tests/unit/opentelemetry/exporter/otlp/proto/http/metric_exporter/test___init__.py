@@ -5,7 +5,9 @@
 
 import unittest
 from http.client import BadStatusLine, InvalidURL, RemoteDisconnected
+from time import sleep
 from unittest.mock import patch
+from urllib.error import URLError
 
 from opentelemetry.exporter.otlp.proto.common._internal.metrics_encoder import (
     encode_metrics,
@@ -264,6 +266,29 @@ class TestOTLPMetricExporter(unittest.TestCase):
         )
         self.assertEqual(result, MetricExportResult.FAILURE)
         self.assertEqual(attempts, 1)
+
+    def test_a_backoff_that_overshoots_never_hands_export_a_negative_timeout(self):
+        exporter = OTLPMetricExporter(timeout=0.5)
+        budgets = []
+
+        def record_the_budget_and_fail(serialized_data, timeout_sec=None):
+            budgets.append(timeout_sec)
+            raise URLError("refused")
+
+        def wait_longer_than_asked(seconds):
+            sleep(seconds + 0.4)
+            return False
+
+        with patch.object(exporter, "_export", side_effect=record_the_budget_and_fail):
+            with patch(_UNIFORM, return_value=0.25):
+                with patch.object(
+                    exporter._shutdown_in_progress, "wait", side_effect=wait_longer_than_asked
+                ):
+                    result = exporter.export(_empty_metrics_data())
+        self.assertEqual(result, MetricExportResult.FAILURE)
+        self.assertGreater(len(budgets), 1)
+        self.assertTrue(all(budget >= 0 for budget in budgets))
+        exporter.shutdown()
 
     def test_export_with_batch_size_sends_multiple_requests(self):
         # 3 data points with batch_size=1 → 3 separate HTTP requests

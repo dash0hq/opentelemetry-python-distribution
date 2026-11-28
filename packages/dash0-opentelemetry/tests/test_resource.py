@@ -339,6 +339,84 @@ def test_a_generic_runner_run_as_a_module_supplies_no_fallback_name(
     assert detect_fallback_service_name() is None
 
 
+_PROGRAMS_ADDED_FOR_ISSUE_138 = [
+    "airflow",
+    "apache-airflow",
+    "chalice",
+    "dagster",
+    "fastapi",
+    "gradio",
+    "litestar",
+    "pip",
+    "pip3",
+    "prefect",
+    "pserve",
+    "quart",
+    "sanic",
+    "scrapy",
+    "streamlit",
+    "twist",
+    "twistd",
+    "uwsgi",
+]
+
+
+@pytest.mark.parametrize("program", _PROGRAMS_ADDED_FOR_ISSUE_138)
+def test_a_runner_console_script_supplies_no_fallback_name(monkeypatch, program):
+    monkeypatch.setattr(resource_module.sys, "argv", [f"/usr/local/bin/{program}"])
+
+    assert detect_fallback_service_name() is None
+
+
+@pytest.mark.parametrize(
+    "launcher",
+    [
+        "airflow",
+        "chalice",
+        "dagster",
+        "fastapi",
+        "gradio",
+        "litestar",
+        "prefect",
+        "quart",
+        "sanic",
+        "streamlit",
+    ],
+)
+def test_a_launcher_run_as_a_module_supplies_no_fallback_name(monkeypatch, launcher):
+    monkeypatch.setattr(resource_module.sys, "orig_argv", [_PYTHON, "-m", launcher])
+    monkeypatch.setattr(resource_module.sys, "argv", ["-m"])
+
+    assert detect_fallback_service_name() is None
+
+
+def test_uwsgi_is_recognized_from_the_bare_name_it_puts_in_argv(monkeypatch):
+    """uWSGI sets ``sys.argv[0]`` to the literal ``uwsgi``, with no directory."""
+    monkeypatch.setattr(resource_module.sys, "argv", ["uwsgi"])
+
+    assert detect_fallback_service_name() is None
+
+
+@_needs_tomllib
+def test_fastapi_run_names_the_application_and_not_fastapi(monkeypatch, tmp_path):
+    """``fastapi run main.py`` named the service after FastAPI's own release."""
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "checkout-service"\nversion = "2.4.0"\n', encoding="utf8"
+    )
+    binaries = tmp_path / ".venv" / "bin"
+    binaries.mkdir(parents=True)
+    monkeypatch.setattr(
+        resource_module.sys, "argv", [str(binaries / "fastapi"), "run", "main.py"]
+    )
+    monkeypatch.setattr(
+        resource_module,
+        "distributions",
+        lambda: [_FakeDistribution("fastapi", "0.115.0", ("fastapi",))],
+    )
+
+    assert detect_service_metadata() == ("checkout-service", "2.4.0")
+
+
 def test_a_module_that_is_not_a_runner_still_names_itself(monkeypatch):
     monkeypatch.setattr(resource_module.sys, "orig_argv", [_PYTHON, "-m", "checkout"])
     monkeypatch.setattr(resource_module.sys, "argv", ["-m"])
@@ -351,6 +429,54 @@ def test_a_django_manage_script_supplies_no_fallback_name(monkeypatch):
     monkeypatch.setattr(resource_module.sys, "argv", ["/app/manage.py"])
 
     assert detect_fallback_service_name() is None
+
+
+@pytest.mark.parametrize("script", ["uvicorn.exe", "gunicorn.exe", "fastapi.exe"])
+def test_a_runner_installed_as_a_windows_executable_supplies_no_fallback_name(
+    monkeypatch, script
+):
+    """``uvicorn.exe`` used to become the service name, defeating the list."""
+    monkeypatch.setattr(resource_module.sys, "argv", [f"/opt/venv/Scripts/{script}"])
+
+    assert detect_fallback_service_name() is None
+
+
+def test_a_runner_installed_as_a_windows_executable_claims_no_distribution(monkeypatch):
+    """The ``.exe`` comes off before the runner check, or the scan matches uvicorn."""
+    monkeypatch.setattr(resource_module.sys, "argv", ["/opt/venv/Scripts/uvicorn.exe"])
+    monkeypatch.setattr(
+        resource_module,
+        "distributions",
+        lambda: [_FakeDistribution("uvicorn", "0.54.0", ("uvicorn",))],
+    )
+
+    assert distribution_of_running_program() is None
+
+
+def test_a_windows_console_script_still_names_the_distribution(monkeypatch):
+    """The entry point is declared as ``checkout``, so ``.exe`` has to come off."""
+    monkeypatch.setattr(resource_module.sys, "argv", ["/opt/venv/Scripts/checkout.exe"])
+    monkeypatch.setattr(
+        resource_module,
+        "distributions",
+        lambda: [_FakeDistribution("checkout-service", "2.4.0", ("checkout",))],
+    )
+
+    assert detect_service_metadata() == ("checkout-service", "2.4.0")
+
+
+def test_a_windowed_source_script_keeps_its_name_and_claims_no_distribution(
+    monkeypatch,
+):
+    monkeypatch.setattr(resource_module.sys, "argv", ["/opt/app/server.pyw"])
+    monkeypatch.setattr(
+        resource_module,
+        "distributions",
+        lambda: [_FakeDistribution("server", "1.0.0", ("server",))],
+    )
+
+    assert detect_fallback_service_name() == "server"
+    assert distribution_of_running_program() is None
 
 
 def test_a_generic_runner_leaves_the_service_name_unset(monkeypatch):

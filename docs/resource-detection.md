@@ -62,6 +62,9 @@ Steps 3 and 4 also supply `service.version`, from `Version` and `[project].versi
 Steps 1, 2 and 5 do not.
 No version is ever invented, because an absent version is more useful than a wrong one.
 Steps 3 and 5 both decline to name a generic runner, so a process launched by one can finish with no detected name at all.
+A `.py`, `.pyw` or `.exe` suffix comes off the basename before step 5 reports it and before the runner check reads it.
+A console script installed on Windows as `uvicorn.exe` is therefore recognised as the runner `uvicorn`.
+The `.exe` comes off before step 3 reads the name too, since `pip` installs the console script as `uvicorn.exe` while the `console_scripts` entry point is declared as `uvicorn`.
 
 **How the installed distribution is identified.**
 A process started by a console script is owned by the distribution that declared that script, which is the common shape of a `pip install .` deployment.
@@ -82,6 +85,10 @@ This step needs `tomllib` and is therefore skipped on Python 3.10, which predate
 **Generic runners are skipped.**
 A console script such as `gunicorn`, `uvicorn`, `celery` or `flask` launches someone else's application, so its name describes the launcher and its version describes the launcher's release.
 Running `gunicorn myapp:app` therefore does not report `service.name=gunicorn`, and never reports `gunicorn`'s version as `service.version`.
+`fastapi`, `quart`, `litestar`, `sanic`, `gradio`, `streamlit`, `scrapy`, `airflow`, `apache-airflow`, `uwsgi`, `chalice`, `pserve`, `twist`, `twistd`, `dagster` and `prefect` are skipped for the same reason, since each one runs the customer's own code in its own process.
+`airflow`, `apache-airflow`, `dagster` and `prefect` also carry subcommands that serve the product's own API, such as `airflow api-server` and `prefect server start`.
+One console script covers both kinds of subcommand, so the skip applies to both, and a deployment of Airflow, Dagster or Prefect itself reports `unknown_service:<executable>` until you set `OTEL_SERVICE_NAME`.
+`mlflow` is not skipped, because no `mlflow` subcommand runs the customer's code in the `mlflow` process: `mlflow run` and `mlflow models serve` start child processes, and `mlflow server` serves MLflow's own API.
 A runner started as a module is skipped too, so `python -m gunicorn` and `python -m flask run` behave the same way, matched on the top-level package so that `python -m flask.cli` is also covered.
 Detection falls through to `pyproject.toml`, which still finds the application when the virtual environment sits inside the project directory.
 When that finds nothing either, no name is reported and the SDK's own default stands, `unknown_service:<executable>` such as `unknown_service:python3`, because an honest absence is easier to act on than a name that every deployment shares.

@@ -62,9 +62,9 @@ from opentelemetry._proto._pyprotobuf.fields import (
 from opentelemetry._proto._pyprotobuf import encode_tag
 
 
-def _sfixed64(field: int, value: int) -> bytes:
+def _sfixed64(field: int, value: int | None) -> bytes:
     """sfixed64 field (little-endian signed 64-bit int)."""
-    if value == 0:
+    if value is None or value == 0:
         return b""
     return encode_tag(field, WT_64BIT) + pack("<q", int(value))
 

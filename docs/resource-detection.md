@@ -34,8 +34,8 @@ cgroup v1 is tried first; cgroup v2 is the fallback.
 Both standard cgroup path formats and Kubernetes slice naming conventions are handled.
 
 Both files are decoded with `errors="replace"`, so bytes that are not valid UTF-8 in a mount path no longer stop detection.
-Only a path segment that is a lowercase hyphenated UUID is accepted as a pod UID, so a malformed segment is skipped and the search carries on.
-A pod whose UID is not in that form reports no `k8s.pod.uid`.
+A path segment is accepted as a pod UID only when it is a lowercase hyphenated UUID, or the 32 hexadecimal characters the kubelet assigns to a static pod whose manifest carries no `metadata.uid`.
+Any other segment is skipped and the search carries on.
 
 The first accepted UUID in the file wins, and the detector has no way to tell which pod it belongs to.
 A container that can see other pods' mounts, such as a DaemonSet that mounts `/var/lib/kubelet`, can therefore report another pod's UID.

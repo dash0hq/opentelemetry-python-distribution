@@ -93,7 +93,9 @@ _POD_UID_IN_CGROUP = re.compile(
     r"^[a-z_-]*pod(?P<uid>[0-9a-f]{8}[-_][0-9a-f]{4}[-_][0-9a-f]{4}"
     r"[-_][0-9a-f]{4}[-_][0-9a-f]{12})\.slice$"
 )
-_POD_UID_PATTERN = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+_POD_UID_PATTERN = (
+    r"(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[0-9a-f]{32})"
+)
 _POD_UID_EXACT = re.compile(_POD_UID_PATTERN)
 _POD_UID_IN_MOUNTINFO = re.compile(
     rf".{re.escape(_POD_MOUNT_MARKER)}(?P<uid>{_POD_UID_PATTERN})(?![0-9a-f-])"
@@ -158,8 +160,7 @@ def pod_uid_from_cgroup_v2():
         if len(segments) <= 2:
             continue
         penultimate = segments[-2]
-        expected_length = _POD_UID_LEN + len(_POD_LABEL)
-        if penultimate.startswith(_POD_LABEL) and len(penultimate) == expected_length:
+        if penultimate.startswith(_POD_LABEL):
             candidate = penultimate[len(_POD_LABEL) :]
             if _POD_UID_EXACT.fullmatch(candidate):
                 return candidate

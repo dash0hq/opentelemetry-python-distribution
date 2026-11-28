@@ -14,6 +14,11 @@ subtext: |
   nothing at all, and an injected process deactivated the distribution on top
   of it.
 
+  A port that is not a number, as in ``http://collector:notaport``, cost the
+  same outage one step later: ``urlparse`` accepts the value and only reading
+  the port raises, so the exporter raised while the configurators loaded, again
+  before the instrumentors. The gate now reads the port too.
+
   Such a value is now treated the same way as an unset
   ``DASH0_OTEL_COLLECTOR_BASE_URL``: the SDK is turned off, a warning names the
   variable and the parse error, and startup continues.
